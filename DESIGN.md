@@ -30,9 +30,9 @@ The initial design should account for at least two consumer profiles.
 The coloring profile is tolerant.
 
 When the lexer encounters unknown or malformed syntax, it may return an
-`unknown` token, or another token that signals a lexing problem, and allow the
-consumer to decide how to display it. For example, a syntax colorer may choose
-to render such regions in a muted style or in red.
+`unknown` token and allow the consumer to decide how to display it. For
+example, a syntax colorer may choose to render such regions in a muted style or
+in red.
 
 The coloring profile also needs access to whitespace and comments. These are
 important parts of the source text for highlighting and presentation, even when
@@ -87,6 +87,22 @@ Whitespace and comments are first-class lexical categories in the design.
 They should be recognized by the reusable core lexer, even when some consumers
 later choose to suppress them.
 
+In some languages, the specification's own token model may not treat comments
+as ordinary tokens. Even in such cases, the library may still include explicit
+comment items in its reusable token stream model when that improves support for
+consumers such as syntax colorers, documentation tools, and other
+presentation-oriented applications.
+
+This means the design should distinguish between:
+
+- a specification-grounded raw token model
+- the library's reusable token stream model
+
+The reusable token stream model may extend the raw token model with retained
+trivia such as comments, and with recoverable error items such as `unknown`,
+while still preserving a clear connection to the underlying language
+specification.
+
 The design should support caller-configurable trivia retention. At a minimum,
 the policy should allow consumers to choose whether trivia is:
 
@@ -108,18 +124,89 @@ profiles or parameters determine how failures are reported.
 
 In particular:
 
-- a coloring-oriented profile may emit an `unknown` token or similar error-style
-  token and continue
+- a coloring-oriented profile may emit an `unknown` token and continue
 - a compiler-oriented profile should raise a lexical error
+
+At the library level, recoverable `unknown` items should be treated as part of
+the reusable token stream model rather than as part of the
+specification-grounded raw token model.
 
 This distinction is important because syntax coloring can remain useful even
 when the source text is incomplete or temporarily invalid, while a compiler
 must reject invalid input.
 
+## Token Vocabulary
+
+The library design should distinguish between common token categories and
+language-specific token categories.
+
+Common token categories provide a shared vocabulary across lexers. They are
+useful for generic consumers such as syntax colorers, token inspectors, and
+testing utilities.
+
+The standardized consumer-facing projection vocabulary should initially
+include:
+
+- whitespace
+- comment
+- identifier
+- keyword
+- operator
+- delimiter
+- literal
+- unknown
+
+These common names are intended as shared design guidance, not as a claim that
+every language will use every category in exactly the same way.
+
+At the reusable token stream boundary, the categories `whitespace`,
+`comment`, and `unknown` should be treated as especially important common
+categories across languages.
+
+This standardized projection vocabulary is intentionally small. It does not
+currently include categories such as `function`, which may remain available in
+language-specific raw or derived layers until there is a clear cross-language
+need to standardize them.
+
+Individual language lexers should also be free to define language-specific
+token categories where that improves precision or usability. Examples might
+include tokens for particular numeric forms, string forms, interpolation
+markers, or domain-specific keywords.
+
+For some languages, the lexer may need to distinguish categories more precisely
+than a downstream consumer does. For example, a CSS lexer may wish to
+distinguish color literals from other literal forms.
+
+This suggests an additional design principle:
+
+- lexers may recognize precise internal or language-specific token categories
+- consumer-facing interfaces may project these precise categories into broader
+  external categories when compatibility requires it
+
+In particular, a lexer compatible with existing Racket color-lexer interfaces
+may map precise internal categories into the broader classes expected by those
+interfaces, while still preserving the more precise distinctions for other
+applications.
+
+The design should therefore support both:
+
+- a common vocabulary for broadly useful token classes
+- language-specific vocabulary for distinctions that matter only within a
+  particular lexer
+
+When a lexer retains trivia, whitespace and comments should use the common
+vocabulary unless a language-specific distinction is clearly needed.
+
+When a lexer is operating in a tolerant profile, unknown or malformed input
+should be represented using the common `unknown` category.
+
 ## Public Interface Direction
 
 The intended primary interface is a lexer procedure that consumes an input port
 and returns the next token-like value.
+
+The design should expose a core lexer constructor, such as `make-lexer`, that
+produces this port-based lexer procedure.
 
 Lexer construction, configuration, or invocation should support explicit
 behavior settings for at least:
@@ -128,8 +215,32 @@ behavior settings for at least:
 - trivia retention policy
 - optional source-position wrapping
 
+The preferred direction is that these settings are chosen when the lexer is
+constructed. The same settings should also be available through convenience
+interfaces such as `string->tokens`, which should internally use the same core
+lexer design.
+
+The design should include predefined profiles, such as `'coloring` and
+`'compiler`, that supply sensible defaults for these settings.
+
+Profiles should define defaults, while explicit options override those
+defaults. This makes the API predictable while still allowing specific tools to
+adjust behavior when needed.
+
+The language-specific lexical knowledge should remain fixed. Profiles and
+options should control reporting and token-retention behavior, not the lexical
+definition of the language itself.
+
 For parser-facing consumers, `parser-tools` compatibility should be the default
 external token contract.
+
+In addition to the primary port-based interface, the library should also
+provide a convenience function such as `string->tokens` for tokenizing an
+entire string without requiring callers to work with string ports directly.
+
+This convenience interface should be defined as a thin wrapper over the
+port-based lexer interface, so that it shares the same lexical behavior,
+profiles, and compatibility guarantees.
 
 ## Deferred Items
 

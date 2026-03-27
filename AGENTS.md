@@ -36,6 +36,9 @@ Coding guidelines for Racket code in `lexers`:
 
 17. Use `rackunit` for tests.
 18. For consecutive calls with the same callee and simple arguments, align argument columns to improve scanability.
+19. When an existing lexer is available in another library, use it as prior art,
+    but redesign from the language specification when needed so the result is a
+    reusable lexer rather than one tied to a single application.
 
 ## Packages
 
