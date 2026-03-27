@@ -65,6 +65,35 @@ Across languages, the projected lexer constructors return one-argument port
 readers. Create the lexer once, call it repeatedly on the same input port, and
 stop when the result is an end-of-file token.
 
+@subsection{Profiles}
+
+Both the CSS and JavaScript projected APIs currently support the same profile
+names:
+
+@itemlist[
+ @item{@racket['coloring]}
+ @item{@racket['compiler]}]
+
+The current defaults are:
+
+@tabular[#:sep @hspace[2]
+ (list (list @bold{Profile} @bold{Trivia} @bold{Source Positions} @bold{Malformed Input})
+       (list @racket['coloring] @racket['keep] @racket[#t] "emit unknown tokens")
+       (list @racket['compiler] @racket['skip] @racket[#t] "raise an exception"))]
+
+For the keyword arguments accepted by @racket[make-css-lexer],
+@racket[css-string->tokens], @racket[make-javascript-lexer], and
+@racket[javascript-string->tokens]:
+
+@itemlist[
+ @item{@racket[#:profile] selects the named default bundle.}
+ @item{@racket[#:trivia 'profile-default] means “use the trivia policy from the
+       selected profile”.}
+ @item{@racket[#:source-positions 'profile-default] means “use the
+       source-position setting from the selected profile”.}
+ @item{An explicit @racket[#:trivia] or @racket[#:source-positions] value
+       overrides the selected profile default.}]
+
 @section{CSS}
 
 @defmodule[lexers/css]
