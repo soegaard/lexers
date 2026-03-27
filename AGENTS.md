@@ -42,6 +42,11 @@ Coding guidelines for Racket code in `lexers`:
 20. When starting a lexer for a new language, begin with a deliberately small
     real-language subset in order to validate the shared architecture before
     expanding toward broader specification coverage.
+21. Keep `README.md` lightweight. Long-term public-facing documentation belongs
+    in `lexers-doc`.
+22. When generating local Scribble HTML output, place it outside the packages,
+    and use `+m`; for example:
+    `raco scribble +m --htmls --dest html/ lexers-doc/lexers.scrbl`.
 
 ## Packages
 
