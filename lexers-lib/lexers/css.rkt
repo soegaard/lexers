@@ -115,8 +115,12 @@
     (css-string->tokens "rgb(10 20 30)" #:profile 'coloring))
   (define url-tokens
     (css-string->tokens "url(foo.png)" #:profile 'coloring))
+  (define quoted-url-tokens
+    (css-string->tokens "url(\"foo.png\")" #:profile 'coloring #:source-positions #f))
   (define bad-url-tokens
     (css-string->tokens "url(foo.png" #:profile 'coloring))
+  (define spaced-bad-url-tokens
+    (css-string->tokens "url(foo bar)" #:profile 'coloring))
   (define escaped-url-paren-tokens
     (css-string->tokens "url(foo\\)bar)" #:profile 'coloring))
   (define bad-string-tokens
@@ -187,7 +191,12 @@
   (check-equal? (stream-token-name (car compiler-tokens)) 'identifier)
   (check-equal? (stream-token-name (car function-tokens)) 'literal)
   (check-equal? (stream-token-name (car url-tokens)) 'literal)
+  (check-equal? (stream-token-name (car quoted-url-tokens)) 'literal)
+  (check-equal? (stream-token-value (car quoted-url-tokens)) "url")
+  (check-equal? (stream-token-name (cadr quoted-url-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (cadr quoted-url-tokens)) "(")
   (check-equal? (stream-token-name (car bad-url-tokens)) 'unknown)
+  (check-equal? (stream-token-name (car spaced-bad-url-tokens)) 'unknown)
   (check-equal? (stream-token-name (car escaped-url-paren-tokens)) 'literal)
   (check-equal? (stream-token-value (car escaped-url-paren-tokens)) "url(foo\\)bar)")
   (check-equal? (stream-token-name (car bad-string-tokens)) 'unknown)
@@ -234,6 +243,9 @@
   (check-exn exn:fail:read?
              (lambda ()
                (css-string->tokens "url(foo.png" #:profile 'compiler)))
+  (check-exn exn:fail:read?
+             (lambda ()
+               (css-string->tokens "url(foo bar)" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
   (check-not-false (css-derived-token-has-tag? derived-function-token 'color-function))

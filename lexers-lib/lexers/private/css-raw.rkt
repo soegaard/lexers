@@ -292,23 +292,31 @@
          [(char=? next #\newline)  (values (get-output-string out) #f)]
          [else                     (loop #f)])])))
 
-;; read-url-tail! : input-port? -> (values string? boolean?)
-;;   Consume the remainder of a simple url(...) form, reporting whether a
-;;   closing parenthesis was found.
+;; read-url-tail! : input-port? -> (values string? boolean? boolean?)
+;;   Consume the remainder of a simplified bare url(...) form, reporting
+;;   whether a closing parenthesis was found and whether malformed content was
+;;   seen along the way.
 (define (read-url-tail! in)
   (define out (open-output-string))
-  (let loop ([escaped? #f])
+  (let loop ([escaped? #f]
+             [malformed? #f])
     (define next (read-char in))
     (cond
       [(eof-object? next)
-       (values (get-output-string out) #f)]
+       (values (get-output-string out) #f malformed?)]
       [else
        (write-char next out)
        (cond
-         [escaped?          (loop #f)]
-         [(char=? next #\\) (loop #t)]
-         [(char=? next #\)) (values (get-output-string out) #t)]
-         [else              (loop #f)])])))
+         [escaped?                 (loop #f malformed?)]
+         [(char=? next #\\)        (loop #t malformed?)]
+         [(char=? next #\))        (values (get-output-string out) #t malformed?)]
+         [(or (char=? next #\")
+              (char=? next #\')
+              (char=? next #\newline)
+              (char-whitespace? next))
+          (loop #f #t)]
+         [else
+          (loop #f malformed?)])])))
 
 ;; read-number-literal! : input-port? -> string?
 ;;   Consume a small numeric literal subset for the scaffold.
@@ -457,17 +465,28 @@
      (define maybe-function?
        (and (char? after-ident)
             (char=? after-ident start-paren)))
-     (cond
-       [(and maybe-function?
-             (string-ci=? text "url"))
-        (read-char in)
-        (define-values (tail terminated?) (read-url-tail! in))
-        (raw-token in
-                   start-pos
-                   (if terminated?
-                       'url-token
-                       'bad-url-token)
-                   (string-append text "(" tail))]
+       (cond
+         [(and maybe-function?
+               (string-ci=? text "url"))
+        (define after-open-paren (peek-char in 1))
+        (cond
+          [(and (char? after-open-paren)
+                (or (char=? after-open-paren #\")
+                    (char=? after-open-paren #\')))
+           (raw-token in
+                      start-pos
+                      'function-token
+                      text)]
+          [else
+           (read-char in)
+           (define-values (tail terminated? malformed?) (read-url-tail! in))
+           (raw-token in
+                      start-pos
+                      (if (and terminated?
+                               (not malformed?))
+                          'url-token
+                          'bad-url-token)
+                      (string-append text "(" tail))])]
        [else
         (raw-token in
                    start-pos
