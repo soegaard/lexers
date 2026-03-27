@@ -12,8 +12,16 @@
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
 ;; css-derived-token? : any/c -> boolean?
 ;;   Recognize a derived CSS token value returned by the derived-token API.
+;; css-derived-token-tags : css-derived-token? -> (listof symbol?)
+;;   Extract the CSS-specific classification tags for one derived token.
 ;; css-derived-token-has-tag? : css-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived CSS token has a given classification tag.
+;; css-derived-token-text : css-derived-token? -> string?
+;;   Extract the source text corresponding to one derived CSS token.
+;; css-derived-token-start : css-derived-token? -> position?
+;;   Extract the starting source position for one derived CSS token.
+;; css-derived-token-end : css-derived-token? -> position?
+;;   Extract the ending source position for one derived CSS token.
 ;; css-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire CSS string using the CSS lexer.
 ;; css-string->derived-tokens : string? -> (listof css-derived-token?)
@@ -24,7 +32,11 @@
 (provide make-css-lexer
          make-css-derived-lexer
          css-derived-token?
+         css-derived-token-tags
          css-derived-token-has-tag?
+         css-derived-token-text
+         css-derived-token-start
+         css-derived-token-end
          css-string->tokens
          css-string->derived-tokens
          css-profiles)
@@ -33,6 +45,8 @@
          "private/config.rkt"
          (rename-in "private/css-derived.rkt"
                     [css-derived-token? private-css-derived-token?]
+                    [css-derived-token-raw private-css-derived-token-raw]
+                    [css-derived-token-tags private-css-derived-token-tags]
                     [css-derived-token-has-tag? private-css-derived-token-has-tag?])
          "private/css-raw.rkt"
          "private/css-tokenize.rkt"
@@ -45,10 +59,30 @@
 (define (css-derived-token? v)
   (private-css-derived-token? v))
 
+;; css-derived-token-tags : css-derived-token? -> (listof symbol?)
+;;   Extract the CSS-specific classification tags for one derived token.
+(define (css-derived-token-tags token)
+  (private-css-derived-token-tags token))
+
 ;; css-derived-token-has-tag? : css-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived CSS token has a given classification tag.
 (define (css-derived-token-has-tag? token tag)
   (private-css-derived-token-has-tag? token tag))
+
+;; css-derived-token-text : css-derived-token? -> string?
+;;   Extract the source text corresponding to one derived CSS token.
+(define (css-derived-token-text token)
+  (css-raw-token-text (private-css-derived-token-raw token)))
+
+;; css-derived-token-start : css-derived-token? -> position?
+;;   Extract the starting source position for one derived CSS token.
+(define (css-derived-token-start token)
+  (css-raw-token-start (private-css-derived-token-raw token)))
+
+;; css-derived-token-end : css-derived-token? -> position?
+;;   Extract the ending source position for one derived CSS token.
+(define (css-derived-token-end token)
+  (css-raw-token-end (private-css-derived-token-raw token)))
 
 ;; make-css-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based CSS lexer.
@@ -181,7 +215,7 @@
     (find-derived-token 'custom-property-name))
   (define derived-non-color-hash-token
     (findf (lambda (token)
-             (string=? (css-raw-token-text (css-derived-token-raw token))
+             (string=? (css-derived-token-text token)
                        "#main"))
            derived-tokens))
 
@@ -248,6 +282,14 @@
                (css-string->tokens "url(foo bar)" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
+  (check-equal? (css-derived-token-tags derived-color-token)
+                '(color-literal))
+  (check-equal? (css-derived-token-text derived-color-token)
+                "#fff")
+  (check-equal? (position-offset (css-derived-token-start derived-color-token))
+                1)
+  (check-equal? (position-offset (css-derived-token-end derived-color-token))
+                5)
   (check-not-false (css-derived-token-has-tag? derived-function-token 'color-function))
   (check-not-false (css-derived-token-has-tag? derived-custom-property-token 'custom-property-name))
   (check-not-false derived-non-color-hash-token)

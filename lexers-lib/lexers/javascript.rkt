@@ -12,8 +12,16 @@
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
 ;; javascript-derived-token? : any/c -> boolean?
 ;;   Recognize a derived JavaScript token value returned by the derived-token API.
+;; javascript-derived-token-tags : javascript-derived-token? -> (listof symbol?)
+;;   Extract the JavaScript-specific classification tags for one derived token.
 ;; javascript-derived-token-has-tag? : javascript-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived JavaScript token has a given classification tag.
+;; javascript-derived-token-text : javascript-derived-token? -> string?
+;;   Extract the source text corresponding to one derived JavaScript token.
+;; javascript-derived-token-start : javascript-derived-token? -> position?
+;;   Extract the starting source position for one derived JavaScript token.
+;; javascript-derived-token-end : javascript-derived-token? -> position?
+;;   Extract the ending source position for one derived JavaScript token.
 ;; javascript-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire JavaScript string using the JavaScript lexer.
 ;; javascript-string->derived-tokens : string? -> (listof javascript-derived-token?)
@@ -24,7 +32,11 @@
 (provide make-javascript-lexer
          make-javascript-derived-lexer
          javascript-derived-token?
+         javascript-derived-token-tags
          javascript-derived-token-has-tag?
+         javascript-derived-token-text
+         javascript-derived-token-start
+         javascript-derived-token-end
          javascript-string->tokens
          javascript-string->derived-tokens
          javascript-profiles)
@@ -33,6 +45,8 @@
          "private/config.rkt"
          (rename-in "private/javascript-derived.rkt"
                     [javascript-derived-token? private-javascript-derived-token?]
+                    [javascript-derived-token-raw private-javascript-derived-token-raw]
+                    [javascript-derived-token-tags private-javascript-derived-token-tags]
                     [javascript-derived-token-has-tag? private-javascript-derived-token-has-tag?])
          "private/javascript-raw.rkt"
          "private/javascript-tokenize.rkt"
@@ -45,10 +59,30 @@
 (define (javascript-derived-token? v)
   (private-javascript-derived-token? v))
 
+;; javascript-derived-token-tags : javascript-derived-token? -> (listof symbol?)
+;;   Extract the JavaScript-specific classification tags for one derived token.
+(define (javascript-derived-token-tags token)
+  (private-javascript-derived-token-tags token))
+
 ;; javascript-derived-token-has-tag? : javascript-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived JavaScript token has a given classification tag.
 (define (javascript-derived-token-has-tag? token tag)
   (private-javascript-derived-token-has-tag? token tag))
+
+;; javascript-derived-token-text : javascript-derived-token? -> string?
+;;   Extract the source text corresponding to one derived JavaScript token.
+(define (javascript-derived-token-text token)
+  (javascript-raw-token-text (private-javascript-derived-token-raw token)))
+
+;; javascript-derived-token-start : javascript-derived-token? -> position?
+;;   Extract the starting source position for one derived JavaScript token.
+(define (javascript-derived-token-start token)
+  (javascript-raw-token-start (private-javascript-derived-token-raw token)))
+
+;; javascript-derived-token-end : javascript-derived-token? -> position?
+;;   Extract the ending source position for one derived JavaScript token.
+(define (javascript-derived-token-end token)
+  (javascript-raw-token-end (private-javascript-derived-token-raw token)))
 
 ;; make-javascript-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based JavaScript lexer.
@@ -155,5 +189,13 @@
                (javascript-string->tokens "\"unterminated" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "const")) 'eof))
   (check-not-false (javascript-derived-token-has-tag? derived-keyword-token 'keyword))
+  (check-equal? (javascript-derived-token-tags derived-keyword-token)
+                '(keyword))
+  (check-equal? (javascript-derived-token-text derived-keyword-token)
+                "const")
+  (check-equal? (position-offset (javascript-derived-token-start derived-keyword-token))
+                1)
+  (check-equal? (position-offset (javascript-derived-token-end derived-keyword-token))
+                6)
   (check-not-false (javascript-derived-token-has-tag? derived-identifier-token 'identifier))
   (check-not-false (javascript-derived-token-has-tag? derived-number-token 'numeric-literal)))

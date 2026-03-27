@@ -293,10 +293,26 @@ returns @racket['eof], and returns the resulting list of derived tokens.}
 Recognizes derived CSS token values returned by
 @racket[make-css-derived-lexer] and @racket[css-string->derived-tokens].}
 
+@defproc[(css-derived-token-tags [token css-derived-token?])
+         (listof symbol?)]{
+Returns the CSS-specific classification tags attached to a derived CSS token.}
+
 @defproc[(css-derived-token-has-tag? [token css-derived-token?]
                                      [tag symbol?])
          boolean?]{
 Determines whether a derived CSS token carries a given classification tag.}
+
+@defproc[(css-derived-token-text [token css-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived CSS token.}
+
+@defproc[(css-derived-token-start [token css-derived-token?])
+         position?]{
+Returns the starting source position for a derived CSS token.}
+
+@defproc[(css-derived-token-end [token css-derived-token?])
+         position?]{
+Returns the ending source position for a derived CSS token.}
 
 @subsection{CSS Derived Tokens}
 
@@ -320,7 +336,9 @@ The current CSS scaffold may attach tags such as:
 (define derived-tokens
   (css-string->derived-tokens "#fff rgb( --brand-color 12px"))
 (map (lambda (token)
-       (list (css-derived-token-has-tag? token 'color-literal)
+       (list (css-derived-token-text token)
+             (css-derived-token-tags token)
+             (css-derived-token-has-tag? token 'color-literal)
              (css-derived-token-has-tag? token 'color-function)
              (css-derived-token-has-tag? token 'custom-property-name)
              (css-derived-token-has-tag? token 'length-dimension)))
@@ -489,11 +507,28 @@ Recognizes derived JavaScript token values returned by
 @racket[make-javascript-derived-lexer] and
 @racket[javascript-string->derived-tokens].}
 
+@defproc[(javascript-derived-token-tags [token javascript-derived-token?])
+         (listof symbol?)]{
+Returns the JavaScript-specific classification tags attached to a derived
+JavaScript token.}
+
 @defproc[(javascript-derived-token-has-tag? [token javascript-derived-token?]
                                             [tag symbol?])
          boolean?]{
 Determines whether a derived JavaScript token carries a given classification
 tag.}
+
+@defproc[(javascript-derived-token-text [token javascript-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived JavaScript token.}
+
+@defproc[(javascript-derived-token-start [token javascript-derived-token?])
+         position?]{
+Returns the starting source position for a derived JavaScript token.}
+
+@defproc[(javascript-derived-token-end [token javascript-derived-token?])
+         position?]{
+Returns the ending source position for a derived JavaScript token.}
 
 @subsection{JavaScript Derived Tokens}
 
@@ -516,7 +551,9 @@ The current JavaScript scaffold may attach tags such as:
 (define derived-tokens
   (javascript-string->derived-tokens "const name = 1"))
 (map (lambda (token)
-       (list (javascript-derived-token-has-tag? token 'keyword)
+       (list (javascript-derived-token-text token)
+             (javascript-derived-token-tags token)
+             (javascript-derived-token-has-tag? token 'keyword)
              (javascript-derived-token-has-tag? token 'identifier)
              (javascript-derived-token-has-tag? token 'numeric-literal)))
      derived-tokens)
