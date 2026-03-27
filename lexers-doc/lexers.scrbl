@@ -10,12 +10,14 @@
 @(define css-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
+                         parser-tools/lex
                          lexers/css))
      the-eval))
 
 @(define javascript-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
+                         parser-tools/lex
                          lexers/javascript))
      the-eval))
 
@@ -52,6 +54,10 @@ The current profile split is:
        recoverable malformed input, and includes source positions by default.}
  @item{@racket['compiler] --- skips trivia by default, raises on malformed
        input, and includes source positions by default.}]
+
+Across languages, the projected lexer constructors return one-argument port
+readers. Create the lexer once, call it repeatedly on the same input port, and
+stop when the result is an end-of-file token.
 
 @section{CSS}
 
@@ -106,6 +112,51 @@ Tokenizes an entire CSS string using the projected token API.
 This is a convenience wrapper over @racket[make-css-lexer]. It opens a string
 port, enables line counting, repeatedly calls the port-based lexer until
 end-of-file, and returns the resulting token list.}
+
+@subsection{CSS Returned Tokens}
+
+The projected CSS API returns values in the same general shape as
+@racketmodname[parser-tools/lex]:
+
+@itemlist[
+ @item{The end of input is reported as @racket['eof], either directly or inside
+       a @racket[position-token?].}
+ @item{Most ordinary results are @racket[token?] values whose
+       @racket[token-name] is a projected category and whose
+       @racket[token-value] contains language-specific text or metadata.}
+ @item{When @racket[#:source-positions] is true, each result is wrapped in a
+       @racket[position-token?].}
+ @item{When @racket[#:source-positions] is false, results are returned without
+       that outer wrapper.}]
+
+Common projected CSS categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+In @racket['coloring] mode, whitespace and comments are kept, and recoverable
+malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
+whitespace and comments are skipped by default, and malformed input raises an
+exception instead of producing an @racket['unknown] token.
+
+@examples[#:eval css-eval
+(define inspect-lexer
+  (make-css-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "color: #fff;"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(position-token? first-token)
+(token-name (position-token-token first-token))
+(token-value (position-token-token first-token))
+]}
 
 @defproc[(make-css-derived-lexer)
          (input-port? . -> . (or/c 'eof css-derived-token?))]{
@@ -203,6 +254,52 @@ Tokenizes an entire JavaScript string using the projected token API.
 This is a convenience wrapper over @racket[make-javascript-lexer]. It opens a
 string port, enables line counting, repeatedly calls the port-based lexer until
 end-of-file, and returns the resulting token list.}
+
+@subsection{JavaScript Returned Tokens}
+
+The projected JavaScript API uses the same output shape:
+
+@itemlist[
+ @item{The end of input is reported as @racket['eof], either directly or inside
+       a @racket[position-token?].}
+ @item{Ordinary results are usually @racket[token?] values whose
+       @racket[token-name] is a projected category and whose
+       @racket[token-value] contains language-specific text or metadata.}
+ @item{When @racket[#:source-positions] is true, each result is wrapped in a
+       @racket[position-token?].}
+ @item{When @racket[#:source-positions] is false, results are returned without
+       that outer wrapper.}]
+
+Common projected JavaScript categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['keyword]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['operator]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+In @racket['coloring] mode, whitespace and comments are kept, and recoverable
+malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
+whitespace and comments are skipped by default, and malformed input raises an
+exception instead of producing an @racket['unknown] token.
+
+@examples[#:eval javascript-eval
+(define inspect-lexer
+  (make-javascript-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "const x = 1;"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(position-token? first-token)
+(token-name (position-token-token first-token))
+(token-value (position-token-token first-token))
+]}
 
 @defproc[(make-javascript-derived-lexer)
          (input-port? . -> . (or/c 'eof javascript-derived-token?))]{
