@@ -10,6 +10,8 @@
 ;;   Construct a port-based JavaScript lexer.
 ;; make-javascript-derived-lexer : -> (input-port? -> (or/c javascript-derived-token? 'eof))
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
+;; javascript-derived-token? : any/c -> boolean?
+;;   Recognize a derived JavaScript token value returned by the derived-token API.
 ;; javascript-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire JavaScript string using the JavaScript lexer.
 ;; javascript-string->derived-tokens : string? -> (listof javascript-derived-token?)
@@ -19,18 +21,25 @@
 
 (provide make-javascript-lexer
          make-javascript-derived-lexer
+         javascript-derived-token?
          javascript-string->tokens
          javascript-string->derived-tokens
          javascript-profiles)
 
 (require parser-tools/lex
          "private/config.rkt"
-         "private/javascript-derived.rkt"
+         (rename-in "private/javascript-derived.rkt"
+                    [javascript-derived-token? private-javascript-derived-token?])
          "private/javascript-raw.rkt"
          "private/javascript-tokenize.rkt"
          "private/parser-tools-compat.rkt")
 
 (define javascript-profiles javascript-profile-defaults)
+
+;; javascript-derived-token? : any/c -> boolean?
+;;   Recognize a derived JavaScript token value returned by the derived-token API.
+(define (javascript-derived-token? v)
+  (private-javascript-derived-token? v))
 
 ;; make-javascript-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based JavaScript lexer.

@@ -10,6 +10,8 @@
 ;;   Construct a port-based CSS lexer.
 ;; make-css-derived-lexer : -> (input-port? -> (or/c css-derived-token? 'eof))
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
+;; css-derived-token? : any/c -> boolean?
+;;   Recognize a derived CSS token value returned by the derived-token API.
 ;; css-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire CSS string using the CSS lexer.
 ;; css-string->derived-tokens : string? -> (listof css-derived-token?)
@@ -19,18 +21,25 @@
 
 (provide make-css-lexer
          make-css-derived-lexer
+         css-derived-token?
          css-string->tokens
          css-string->derived-tokens
          css-profiles)
 
 (require parser-tools/lex
          "private/config.rkt"
-         "private/css-derived.rkt"
+         (rename-in "private/css-derived.rkt"
+                    [css-derived-token? private-css-derived-token?])
          "private/css-raw.rkt"
          "private/css-tokenize.rkt"
          "private/parser-tools-compat.rkt")
 
 (define css-profiles css-profile-defaults)
+
+;; css-derived-token? : any/c -> boolean?
+;;   Recognize a derived CSS token value returned by the derived-token API.
+(define (css-derived-token? v)
+  (private-css-derived-token? v))
 
 ;; make-css-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based CSS lexer.

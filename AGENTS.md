@@ -47,6 +47,10 @@ Coding guidelines for Racket code in `lexers`:
 22. When generating local Scribble HTML output, place it outside the packages,
     and use `+m`; for example:
     `raco scribble +m --htmls --dest html/ lexers-doc/lexers.scrbl`.
+23. In documentation, prefer explicit input and output types over a plain
+    `procedure?`.
+24. In documentation, prefer precise types over broad placeholders such as
+    `any/c`.
 
 ## Packages
 
