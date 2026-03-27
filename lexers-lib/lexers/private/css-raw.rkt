@@ -134,6 +134,22 @@
          [(char=? next quote-char) (values (get-output-string out) #t)]
          [else                     (loop #f)])])))
 
+;; read-url-tail! : input-port? -> (values string? boolean?)
+;;   Consume the remainder of a simple url(...) form, reporting whether a
+;;   closing parenthesis was found.
+(define (read-url-tail! in)
+  (define out (open-output-string))
+  (let loop ()
+    (define next (read-char in))
+    (cond
+      [(eof-object? next)
+       (values (get-output-string out) #f)]
+      [else
+       (write-char next out)
+       (cond
+         [(char=? next #\)) (values (get-output-string out) #t)]
+         [else              (loop)])])))
+
 ;; read-number-literal! : input-port? -> string?
 ;;   Consume a small numeric literal subset for the scaffold.
 (define (read-number-literal! in)
@@ -236,12 +252,24 @@
      (define maybe-function?
        (and (char? after-ident)
             (char=? after-ident start-paren)))
-     (raw-token in
-                start-pos
-                (if maybe-function?
-                    'function-token
-                    'ident-token)
-                text)]
+     (cond
+       [(and maybe-function?
+             (string-ci=? text "url"))
+        (read-char in)
+        (define-values (tail terminated?) (read-url-tail! in))
+        (raw-token in
+                   start-pos
+                   (if terminated?
+                       'url-token
+                       'bad-url-token)
+                   (string-append text "(" tail))]
+       [else
+        (raw-token in
+                   start-pos
+                   (if maybe-function?
+                       'function-token
+                       'ident-token)
+                   text)])]
     [(and (char? next)
           (delimiter-token-kind next))
      (define ch (read-char in))
@@ -250,4 +278,4 @@
                 (delimiter-token-kind ch)
                 (string ch))]
     [else
-     (raw-token in start-pos 'unknown-raw-token (string (read-char in)))]))
+     (raw-token in start-pos 'delim-token (string (read-char in)))]))

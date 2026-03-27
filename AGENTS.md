@@ -39,6 +39,9 @@ Coding guidelines for Racket code in `lexers`:
 19. When an existing lexer is available in another library, use it as prior art,
     but redesign from the language specification when needed so the result is a
     reusable lexer rather than one tied to a single application.
+20. When starting a lexer for a new language, begin with a deliberately small
+    real-language subset in order to validate the shared architecture before
+    expanding toward broader specification coverage.
 
 ## Packages
 

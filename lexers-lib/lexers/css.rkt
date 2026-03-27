@@ -95,6 +95,10 @@
     (css-string->tokens "/* c */ color: #fff;" #:profile 'compiler))
   (define function-tokens
     (css-string->tokens "rgb(10 20 30)" #:profile 'coloring))
+  (define url-tokens
+    (css-string->tokens "url(foo.png)" #:profile 'coloring))
+  (define bad-url-tokens
+    (css-string->tokens "url(foo.png" #:profile 'coloring))
   (define bad-string-tokens
     (css-string->tokens "\"unterminated" #:profile 'coloring))
   (define no-position-tokens
@@ -103,6 +107,8 @@
     (css-string->tokens "   color" #:profile 'compiler))
   (define coloring-with-trivia-tokens
     (css-string->tokens "   color" #:profile 'coloring))
+  (define delim-tokens
+    (css-string->tokens "~" #:profile 'compiler))
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
@@ -123,13 +129,19 @@
   (check-equal? (stream-token-name (car coloring-tokens)) 'comment)
   (check-equal? (stream-token-name (car compiler-tokens)) 'identifier)
   (check-equal? (stream-token-name (car function-tokens)) 'literal)
+  (check-equal? (stream-token-name (car url-tokens)) 'literal)
+  (check-equal? (stream-token-name (car bad-url-tokens)) 'unknown)
   (check-equal? (stream-token-name (car bad-string-tokens)) 'unknown)
   (check-false (position-token? (car no-position-tokens)))
   (check-equal? (stream-token-name (car compiler-no-trivia-tokens)) 'identifier)
   (check-equal? (stream-token-name (car coloring-with-trivia-tokens)) 'whitespace)
+  (check-equal? (stream-token-name (car delim-tokens)) 'delimiter)
   (check-exn exn:fail:read?
              (lambda ()
-               (css-string->tokens "~" #:profile 'compiler)))
+               (css-string->tokens "\"unterminated" #:profile 'compiler)))
+  (check-exn exn:fail:read?
+             (lambda ()
+               (css-string->tokens "url(foo.png" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
   (check-equal? (length derived-tokens) 6)
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))

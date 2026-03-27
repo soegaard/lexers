@@ -36,6 +36,8 @@
       bad-string-token
       function-token
       hash-token
+      url-token
+      bad-url-token
       number-token
       percentage-token
       dimension-token)   stream-category-literal]
@@ -47,7 +49,8 @@
       close-bracket-token
       colon-token
       semicolon-token
-      comma-token)       stream-category-delimiter]
+      comma-token
+      delim-token)       stream-category-delimiter]
     [(unknown-raw-token) stream-category-unknown]
     [else                stream-category-unknown]))
 
@@ -77,9 +80,9 @@
                        (make-stream-position 1 1 0)
                        (css-config-source-positions config)))
 
-;; unknown-raw-token->result : css-raw-token? css-config? -> token-like?
-;;   Project unknown raw input or raise in strict mode.
-(define (unknown-raw-token->result raw-token config)
+;; malformed-token->result : css-raw-token? css-config? -> token-like?
+;;   Project malformed raw input or raise in strict mode.
+(define (malformed-token->result raw-token config)
   (case (css-config-errors config)
     [(emit-unknown)
      (wrap-token-with-pos
@@ -123,11 +126,15 @@
 ;; project-css-raw-token : (or/c css-raw-token? 'eof) css-config? -> token-like?
 ;;   Convert a raw CSS token into a reusable-stream token-like value.
 (define (project-css-raw-token raw-token config)
+  (define derived-token
+    (and (not (eq? raw-token 'eof))
+         (derive-css-token raw-token)))
   (cond
     [(eq? raw-token 'eof)
      (raw-eof->token config)]
-    [(eq? (css-raw-token-kind raw-token) 'unknown-raw-token)
-     (unknown-raw-token->result raw-token config)]
+    [(and derived-token
+          (css-derived-token-has-tag? derived-token 'malformed-token))
+     (malformed-token->result raw-token config)]
     [(visible-raw-token? raw-token config)
      (plain-raw-token->result raw-token config)]
     [else

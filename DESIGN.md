@@ -200,6 +200,25 @@ vocabulary unless a language-specific distinction is clearly needed.
 When a lexer is operating in a tolerant profile, unknown or malformed input
 should be represented using the common `unknown` category.
 
+## Language Versions
+
+For evolving languages and standards, lexer design must account for versioned
+specifications.
+
+This concern should be handled at the language level, not as part of the
+shared cross-language consumer profiles such as `'coloring` and `'compiler`.
+
+The general design rule is:
+
+- the shared lexer architecture remains stable across languages
+- each language lexer documents the specification version, edition, snapshot,
+  or baseline feature set it targets
+- version-specific differences are handled in the language-specific design
+  notes and implementation
+
+Each language note should therefore record the intended baseline version and,
+when relevant, how later or earlier language variants may affect tokenization.
+
 ## Public Interface Direction
 
 The intended primary interface is a lexer procedure that consumes an input port

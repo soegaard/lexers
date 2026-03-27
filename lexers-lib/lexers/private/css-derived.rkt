@@ -95,7 +95,7 @@
       [else
        '()])
     (case kind
-      [(bad-string-token) '(malformed-token)]
+      [(bad-string-token bad-url-token) '(malformed-token)]
       [(unknown-raw-token) '(malformed-token)]
       [else                '()]))))
 
