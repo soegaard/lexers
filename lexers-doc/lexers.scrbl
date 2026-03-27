@@ -4,7 +4,6 @@
           (for-label racket/base
                      racket/contract/base
                      parser-tools/lex
-                     lexers/categories
                      lexers/css
                      lexers/token
                      lexers/javascript))
@@ -40,7 +39,6 @@ designed to support other consumers.
 The public language modules currently available are:
 
 @itemlist[
- @item{@racketmodname[lexers/categories]}
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/javascript]}]
@@ -69,23 +67,9 @@ The current profile split is:
 
 Across languages, the projected lexer constructors return one-argument port
 readers. Create the lexer once, call it repeatedly on the same input port, and
-stop when the result is an end-of-file token.
-
-@subsection{Category Constants}
-
-The module @racketmodname[lexers/categories] exports the stable projected
-category names so consumers do not need to hardcode symbols.
-
-@defmodule[lexers/categories]
-
-@defthing[lexer-category-whitespace symbol?]{The public category for whitespace tokens.}
-@defthing[lexer-category-comment symbol?]{The public category for comment tokens.}
-@defthing[lexer-category-identifier symbol?]{The public category for identifier tokens.}
-@defthing[lexer-category-keyword symbol?]{The public category for keyword tokens.}
-@defthing[lexer-category-literal symbol?]{The public category for literal tokens.}
-@defthing[lexer-category-operator symbol?]{The public category for operator tokens.}
-@defthing[lexer-category-delimiter symbol?]{The public category for delimiter tokens.}
-@defthing[lexer-category-unknown symbol?]{The public category for recoverable unknown tokens.}
+stop when the result is an end-of-file token. The projected category symbols
+themselves, such as @racket['identifier], @racket['literal], and
+@racket['keyword], are intended to be the stable public API.
 
 @subsection{Token Helpers}
 
