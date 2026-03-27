@@ -47,6 +47,12 @@ Each language module currently exposes two related kinds of API:
  @item{A derived-token API intended for richer language-specific inspection and
        testing.}]
 
+The projected APIs are intentionally close to
+@racketmodname[parser-tools/lex]. They return bare symbols, @racket[token?]
+values, and optional @racket[position-token?] wrappers built from the actual
+@racketmodname[parser-tools/lex] structures, so existing parser-oriented tools
+can consume them more easily.
+
 The current profile split is:
 
 @itemlist[
@@ -144,6 +150,22 @@ In @racket['coloring] mode, whitespace and comments are kept, and recoverable
 malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
 whitespace and comments are skipped by default, and malformed input raises an
 exception instead of producing an @racket['unknown] token.
+
+For the current CSS scaffold, @racket[token-value] normally preserves the
+original source text of the emitted token. In particular:
+
+@itemlist[
+ @item{For @racket['identifier], the value is the matched identifier text, such
+       as @racket["color"] or @racket["--brand-color"].}
+ @item{For @racket['literal], the value is the matched literal text, such as
+       @racket["#fff"], @racket["12px"], @racket["url(foo.png)"], or
+       @racket["rgb("].}
+ @item{For @racket['comment] and @racket['whitespace], the value is the
+       original comment or whitespace text when those categories are kept.}
+ @item{For @racket['delimiter], the value is the matched delimiter text, such
+       as @racket[":"], @racket[";"], or @racket["{"].}
+ @item{For @racket['unknown] in tolerant mode, the value is the malformed input
+       text that could not be accepted.}]
 
 @examples[#:eval css-eval
 (define inspect-lexer
@@ -287,6 +309,21 @@ In @racket['coloring] mode, whitespace and comments are kept, and recoverable
 malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
 whitespace and comments are skipped by default, and malformed input raises an
 exception instead of producing an @racket['unknown] token.
+
+For the current JavaScript scaffold, @racket[token-value] also preserves the
+original source text of the emitted token. In particular:
+
+@itemlist[
+ @item{For @racket['keyword] and @racket['identifier], the value is the matched
+       identifier text, such as @racket["const"] or @racket["name"].}
+ @item{For @racket['literal], the value is the matched literal text, such as
+       @racket["1"] or @racket["\"hello\""].}
+ @item{For @racket['comment] and @racket['whitespace], the value is the
+       original comment or whitespace text when those categories are kept.}
+ @item{For @racket['operator] and @racket['delimiter], the value is the matched
+       character text, such as @racket["="], @racket[";"], or @racket["("].}
+ @item{For @racket['unknown] in tolerant mode, the value is the malformed input
+       text that could not be accepted.}]
 
 @examples[#:eval javascript-eval
 (define inspect-lexer
