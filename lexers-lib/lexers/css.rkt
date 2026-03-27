@@ -97,6 +97,12 @@
     (css-string->tokens "rgb(10 20 30)" #:profile 'coloring))
   (define bad-string-tokens
     (css-string->tokens "\"unterminated" #:profile 'coloring))
+  (define no-position-tokens
+    (css-string->tokens "color" #:profile 'coloring #:source-positions #f))
+  (define compiler-no-trivia-tokens
+    (css-string->tokens "   color" #:profile 'compiler))
+  (define coloring-with-trivia-tokens
+    (css-string->tokens "   color" #:profile 'coloring))
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
@@ -113,10 +119,17 @@
     (find-derived-token 'custom-property-name))
 
   (check-true (pair? coloring-tokens))
+  (check-true (position-token? (car coloring-tokens)))
   (check-equal? (stream-token-name (car coloring-tokens)) 'comment)
   (check-equal? (stream-token-name (car compiler-tokens)) 'identifier)
   (check-equal? (stream-token-name (car function-tokens)) 'literal)
   (check-equal? (stream-token-name (car bad-string-tokens)) 'unknown)
+  (check-false (position-token? (car no-position-tokens)))
+  (check-equal? (stream-token-name (car compiler-no-trivia-tokens)) 'identifier)
+  (check-equal? (stream-token-name (car coloring-with-trivia-tokens)) 'whitespace)
+  (check-exn exn:fail:read?
+             (lambda ()
+               (css-string->tokens "~" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
   (check-equal? (length derived-tokens) 6)
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
