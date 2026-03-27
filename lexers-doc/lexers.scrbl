@@ -5,12 +5,14 @@
                      racket/contract/base
                      parser-tools/lex
                      lexers/css
+                     lexers/token
                      lexers/javascript))
 
 @(define css-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
                          parser-tools/lex
+                         lexers/token
                          lexers/css))
      the-eval))
 
@@ -18,6 +20,7 @@
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
                          parser-tools/lex
+                         lexers/token
                          lexers/javascript))
      the-eval))
 
@@ -36,6 +39,7 @@ designed to support other consumers.
 The public language modules currently available are:
 
 @itemlist[
+ @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/javascript]}]
 
@@ -64,6 +68,29 @@ The current profile split is:
 Across languages, the projected lexer constructors return one-argument port
 readers. Create the lexer once, call it repeatedly on the same input port, and
 stop when the result is an end-of-file token.
+
+@subsection{Token Helpers}
+
+The helper module @racketmodname[lexers/token] provides a small public API for
+inspecting wrapped or unwrapped projected token values without reaching
+directly into @racketmodname[parser-tools/lex].
+
+@defmodule[lexers/token]
+
+@defproc[(lexer-token-name [token (or/c symbol? token? position-token?)])
+         symbol?]{
+Extracts the effective token category from a wrapped or unwrapped projected
+token value.}
+
+@defproc[(lexer-token-value [token (or/c symbol? token? position-token?)])
+         any/c]{
+Extracts the effective token payload from a wrapped or unwrapped projected
+token value. For the bare end-of-file symbol, the result is @racket[#f].}
+
+@defproc[(lexer-token-eof? [token (or/c symbol? token? position-token?)])
+         boolean?]{
+Determines whether a wrapped or unwrapped projected token value represents end
+of input.}
 
 @subsection{Profiles}
 
@@ -205,8 +232,8 @@ original source text of the emitted token. In particular:
 (define first-token
   (inspect-lexer inspect-in))
 (position-token? first-token)
-(token-name (position-token-token first-token))
-(token-value (position-token-token first-token))
+(lexer-token-name first-token)
+(lexer-token-value first-token)
 ]}
 
 @defproc[(make-css-derived-lexer)
@@ -397,8 +424,8 @@ original source text of the emitted token. In particular:
 (define first-token
   (inspect-lexer inspect-in))
 (position-token? first-token)
-(token-name (position-token-token first-token))
-(token-value (position-token-token first-token))
+(lexer-token-name first-token)
+(lexer-token-value first-token)
 ]}
 
 @defproc[(make-javascript-derived-lexer)

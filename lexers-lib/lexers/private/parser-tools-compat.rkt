@@ -15,6 +15,8 @@
 ;;   Construct a parser-tools position value.
 ;; stream-token-name     : token-like? -> symbol?
 ;;   Extract the token category from a wrapped or unwrapped token value.
+;; stream-token-value    : token-like? -> any/c
+;;   Extract the token value from a wrapped or unwrapped token value.
 ;; eof-token?            : token-like? -> boolean?
 ;;   Recognize wrapped or unwrapped eof results.
 
@@ -22,6 +24,7 @@
          wrap-token-with-pos
          make-stream-position
          stream-token-name
+         stream-token-value
          eof-token?)
 
 (require parser-tools/lex
@@ -51,6 +54,14 @@
     [(position-token? token) (stream-token-name (position-token-token token))]
     [(symbol? token)         token]
     [else                    (token-name token)]))
+
+;; stream-token-value : token-like? -> any/c
+;;   Extract the token value from a wrapped or unwrapped token value.
+(define (stream-token-value token)
+  (cond
+    [(position-token? token) (stream-token-value (position-token-token token))]
+    [(symbol? token)         #f]
+    [else                    (token-value token)]))
 
 ;; eof-token? : token-like? -> boolean?
 ;;   Recognize wrapped or unwrapped eof results.
