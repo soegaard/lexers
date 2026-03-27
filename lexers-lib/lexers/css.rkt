@@ -47,6 +47,7 @@
                     [css-derived-token? private-css-derived-token?]
                     [css-derived-token-raw private-css-derived-token-raw]
                     [css-derived-token-tags private-css-derived-token-tags]
+                    [make-css-derived-classifier private-make-css-derived-classifier]
                     [css-derived-token-has-tag? private-css-derived-token-has-tag?])
          "private/css-raw.rkt"
          "private/css-tokenize.rkt"
@@ -93,17 +94,18 @@
     (make-css-config #:profile          profile
                      #:trivia           trivia
                      #:source-positions source-positions))
-  (lambda (in)
-    (read-css-token in config)))
+  (make-css-token-reader config))
 
 ;; make-css-derived-lexer : -> (input-port? -> (or/c css-derived-token? 'eof))
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
 (define (make-css-derived-lexer)
+  (define classify-css-token
+    (private-make-css-derived-classifier))
   (lambda (in)
     (define raw-token (read-css-raw-token in))
     (cond
       [(eq? raw-token 'eof) 'eof]
-      [else                 (derive-css-token raw-token)])))
+      [else                 (classify-css-token raw-token)])))
 
 ;; css-string->tokens : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire CSS string using the CSS lexer.
@@ -202,17 +204,40 @@
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
-    (css-string->derived-tokens "#fff rgb( --brand-color #main"))
+    (css-string->derived-tokens "@media #fff rgb( --brand-color \"hi\" 12px 10% 42 U+00A0-00FF #main"))
   (define (find-derived-token tag)
     (findf (lambda (token)
              (css-derived-token-has-tag? token tag))
            derived-tokens))
+  (define derived-at-rule-token
+    (find-derived-token 'at-rule-name))
   (define derived-color-token
     (find-derived-token 'color-literal))
   (define derived-function-token
     (find-derived-token 'color-function))
   (define derived-custom-property-token
     (find-derived-token 'custom-property-name))
+  (define derived-string-token
+    (find-derived-token 'string-literal))
+  (define derived-numeric-token
+    (find-derived-token 'numeric-literal))
+  (define contextual-derived-tokens
+    (css-string->derived-tokens ".foo { color: red; }"))
+  (define contextual-selector-token
+    (findf (lambda (token)
+             (and (css-derived-token-has-tag? token 'selector-token)
+                  (string=? (css-derived-token-text token) "foo")))
+           contextual-derived-tokens))
+  (define contextual-property-token
+    (findf (lambda (token)
+             (and (css-derived-token-has-tag? token 'property-name)
+                  (string=? (css-derived-token-text token) "color")))
+           contextual-derived-tokens))
+  (define contextual-value-token
+    (findf (lambda (token)
+             (and (css-derived-token-has-tag? token 'declaration-value-token)
+                  (string=? (css-derived-token-text token) "red")))
+           contextual-derived-tokens))
   (define derived-non-color-hash-token
     (findf (lambda (token)
              (string=? (css-derived-token-text token)
@@ -281,17 +306,27 @@
              (lambda ()
                (css-string->tokens "url(foo bar)" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
+  (check-not-false (css-derived-token-has-tag? derived-at-rule-token 'at-rule-name))
+  (check-equal? (css-derived-token-text derived-at-rule-token)
+                "@media")
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
-  (check-equal? (css-derived-token-tags derived-color-token)
-                '(color-literal))
+  (check-not-false
+   (member 'color-literal
+           (css-derived-token-tags derived-color-token)))
   (check-equal? (css-derived-token-text derived-color-token)
                 "#fff")
   (check-equal? (position-offset (css-derived-token-start derived-color-token))
-                1)
+                8)
   (check-equal? (position-offset (css-derived-token-end derived-color-token))
-                5)
+                12)
   (check-not-false (css-derived-token-has-tag? derived-function-token 'color-function))
+  (check-not-false (css-derived-token-has-tag? derived-function-token 'function-name))
   (check-not-false (css-derived-token-has-tag? derived-custom-property-token 'custom-property-name))
+  (check-not-false (css-derived-token-has-tag? derived-string-token 'string-literal))
+  (check-not-false (css-derived-token-has-tag? derived-numeric-token 'numeric-literal))
+  (check-not-false contextual-selector-token)
+  (check-not-false contextual-property-token)
+  (check-not-false contextual-value-token)
   (check-not-false derived-non-color-hash-token)
   (check-false
    (css-derived-token-has-tag? derived-non-color-hash-token 'color-literal)))

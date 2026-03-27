@@ -6,10 +6,10 @@
 ;;
 ;; Project raw CSS tokens into the reusable stream model.
 
-;; project-css-raw-token : (or/c css-raw-token? 'eof) css-config? -> token-like?
-;;   Convert a raw CSS token into a reusable-stream token-like value.
+;; project-css-derived-token : (or/c css-derived-token? 'eof) css-config? -> token-like?
+;;   Convert a derived CSS token into a reusable-stream token-like value.
 
-(provide project-css-raw-token)
+(provide project-css-derived-token)
 
 (require parser-tools/lex
          syntax/readerr
@@ -88,9 +88,10 @@
                        (make-stream-position 1 1 0)
                        (css-config-source-positions config)))
 
-;; malformed-token->result : css-raw-token? css-config? -> token-like?
-;;   Project malformed raw input or raise in strict mode.
-(define (malformed-token->result raw-token config)
+;; malformed-token->result : css-derived-token? css-config? -> token-like?
+;;   Project malformed input or raise in strict mode.
+(define (malformed-token->result derived-token config)
+  (define raw-token (css-derived-token-raw derived-token))
   (case (css-config-errors config)
     [(emit-unknown)
      (wrap-token-with-pos
@@ -113,17 +114,17 @@
             "unsupported CSS error policy: ~a"
             (css-config-errors config))]))
 
-;; visible-raw-token? : css-raw-token? css-config? -> boolean?
-;;   Determine whether a raw token should be emitted in the current profile.
-(define (visible-raw-token? raw-token config)
-  (case (css-raw-token-kind raw-token)
+;; visible-derived-token? : css-derived-token? css-config? -> boolean?
+;;   Determine whether a derived token should be emitted in the current profile.
+(define (visible-derived-token? derived-token config)
+  (case (css-raw-token-kind (css-derived-token-raw derived-token))
     [(whitespace-token comment-token) (not (skip-trivia? config))]
     [else                             #t]))
 
-;; plain-raw-token->result : css-raw-token? css-config? -> token-like?
-;;   Project a non-error raw token to the reusable stream model.
-(define (plain-raw-token->result raw-token config)
-  (define derived-token (derive-css-token raw-token))
+;; plain-derived-token->result : css-derived-token? css-config? -> token-like?
+;;   Project a non-error derived token to the reusable stream model.
+(define (plain-derived-token->result derived-token config)
+  (define raw-token (css-derived-token-raw derived-token))
   (wrap-token-with-pos
    (make-stream-token (derived->stream-category derived-token)
                       (css-raw-token-text raw-token))
@@ -131,19 +132,15 @@
    (css-raw-token-end raw-token)
    (css-config-source-positions config)))
 
-;; project-css-raw-token : (or/c css-raw-token? 'eof) css-config? -> token-like?
-;;   Convert a raw CSS token into a reusable-stream token-like value.
-(define (project-css-raw-token raw-token config)
-  (define derived-token
-    (and (not (eq? raw-token 'eof))
-         (derive-css-token raw-token)))
+;; project-css-derived-token : (or/c css-derived-token? 'eof) css-config? -> token-like?
+;;   Convert a derived CSS token into a reusable-stream token-like value.
+(define (project-css-derived-token derived-token config)
   (cond
-    [(eq? raw-token 'eof)
+    [(eq? derived-token 'eof)
      (raw-eof->token config)]
-    [(and derived-token
-          (css-derived-token-has-tag? derived-token 'malformed-token))
-     (malformed-token->result raw-token config)]
-    [(visible-raw-token? raw-token config)
-     (plain-raw-token->result raw-token config)]
+    [(css-derived-token-has-tag? derived-token 'malformed-token)
+     (malformed-token->result derived-token config)]
+    [(visible-derived-token? derived-token config)
+     (plain-derived-token->result derived-token config)]
     [else
      #f]))

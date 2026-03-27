@@ -37,6 +37,7 @@ Coding guidelines for Racket code in `lexers`:
 17. Use `rackunit` for tests.
 18. For consecutive calls with the same callee and simple arguments, align argument columns to improve scanability.
 19. For public API design, prefer exposing information through derived-token accessors before making raw-token representations public.
+20. Derived-token tags should describe syntax role or reusable language meaning, not presentation.
 19. When an existing lexer is available in another library, use it as prior art,
     but redesign from the language specification when needed so the result is a
     reusable lexer rather than one tied to a single application.

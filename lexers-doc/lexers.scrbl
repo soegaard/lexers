@@ -324,23 +324,36 @@ language-aware tools.
 The current CSS scaffold may attach tags such as:
 
 @itemlist[
+ @item{@racket['at-rule-name]}
  @item{@racket['color-literal]}
  @item{@racket['color-function]}
+ @item{@racket['selector-token]}
+ @item{@racket['property-name]}
+ @item{@racket['declaration-value-token]}
+ @item{@racket['function-name]}
  @item{@racket['gradient-function]}
  @item{@racket['custom-property-name]}
  @item{@racket['property-name-candidate]}
+ @item{@racket['string-literal]}
+ @item{@racket['numeric-literal]}
  @item{@racket['length-dimension]}
  @item{@racket['malformed-token]}]
 
 @examples[#:eval css-eval
 (define derived-tokens
-  (css-string->derived-tokens "#fff rgb( --brand-color 12px"))
+  (css-string->derived-tokens ".foo { color: red; background: rgb(1 2 3); }"))
 (map (lambda (token)
        (list (css-derived-token-text token)
              (css-derived-token-tags token)
+             (css-derived-token-has-tag? token 'selector-token)
+             (css-derived-token-has-tag? token 'property-name)
+             (css-derived-token-has-tag? token 'declaration-value-token)
              (css-derived-token-has-tag? token 'color-literal)
+             (css-derived-token-has-tag? token 'function-name)
              (css-derived-token-has-tag? token 'color-function)
              (css-derived-token-has-tag? token 'custom-property-name)
+             (css-derived-token-has-tag? token 'string-literal)
+             (css-derived-token-has-tag? token 'numeric-literal)
              (css-derived-token-has-tag? token 'length-dimension)))
      derived-tokens)
 ]}
