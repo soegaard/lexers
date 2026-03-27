@@ -38,6 +38,7 @@
       hash-token
       url-token
       bad-url-token
+      unicode-range-token
       number-token
       percentage-token
       dimension-token)   stream-category-literal]
@@ -47,6 +48,13 @@
       close-paren-token
       open-bracket-token
       close-bracket-token
+      CDO-token
+      CDC-token
+      include-match-token
+      dash-match-token
+      prefix-match-token
+      suffix-match-token
+      substring-match-token
       colon-token
       semicolon-token
       comma-token

@@ -117,8 +117,14 @@
     (css-string->tokens "url(foo.png)" #:profile 'coloring))
   (define bad-url-tokens
     (css-string->tokens "url(foo.png" #:profile 'coloring))
+  (define escaped-url-paren-tokens
+    (css-string->tokens "url(foo\\)bar)" #:profile 'coloring))
   (define bad-string-tokens
     (css-string->tokens "\"unterminated" #:profile 'coloring))
+  (define bad-newline-string-tokens
+    (css-string->tokens "\"line\nbreak\"" #:profile 'coloring))
+  (define escaped-newline-string-tokens
+    (css-string->tokens "\"line\\\nbreak\"" #:profile 'coloring))
   (define no-position-tokens
     (css-string->tokens "color" #:profile 'coloring #:source-positions #f))
   (define compiler-no-trivia-tokens
@@ -127,10 +133,38 @@
     (css-string->tokens "   color" #:profile 'coloring))
   (define delim-tokens
     (css-string->tokens "~" #:profile 'compiler))
+  (define hash-ident-tokens
+    (css-string->tokens "#main" #:profile 'compiler #:source-positions #f))
+  (define leading-dot-number-tokens
+    (css-string->tokens ".5em" #:profile 'compiler #:source-positions #f))
+  (define cdo-tokens
+    (css-string->tokens "<!--" #:profile 'compiler #:source-positions #f))
+  (define cdc-tokens
+    (css-string->tokens "-->" #:profile 'compiler #:source-positions #f))
+  (define include-match-tokens
+    (css-string->tokens "~=" #:profile 'compiler #:source-positions #f))
+  (define dash-match-tokens
+    (css-string->tokens "|=" #:profile 'compiler #:source-positions #f))
+  (define prefix-match-tokens
+    (css-string->tokens "^=" #:profile 'compiler #:source-positions #f))
+  (define suffix-match-tokens
+    (css-string->tokens "$=" #:profile 'compiler #:source-positions #f))
+  (define substring-match-tokens
+    (css-string->tokens "*=" #:profile 'compiler #:source-positions #f))
+  (define escaped-ident-tokens
+    (css-string->tokens "\\66 oo" #:profile 'compiler #:source-positions #f))
+  (define escaped-function-tokens
+    (css-string->tokens "r\\67 b(" #:profile 'compiler #:source-positions #f))
+  (define unicode-range-tokens
+    (css-string->tokens "U+00A0-00FF" #:profile 'compiler #:source-positions #f))
+  (define wildcard-unicode-range-tokens
+    (css-string->tokens "u+4??" #:profile 'compiler #:source-positions #f))
+  (define unicode-range-near-miss-tokens
+    (css-string->tokens "u+" #:profile 'compiler #:source-positions #f))
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
-    (css-string->derived-tokens "#fff rgb( --brand-color"))
+    (css-string->derived-tokens "#fff rgb( --brand-color #main"))
   (define (find-derived-token tag)
     (findf (lambda (token)
              (css-derived-token-has-tag? token tag))
@@ -141,6 +175,11 @@
     (find-derived-token 'color-function))
   (define derived-custom-property-token
     (find-derived-token 'custom-property-name))
+  (define derived-non-color-hash-token
+    (findf (lambda (token)
+             (string=? (css-raw-token-text (css-derived-token-raw token))
+                       "#main"))
+           derived-tokens))
 
   (check-true (pair? coloring-tokens))
   (check-true (position-token? (car coloring-tokens)))
@@ -149,19 +188,56 @@
   (check-equal? (stream-token-name (car function-tokens)) 'literal)
   (check-equal? (stream-token-name (car url-tokens)) 'literal)
   (check-equal? (stream-token-name (car bad-url-tokens)) 'unknown)
+  (check-equal? (stream-token-name (car escaped-url-paren-tokens)) 'literal)
+  (check-equal? (stream-token-value (car escaped-url-paren-tokens)) "url(foo\\)bar)")
   (check-equal? (stream-token-name (car bad-string-tokens)) 'unknown)
+  (check-equal? (stream-token-name (car bad-newline-string-tokens)) 'unknown)
+  (check-equal? (stream-token-name (car escaped-newline-string-tokens)) 'literal)
   (check-false (position-token? (car no-position-tokens)))
   (check-equal? (stream-token-name (car compiler-no-trivia-tokens)) 'identifier)
   (check-equal? (stream-token-name (car coloring-with-trivia-tokens)) 'whitespace)
   (check-equal? (stream-token-name (car delim-tokens)) 'delimiter)
+  (check-equal? (stream-token-name (car hash-ident-tokens)) 'literal)
+  (check-equal? (stream-token-value (car hash-ident-tokens)) "#main")
+  (check-equal? (stream-token-name (car leading-dot-number-tokens)) 'literal)
+  (check-equal? (stream-token-value (car leading-dot-number-tokens)) ".5em")
+  (check-equal? (stream-token-name (car cdo-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car cdo-tokens)) "<!--")
+  (check-equal? (stream-token-name (car cdc-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car cdc-tokens)) "-->")
+  (check-equal? (stream-token-name (car include-match-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car include-match-tokens)) "~=")
+  (check-equal? (stream-token-name (car dash-match-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car dash-match-tokens)) "|=")
+  (check-equal? (stream-token-name (car prefix-match-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car prefix-match-tokens)) "^=")
+  (check-equal? (stream-token-name (car suffix-match-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car suffix-match-tokens)) "$=")
+  (check-equal? (stream-token-name (car substring-match-tokens)) 'delimiter)
+  (check-equal? (stream-token-value (car substring-match-tokens)) "*=")
+  (check-equal? (stream-token-name (car escaped-ident-tokens)) 'identifier)
+  (check-equal? (stream-token-value (car escaped-ident-tokens)) "\\66 oo")
+  (check-equal? (stream-token-name (car escaped-function-tokens)) 'literal)
+  (check-equal? (stream-token-value (car escaped-function-tokens)) "r\\67 b")
+  (check-equal? (stream-token-name (car unicode-range-tokens)) 'literal)
+  (check-equal? (stream-token-value (car unicode-range-tokens)) "U+00A0-00FF")
+  (check-equal? (stream-token-name (car wildcard-unicode-range-tokens)) 'literal)
+  (check-equal? (stream-token-value (car wildcard-unicode-range-tokens)) "u+4??")
+  (check-equal? (stream-token-name (car unicode-range-near-miss-tokens)) 'identifier)
+  (check-equal? (stream-token-value (car unicode-range-near-miss-tokens)) "u")
   (check-exn exn:fail:read?
              (lambda ()
                (css-string->tokens "\"unterminated" #:profile 'compiler)))
   (check-exn exn:fail:read?
              (lambda ()
+               (css-string->tokens "\"line\nbreak\"" #:profile 'compiler)))
+  (check-exn exn:fail:read?
+             (lambda ()
                (css-string->tokens "url(foo.png" #:profile 'compiler)))
   (check-false (eq? (derived-lexer (open-input-string "#fff")) 'eof))
-  (check-equal? (length derived-tokens) 6)
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
   (check-not-false (css-derived-token-has-tag? derived-function-token 'color-function))
-  (check-not-false (css-derived-token-has-tag? derived-custom-property-token 'custom-property-name)))
+  (check-not-false (css-derived-token-has-tag? derived-custom-property-token 'custom-property-name))
+  (check-not-false derived-non-color-hash-token)
+  (check-false
+   (css-derived-token-has-tag? derived-non-color-hash-token 'color-literal)))
