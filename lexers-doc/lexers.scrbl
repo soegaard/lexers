@@ -87,6 +87,21 @@ token value.}
 Extracts the effective token payload from a wrapped or unwrapped projected
 token value. For the bare end-of-file symbol, the result is @racket[#f].}
 
+@defproc[(lexer-token-has-positions? [token (or/c symbol? token? position-token?)])
+         boolean?]{
+Determines whether a wrapped or unwrapped projected token value carries source
+positions.}
+
+@defproc[(lexer-token-start [token (or/c symbol? token? position-token?)])
+         (or/c position? #f)]{
+Extracts the starting position from a wrapped projected token value. For
+unwrapped values, the result is @racket[#f].}
+
+@defproc[(lexer-token-end [token (or/c symbol? token? position-token?)])
+         (or/c position? #f)]{
+Extracts the ending position from a wrapped projected token value. For
+unwrapped values, the result is @racket[#f].}
+
 @defproc[(lexer-token-eof? [token (or/c symbol? token? position-token?)])
          boolean?]{
 Determines whether a wrapped or unwrapped projected token value represents end
@@ -231,9 +246,11 @@ original source text of the emitted token. In particular:
 (port-count-lines! inspect-in)
 (define first-token
   (inspect-lexer inspect-in))
-(position-token? first-token)
+(lexer-token-has-positions? first-token)
 (lexer-token-name first-token)
 (lexer-token-value first-token)
+(position-offset (lexer-token-start first-token))
+(position-offset (lexer-token-end first-token))
 ]}
 
 @defproc[(make-css-derived-lexer)
@@ -423,9 +440,11 @@ original source text of the emitted token. In particular:
 (port-count-lines! inspect-in)
 (define first-token
   (inspect-lexer inspect-in))
-(position-token? first-token)
+(lexer-token-has-positions? first-token)
 (lexer-token-name first-token)
 (lexer-token-value first-token)
+(position-offset (lexer-token-start first-token))
+(position-offset (lexer-token-end first-token))
 ]}
 
 @defproc[(make-javascript-derived-lexer)

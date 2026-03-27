@@ -17,6 +17,12 @@
 ;;   Extract the token category from a wrapped or unwrapped token value.
 ;; stream-token-value    : token-like? -> any/c
 ;;   Extract the token value from a wrapped or unwrapped token value.
+;; stream-token-has-positions? : token-like? -> boolean?
+;;   Determine whether a token-like value carries source positions.
+;; stream-token-start    : token-like? -> (or/c position? #f)
+;;   Extract the starting position from a wrapped token-like value.
+;; stream-token-end      : token-like? -> (or/c position? #f)
+;;   Extract the ending position from a wrapped token-like value.
 ;; eof-token?            : token-like? -> boolean?
 ;;   Recognize wrapped or unwrapped eof results.
 
@@ -25,6 +31,9 @@
          make-stream-position
          stream-token-name
          stream-token-value
+         stream-token-has-positions?
+         stream-token-start
+         stream-token-end
          eof-token?)
 
 (require parser-tools/lex
@@ -62,6 +71,25 @@
     [(position-token? token) (stream-token-value (position-token-token token))]
     [(symbol? token)         #f]
     [else                    (token-value token)]))
+
+;; stream-token-has-positions? : token-like? -> boolean?
+;;   Determine whether a token-like value carries source positions.
+(define (stream-token-has-positions? token)
+  (position-token? token))
+
+;; stream-token-start : token-like? -> (or/c position? #f)
+;;   Extract the starting position from a wrapped token-like value.
+(define (stream-token-start token)
+  (cond
+    [(position-token? token) (position-token-start-pos token)]
+    [else                    #f]))
+
+;; stream-token-end : token-like? -> (or/c position? #f)
+;;   Extract the ending position from a wrapped token-like value.
+(define (stream-token-end token)
+  (cond
+    [(position-token? token) (position-token-end-pos token)]
+    [else                    #f]))
 
 ;; eof-token? : token-like? -> boolean?
 ;;   Recognize wrapped or unwrapped eof results.
