@@ -121,3 +121,12 @@ The following JavaScript-specific questions remain for later design work:
 - how the lexer should distinguish `/` as division from future regex syntax
 - when template strings should become part of the supported baseline
 - when the targeted ECMAScript baseline should be named more precisely
+
+## References
+
+- ECMAScript Language Specification:
+  https://tc39.es/ecma262/
+  This is the primary reference for the JavaScript lexical grammar.
+- MDN JavaScript Reference:
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference
+  This is useful as a practical secondary reference, but not the normative one.
