@@ -12,6 +12,8 @@
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
 ;; javascript-derived-token? : any/c -> boolean?
 ;;   Recognize a derived JavaScript token value returned by the derived-token API.
+;; javascript-derived-token-has-tag? : javascript-derived-token? symbol? -> boolean?
+;;   Determine whether a derived JavaScript token has a given classification tag.
 ;; javascript-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire JavaScript string using the JavaScript lexer.
 ;; javascript-string->derived-tokens : string? -> (listof javascript-derived-token?)
@@ -22,6 +24,7 @@
 (provide make-javascript-lexer
          make-javascript-derived-lexer
          javascript-derived-token?
+         javascript-derived-token-has-tag?
          javascript-string->tokens
          javascript-string->derived-tokens
          javascript-profiles)
@@ -29,7 +32,8 @@
 (require parser-tools/lex
          "private/config.rkt"
          (rename-in "private/javascript-derived.rkt"
-                    [javascript-derived-token? private-javascript-derived-token?])
+                    [javascript-derived-token? private-javascript-derived-token?]
+                    [javascript-derived-token-has-tag? private-javascript-derived-token-has-tag?])
          "private/javascript-raw.rkt"
          "private/javascript-tokenize.rkt"
          "private/parser-tools-compat.rkt")
@@ -40,6 +44,11 @@
 ;;   Recognize a derived JavaScript token value returned by the derived-token API.
 (define (javascript-derived-token? v)
   (private-javascript-derived-token? v))
+
+;; javascript-derived-token-has-tag? : javascript-derived-token? symbol? -> boolean?
+;;   Determine whether a derived JavaScript token has a given classification tag.
+(define (javascript-derived-token-has-tag? token tag)
+  (private-javascript-derived-token-has-tag? token tag))
 
 ;; make-javascript-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based JavaScript lexer.

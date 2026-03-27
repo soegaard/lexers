@@ -12,6 +12,8 @@
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
 ;; css-derived-token? : any/c -> boolean?
 ;;   Recognize a derived CSS token value returned by the derived-token API.
+;; css-derived-token-has-tag? : css-derived-token? symbol? -> boolean?
+;;   Determine whether a derived CSS token has a given classification tag.
 ;; css-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire CSS string using the CSS lexer.
 ;; css-string->derived-tokens : string? -> (listof css-derived-token?)
@@ -22,6 +24,7 @@
 (provide make-css-lexer
          make-css-derived-lexer
          css-derived-token?
+         css-derived-token-has-tag?
          css-string->tokens
          css-string->derived-tokens
          css-profiles)
@@ -29,7 +32,8 @@
 (require parser-tools/lex
          "private/config.rkt"
          (rename-in "private/css-derived.rkt"
-                    [css-derived-token? private-css-derived-token?])
+                    [css-derived-token? private-css-derived-token?]
+                    [css-derived-token-has-tag? private-css-derived-token-has-tag?])
          "private/css-raw.rkt"
          "private/css-tokenize.rkt"
          "private/parser-tools-compat.rkt")
@@ -40,6 +44,11 @@
 ;;   Recognize a derived CSS token value returned by the derived-token API.
 (define (css-derived-token? v)
   (private-css-derived-token? v))
+
+;; css-derived-token-has-tag? : css-derived-token? symbol? -> boolean?
+;;   Determine whether a derived CSS token has a given classification tag.
+(define (css-derived-token-has-tag? token tag)
+  (private-css-derived-token-has-tag? token tag))
 
 ;; make-css-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based CSS lexer.

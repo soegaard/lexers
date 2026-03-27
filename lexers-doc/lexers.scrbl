@@ -218,6 +218,40 @@ returns @racket['eof], and returns the resulting list of derived tokens.}
 Recognizes derived CSS token values returned by
 @racket[make-css-derived-lexer] and @racket[css-string->derived-tokens].}
 
+@defproc[(css-derived-token-has-tag? [token css-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether a derived CSS token carries a given classification tag.}
+
+@subsection{CSS Derived Tokens}
+
+A derived CSS token pairs one raw CSS token with a small list of
+CSS-specific classification tags. This layer is more precise than the projected
+consumer-facing categories and is meant for inspection, testing, and
+language-aware tools.
+
+The current CSS scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['color-literal]}
+ @item{@racket['color-function]}
+ @item{@racket['gradient-function]}
+ @item{@racket['custom-property-name]}
+ @item{@racket['property-name-candidate]}
+ @item{@racket['length-dimension]}
+ @item{@racket['malformed-token]}]
+
+@examples[#:eval css-eval
+(define derived-tokens
+  (css-string->derived-tokens "#fff rgb( --brand-color 12px"))
+(map (lambda (token)
+       (list (css-derived-token-has-tag? token 'color-literal)
+             (css-derived-token-has-tag? token 'color-function)
+             (css-derived-token-has-tag? token 'custom-property-name)
+             (css-derived-token-has-tag? token 'length-dimension)))
+     derived-tokens)
+]}
+
 @defthing[css-profiles immutable-hash?]{
 The profile defaults used by the CSS lexer.}
 
@@ -377,6 +411,39 @@ tokens.}
 Recognizes derived JavaScript token values returned by
 @racket[make-javascript-derived-lexer] and
 @racket[javascript-string->derived-tokens].}
+
+@defproc[(javascript-derived-token-has-tag? [token javascript-derived-token?]
+                                            [tag symbol?])
+         boolean?]{
+Determines whether a derived JavaScript token carries a given classification
+tag.}
+
+@subsection{JavaScript Derived Tokens}
+
+A derived JavaScript token pairs one raw JavaScript token with a small list of
+JavaScript-specific classification tags. This layer is more precise than the
+projected consumer-facing categories and is meant for inspection, testing, and
+language-aware tools.
+
+The current JavaScript scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['keyword]}
+ @item{@racket['identifier]}
+ @item{@racket['string-literal]}
+ @item{@racket['numeric-literal]}
+ @item{@racket['comment]}
+ @item{@racket['malformed-token]}]
+
+@examples[#:eval javascript-eval
+(define derived-tokens
+  (javascript-string->derived-tokens "const name = 1"))
+(map (lambda (token)
+       (list (javascript-derived-token-has-tag? token 'keyword)
+             (javascript-derived-token-has-tag? token 'identifier)
+             (javascript-derived-token-has-tag? token 'numeric-literal)))
+     derived-tokens)
+]}
 
 @defthing[javascript-profiles immutable-hash?]{
 The profile defaults used by the JavaScript lexer.}
