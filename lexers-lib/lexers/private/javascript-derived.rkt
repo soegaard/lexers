@@ -57,6 +57,14 @@
          [else                       '(identifier)])]
       [(private-name-token) '(private-name)]
       [(method-name-token) '(identifier method-name)]
+      [(jsx-tag-name-token) '(identifier jsx-tag-name)]
+      [(jsx-closing-tag-name-token) '(identifier jsx-closing-tag-name)]
+      [(jsx-attribute-name-token) '(identifier jsx-attribute-name)]
+      [(jsx-text-token) '(jsx-text)]
+      [(jsx-fragment-boundary-token) '(jsx-fragment-boundary)]
+      [(jsx-interpolation-start-token
+        jsx-interpolation-end-token)
+       '(jsx-interpolation-boundary)]
       [(string-token) '(string-literal)]
       [(number-token) '(numeric-literal)]
       [(regex-token) '(regex-literal)]

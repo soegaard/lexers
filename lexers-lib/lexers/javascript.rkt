@@ -8,7 +8,7 @@
 
 ;; make-javascript-lexer      : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based JavaScript lexer.
-;; make-javascript-derived-lexer : -> (input-port? -> (or/c javascript-derived-token? 'eof))
+;; make-javascript-derived-lexer : keyword-arguments -> (input-port? -> (or/c javascript-derived-token? 'eof))
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
 ;; javascript-derived-token? : any/c -> boolean?
 ;;   Recognize a derived JavaScript token value returned by the derived-token API.
@@ -24,7 +24,7 @@
 ;;   Extract the ending source position for one derived JavaScript token.
 ;; javascript-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire JavaScript string using the JavaScript lexer.
-;; javascript-string->derived-tokens : string? -> (listof javascript-derived-token?)
+;; javascript-string->derived-tokens : string? keyword-arguments -> (listof javascript-derived-token?)
 ;;   Tokenize an entire JavaScript string into derived token values.
 ;; javascript-profiles        : immutable-hash?
 ;;   Profile defaults for the public JavaScript lexer.
@@ -89,20 +89,22 @@
 ;;   Construct a port-based JavaScript lexer.
 (define (make-javascript-lexer #:profile          [profile 'coloring]
                                #:trivia           [trivia 'profile-default]
-                               #:source-positions [source-positions 'profile-default])
+                               #:source-positions [source-positions 'profile-default]
+                               #:jsx?             [jsx? #f])
   (define config
     (make-javascript-config #:profile          profile
                             #:trivia           trivia
-                            #:source-positions source-positions))
+                            #:source-positions source-positions
+                            #:jsx?             jsx?))
   (make-javascript-token-reader config))
 
-;; make-javascript-derived-lexer : -> (input-port? -> (or/c javascript-derived-token? 'eof))
+;; make-javascript-derived-lexer : keyword-arguments -> (input-port? -> (or/c javascript-derived-token? 'eof))
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
-(define (make-javascript-derived-lexer)
+(define (make-javascript-derived-lexer #:jsx? [jsx? #f])
   (define classify-javascript-token
     (private-make-javascript-derived-classifier))
   (define read-javascript-raw
-    (make-javascript-raw-reader))
+    (make-javascript-raw-reader #:jsx? jsx?))
   (lambda (in)
     (define raw-token (read-javascript-raw in))
     (cond
@@ -114,11 +116,13 @@
 (define (javascript-string->tokens source
                                    #:profile          [profile 'coloring]
                                    #:trivia           [trivia 'profile-default]
-                                   #:source-positions [source-positions 'profile-default])
+                                   #:source-positions [source-positions 'profile-default]
+                                   #:jsx?             [jsx? #f])
   (define lexer
     (make-javascript-lexer #:profile          profile
                            #:trivia           trivia
-                           #:source-positions source-positions))
+                           #:source-positions source-positions
+                           #:jsx?             jsx?))
   (define in (open-input-string source))
   (port-count-lines! in)
   (let loop ([tokens '()])
@@ -127,10 +131,11 @@
       [(eof-token? token) (reverse (cons token tokens))]
       [else               (loop (cons token tokens))])))
 
-;; javascript-string->derived-tokens : string? -> (listof javascript-derived-token?)
+;; javascript-string->derived-tokens : string? keyword-arguments -> (listof javascript-derived-token?)
 ;;   Tokenize an entire JavaScript string into derived token values.
-(define (javascript-string->derived-tokens source)
-  (define lexer (make-javascript-derived-lexer))
+(define (javascript-string->derived-tokens source
+                                          #:jsx? [jsx? #f])
+  (define lexer (make-javascript-derived-lexer #:jsx? jsx?))
   (define in (open-input-string source))
   (port-count-lines! in)
   (let loop ([tokens '()])
@@ -165,11 +170,21 @@
     (javascript-string->tokens "return /ab+c/i;" #:profile 'compiler #:source-positions #f))
   (define template-tokens
     (javascript-string->tokens "`a ${name} b`" #:profile 'compiler #:source-positions #f))
+  (define jsx-tokens
+    (javascript-string->tokens
+     "const el = <Button kind=\"primary\">Hello {name}</Button>;"
+     #:profile 'compiler
+     #:source-positions #f
+     #:jsx? #t))
   (define derived-lexer
     (make-javascript-derived-lexer))
   (define derived-tokens
     (javascript-string->derived-tokens
      "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42, run() {} };\nreturn /ab+c/i;\nconst greeting = `a ${name} b`;"))
+  (define jsx-derived-tokens
+    (javascript-string->derived-tokens
+     "const el = <Button kind=\"primary\">Hello {name}</Button>;\nconst frag = <>ok</>;"
+     #:jsx? #t))
   (define (find-derived-token tag)
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token tag))
@@ -234,6 +249,33 @@
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token 'template-interpolation-boundary))
            derived-tokens))
+  (define derived-jsx-tag-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'jsx-tag-name)
+                  (string=? (javascript-derived-token-text token) "Button")))
+           jsx-derived-tokens))
+  (define derived-jsx-closing-tag-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'jsx-closing-tag-name)
+                  (string=? (javascript-derived-token-text token) "Button")))
+           jsx-derived-tokens))
+  (define derived-jsx-attribute-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'jsx-attribute-name)
+                  (string=? (javascript-derived-token-text token) "kind")))
+           jsx-derived-tokens))
+  (define derived-jsx-text-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'jsx-text))
+           jsx-derived-tokens))
+  (define derived-jsx-interpolation-boundary-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'jsx-interpolation-boundary))
+           jsx-derived-tokens))
+  (define derived-jsx-fragment-boundary-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'jsx-fragment-boundary))
+           jsx-derived-tokens))
 
   (check-true (pair? coloring-tokens))
   (check-true (position-token? (car coloring-tokens)))
@@ -250,6 +292,10 @@
   (check-equal? (stream-token-name (car template-tokens)) 'delimiter)
   (check-equal? (stream-token-name (cadr template-tokens)) 'literal)
   (check-equal? (stream-token-value (cadr template-tokens)) "a ")
+  (check-equal? (map stream-token-name jsx-tokens)
+                '(keyword identifier operator delimiter identifier identifier
+                  operator literal delimiter literal delimiter identifier
+                  delimiter delimiter identifier delimiter delimiter eof))
   (check-exn exn:fail:read?
              (lambda ()
                (javascript-string->tokens "\"unterminated" #:profile 'compiler)))
@@ -275,4 +321,10 @@
   (check-not-false derived-regex-token)
   (check-not-false derived-template-token)
   (check-not-false derived-template-chunk-token)
-  (check-not-false derived-template-boundary-token))
+  (check-not-false derived-template-boundary-token)
+  (check-not-false derived-jsx-tag-token)
+  (check-not-false derived-jsx-closing-tag-token)
+  (check-not-false derived-jsx-attribute-token)
+  (check-not-false derived-jsx-text-token)
+  (check-not-false derived-jsx-interpolation-boundary-token)
+  (check-not-false derived-jsx-fragment-boundary-token))

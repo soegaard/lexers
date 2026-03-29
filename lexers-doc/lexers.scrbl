@@ -224,6 +224,10 @@ malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
 whitespace and comments are skipped by default, and malformed input raises an
 exception instead of producing an @racket['unknown] token.
 
+When @racket[#:jsx?] is enabled, JSX tag names and attribute names still
+project as @racket['identifier], JSX text projects as @racket['literal], and
+JSX punctuation and interpolation boundaries project as @racket['delimiter].
+
 For the current CSS scaffold, @racket[token-value] normally preserves the
 original source text of the emitted token. In particular:
 
@@ -375,7 +379,8 @@ The projected JavaScript API has two entry points:
 
 @defproc[(make-javascript-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                                 [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
-                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                                [#:jsx? jsx? boolean? #f])
          (input-port? . -> . (or/c symbol? token? position-token?))]{
 Constructs a streaming JavaScript lexer.
 
@@ -394,6 +399,10 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
+When @racket[#:jsx?] is true, the lexer accepts a small JSX extension inside
+JavaScript expressions. The projected token categories remain the same, while
+the derived-token API exposes JSX-specific structure.
+
 @examples[#:eval javascript-eval
 (define lexer
   (make-javascript-lexer #:profile 'coloring))
@@ -409,7 +418,8 @@ same port until it returns an end-of-file token.
 @defproc[(javascript-string->tokens [source string?]
                                     [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                                     [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
-                                    [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+                                    [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                                    [#:jsx? jsx? boolean? #f])
          (listof (or/c symbol? token? position-token?))]{
 Tokenizes an entire JavaScript string using the projected token API.
 
@@ -480,7 +490,7 @@ original source text of the emitted token. In particular:
 (position-offset (lexer-token-end first-token))
 ]}
 
-@defproc[(make-javascript-derived-lexer)
+@defproc[(make-javascript-derived-lexer [#:jsx? jsx? boolean? #f])
          (input-port? . -> . (or/c 'eof javascript-derived-token?))]{
 Constructs a streaming JavaScript lexer for the derived-token layer.
 
@@ -505,7 +515,8 @@ lexer once, then call it repeatedly on the same port until it returns
       (derived-lexer derived-in))
 ]}
 
-@defproc[(javascript-string->derived-tokens [source string?])
+@defproc[(javascript-string->derived-tokens [source string?]
+                                            [#:jsx? jsx? boolean? #f])
          (listof javascript-derived-token?)]{
 Tokenizes an entire JavaScript string into derived JavaScript token values.
 
@@ -568,6 +579,12 @@ The current JavaScript scaffold may attach tags such as:
  @item{@racket['template-literal]}
  @item{@racket['template-chunk]}
  @item{@racket['template-interpolation-boundary]}
+ @item{@racket['jsx-tag-name]}
+ @item{@racket['jsx-closing-tag-name]}
+ @item{@racket['jsx-attribute-name]}
+ @item{@racket['jsx-text]}
+ @item{@racket['jsx-interpolation-boundary]}
+ @item{@racket['jsx-fragment-boundary]}
  @item{@racket['comment]}
  @item{@racket['malformed-token]}]
 
@@ -593,6 +610,23 @@ The current JavaScript scaffold may attach tags such as:
              (javascript-derived-token-has-tag? token 'template-chunk)
              (javascript-derived-token-has-tag? token 'template-interpolation-boundary)))
      derived-tokens)
+]}
+
+@examples[#:eval javascript-eval
+(define jsx-derived-tokens
+  (javascript-string->derived-tokens
+   "const el = <Button kind=\"primary\">Hello {name}</Button>;\nconst frag = <>ok</>;"
+   #:jsx? #t))
+(map (lambda (token)
+       (list (javascript-derived-token-text token)
+             (javascript-derived-token-tags token)
+             (javascript-derived-token-has-tag? token 'jsx-tag-name)
+             (javascript-derived-token-has-tag? token 'jsx-closing-tag-name)
+             (javascript-derived-token-has-tag? token 'jsx-attribute-name)
+             (javascript-derived-token-has-tag? token 'jsx-text)
+             (javascript-derived-token-has-tag? token 'jsx-interpolation-boundary)
+             (javascript-derived-token-has-tag? token 'jsx-fragment-boundary)))
+     jsx-derived-tokens)
 ]}
 
 @defthing[javascript-profiles immutable-hash?]{

@@ -30,6 +30,8 @@
 ;;   Extract the configured trivia policy.
 ;; javascript-config-source-positions : javascript-config? -> boolean?
 ;;   Extract the configured source-position setting.
+;; javascript-config-jsx? : javascript-config? -> boolean?
+;;   Extract whether JSX support is enabled for the JavaScript lexer.
 ;; javascript-config-errors : javascript-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-javascript-config : keyword-arguments -> javascript-config?
@@ -47,6 +49,7 @@
          javascript-config-profile
          javascript-config-trivia
          javascript-config-source-positions
+         javascript-config-jsx?
          javascript-config-errors
          make-javascript-config)
 
@@ -54,7 +57,7 @@
 (struct css-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public JavaScript lexer.
-(struct javascript-config (profile trivia source-positions errors) #:transparent)
+(struct javascript-config (profile trivia source-positions jsx? errors) #:transparent)
 
 ;; Profile defaults for the CSS lexer.
 (define css-profile-defaults
@@ -104,7 +107,8 @@
 ;;   Resolve profile defaults and explicit overrides into one config.
 (define (make-javascript-config #:profile          [profile 'coloring]
                                 #:trivia           [trivia 'profile-default]
-                                #:source-positions [source-positions 'profile-default])
+                                #:source-positions [source-positions 'profile-default]
+                                #:jsx?             [jsx? #f])
   (define defaults
     (hash-ref javascript-profile-defaults
               profile
@@ -124,4 +128,5 @@
   (javascript-config profile
                      resolved-trivia
                      resolved-source-positions
+                     jsx?
                      resolved-errors))

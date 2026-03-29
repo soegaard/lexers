@@ -30,14 +30,26 @@
   (case raw-kind
     [(whitespace-token)                   stream-category-whitespace]
     [(line-comment-token block-comment-token) stream-category-comment]
-    [(identifier-token)                   stream-category-identifier]
-    [(string-token bad-string-token number-token regex-token template-chunk-token)
+    [(identifier-token
+      jsx-tag-name-token
+      jsx-closing-tag-name-token
+      jsx-attribute-name-token)
+     stream-category-identifier]
+    [(string-token
+      bad-string-token
+      number-token
+      regex-token
+      template-chunk-token
+      jsx-text-token)
      stream-category-literal]
     [(delimiter-token
       template-start-token
       template-end-token
       template-interpolation-start-token
-      template-interpolation-end-token)
+      template-interpolation-end-token
+      jsx-fragment-boundary-token
+      jsx-interpolation-start-token
+      jsx-interpolation-end-token)
      stream-category-delimiter]
     [(operator-token)                     stream-category-operator]
     [(unknown-raw-token)                  stream-category-unknown]
@@ -56,7 +68,8 @@
     [(or (javascript-derived-token-has-tag? derived-token 'string-literal)
          (javascript-derived-token-has-tag? derived-token 'numeric-literal)
          (javascript-derived-token-has-tag? derived-token 'regex-literal)
-         (javascript-derived-token-has-tag? derived-token 'template-chunk))
+         (javascript-derived-token-has-tag? derived-token 'template-chunk)
+         (javascript-derived-token-has-tag? derived-token 'jsx-text))
      stream-category-literal]
     [(javascript-derived-token-has-tag? derived-token 'comment)
      stream-category-comment]

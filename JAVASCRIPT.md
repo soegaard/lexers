@@ -60,7 +60,6 @@ implementation:
 - automatic semicolon insertion concerns
 - bigint literals
 - numeric separators
-- JSX
 - TypeScript extensions
 
 This keeps the first JavaScript implementation focused on validating the shared
@@ -109,16 +108,14 @@ language-level distinctions for consumers such as `peek` and
 `scribble-tools`, while still fitting the rule that derived-token tags should
 describe syntax role or reusable language meaning rather than presentation.
 
-Template-literal-specific roles and JSX-specific roles should remain deferred
-until after that slice.
-
 Template-literal-specific roles should be prioritized before JSX-specific
 roles. Template literals are a more central part of everyday JavaScript, and
 they can support both `peek` and `scribble-tools` without immediately
 expanding the lexer into a larger JavaScript-plus-JSX dialect commitment.
 
-Only after template-literal support is in place should the library decide
-explicitly whether JSX belongs in scope for `lexers/javascript`.
+With template-literal support in place, the next JavaScript step may add a
+small opt-in JSX extension through an explicit mode parameter such as
+`#:jsx?`, rather than folding JSX into the default JavaScript behavior.
 
 ## Profile Differences
 

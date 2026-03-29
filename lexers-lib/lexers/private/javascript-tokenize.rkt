@@ -22,7 +22,7 @@
   (define classify-javascript-token
     (make-javascript-derived-classifier))
   (define read-javascript-raw
-    (make-javascript-raw-reader))
+    (make-javascript-raw-reader #:jsx? (javascript-config-jsx? config)))
   (lambda (in)
     (unless (input-port? in)
       (raise-argument-error 'make-javascript-token-reader "input-port?" in))

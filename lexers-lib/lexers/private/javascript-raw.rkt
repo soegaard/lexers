@@ -18,7 +18,7 @@
 ;;   Extract the ending source position.
 ;; read-javascript-raw-token  : input-port? -> (or/c javascript-raw-token? 'eof)
 ;;   Read the next raw JavaScript token from an input port.
-;; make-javascript-raw-reader : -> (input-port? -> (or/c javascript-raw-token? 'eof))
+;; make-javascript-raw-reader : keyword-arguments -> (input-port? -> (or/c javascript-raw-token? 'eof))
 ;;   Construct a stateful JavaScript raw-token reader.
 
 (provide javascript-raw-token?
@@ -65,6 +65,17 @@
   (or (js-ident-start? ch)
       (char-numeric? ch)))
 
+;; jsx-ident-start? : char? -> boolean?
+;;   Recognize a simplified JSX name start character.
+(define (jsx-ident-start? ch)
+  (js-ident-start? ch))
+
+;; jsx-ident-char? : char? -> boolean?
+;;   Recognize a simplified JSX name character.
+(define (jsx-ident-char? ch)
+  (or (js-ident-char? ch)
+      (member ch '(#\- #\: #\.))))
+
 ;; string-prefix-at? : input-port? exact-nonnegative-integer? string? -> boolean?
 ;;   Determine whether the input has the given prefix at the current offset.
 (define (string-prefix-at? in offset prefix)
@@ -90,6 +101,16 @@
       [(char? next) next]
       [else #f])))
 
+;; jsx-start-candidate? : input-port? -> boolean?
+;;   Determine whether the current input looks like the start of a JSX construct.
+(define (jsx-start-candidate? in)
+  (and (char=? (peek-char in) #\<)
+       (let ([next (peek-char in 1)])
+         (and (char? next)
+              (or (char=? next #\/)
+                  (char=? next #\>)
+                  (jsx-ident-start? next))))))
+
 ;; current-stream-position : input-port? -> position?
 ;;   Read the current parser-tools-compatible source position from a port.
 (define (current-stream-position in)
@@ -111,6 +132,22 @@
        (loop)]
       [else
        (get-output-string out)])))
+
+;; read-until-jsx-text-break! : input-port? -> string?
+;;   Consume JSX text until the next tag or interpolation boundary.
+(define (read-until-jsx-text-break! in)
+  (define out (open-output-string))
+  (let loop ()
+    (define next (peek-char in))
+    (cond
+      [(or (eof-object? next)
+           (and (char? next)
+                (or (char=? next #\<)
+                    (char=? next #\{))))
+       (get-output-string out)]
+      [else
+       (write-char (read-char in) out)
+       (loop)])))
 
 ;; read-exactly! : input-port? exact-nonnegative-integer? -> string?
 ;;   Consume exactly n characters from an input port.
@@ -264,6 +301,11 @@
 (define (identifier-token-text! in)
   (read-while! in js-ident-char?))
 
+;; jsx-name-token-text! : input-port? -> string?
+;;   Consume a simplified JSX element or attribute name.
+(define (jsx-name-token-text! in)
+  (read-while! in jsx-ident-char?))
+
 ;; read-js-operator! : input-port? -> (or/c string? #f)
 ;;   Consume the longest matching JavaScript operator in the current subset.
 (define (read-js-operator! in)
@@ -332,23 +374,36 @@
     [else
      (raw-token in start-pos 'unknown-raw-token (string (read-char in)))]))
 
-;; make-javascript-raw-reader : -> (input-port? -> (or/c javascript-raw-token? 'eof))
+;; make-javascript-raw-reader : keyword-arguments -> (input-port? -> (or/c javascript-raw-token? 'eof))
 ;;   Construct a stateful JavaScript raw-token reader.
-(define (make-javascript-raw-reader)
+(define (make-javascript-raw-reader #:jsx? [jsx? #f])
   (define can-start-regex? #t)
   (define previous-significant-token #f)
   (define pending-raw-tokens '())
   (define template-mode 'normal)
   (define template-brace-depth 0)
+  (define jsx-mode 'normal)
+  (define jsx-depth 0)
+  (define jsx-tag-kind 'open)
+  (define jsx-await-tag-name? #f)
+  (define jsx-expr-brace-depth 0)
+  (define jsx-return-mode 'children)
   (define (update-regex-state! raw-token)
     (define kind (javascript-raw-token-kind raw-token))
     (define text (javascript-raw-token-text raw-token))
-    (unless (memq kind '(whitespace-token line-comment-token block-comment-token))
+    (unless (memq kind '(whitespace-token line-comment-token block-comment-token jsx-text-token))
       (set! can-start-regex?
             (case kind
               [(identifier-token)
                (member text js-regex-context-keywords)]
-              [(private-name-token string-token number-token regex-token)
+              [(private-name-token
+                string-token
+                number-token
+                regex-token
+                jsx-tag-name-token
+                jsx-closing-tag-name-token
+                jsx-attribute-name-token
+                jsx-fragment-boundary-token)
                #f]
               [(delimiter-token)
                (member text '("(" "[" "{" "," ";" ":" "?"))]
@@ -379,6 +434,97 @@
                              (javascript-raw-token-end raw-token))]
       [else
        raw-token]))
+  (define (jsx-current-mode-default)
+    (cond
+      [(positive? jsx-depth) 'jsx-children]
+      [else                  'normal]))
+  (define (jsx-read-tag-start! in)
+    (define start-pos (current-stream-position in))
+    (cond
+      [(string-prefix-at? in 0 "</>")
+       (define text (read-exactly! in 3))
+       (set! jsx-depth (max 0 (sub1 jsx-depth)))
+       (set! jsx-mode (jsx-current-mode-default))
+       (raw-token in start-pos 'jsx-fragment-boundary-token text)]
+      [(string-prefix-at? in 0 "<>")
+       (define text (read-exactly! in 2))
+       (set! jsx-depth (add1 jsx-depth))
+       (set! jsx-mode 'jsx-children)
+       (raw-token in start-pos 'jsx-fragment-boundary-token text)]
+      [(string-prefix-at? in 0 "</")
+       (define text (read-exactly! in 2))
+       (set! jsx-mode 'jsx-tag)
+       (set! jsx-tag-kind 'close)
+       (set! jsx-await-tag-name? #t)
+       (raw-token in start-pos 'delimiter-token text)]
+      [else
+       (define text (read-exactly! in 1))
+       (set! jsx-mode 'jsx-tag)
+       (set! jsx-tag-kind 'open)
+       (set! jsx-await-tag-name? #t)
+       (raw-token in start-pos 'delimiter-token text)]))
+  (define (jsx-read-tag-token! in)
+    (define start-pos (current-stream-position in))
+    (define next (peek-char in))
+    (cond
+      [(eof-object? next) 'eof]
+      [(and (char? next)
+            (char-whitespace? next))
+       (raw-token in start-pos 'whitespace-token (read-while! in char-whitespace?))]
+      [jsx-await-tag-name?
+       (define text (jsx-name-token-text! in))
+       (set! jsx-await-tag-name? #f)
+       (raw-token in start-pos
+                  (case jsx-tag-kind
+                    [(close) 'jsx-closing-tag-name-token]
+                    [else    'jsx-tag-name-token])
+                  text)]
+      [(string-prefix-at? in 0 "/>")
+       (define text (read-exactly! in 2))
+       (set! jsx-mode (jsx-current-mode-default))
+       (raw-token in start-pos 'delimiter-token text)]
+      [(and (char? next)
+            (char=? next #\>))
+       (define text (string (read-char in)))
+       (case jsx-tag-kind
+         [(close)
+          (set! jsx-depth (max 0 (sub1 jsx-depth)))
+          (set! jsx-mode (jsx-current-mode-default))]
+         [else
+          (set! jsx-depth (add1 jsx-depth))
+          (set! jsx-mode 'jsx-children)])
+       (raw-token in start-pos 'delimiter-token text)]
+      [(and (char? next)
+            (char=? next #\{))
+       (define text (string (read-char in)))
+       (set! jsx-mode 'jsx-expr)
+       (set! jsx-expr-brace-depth 0)
+       (set! jsx-return-mode 'jsx-tag)
+       (raw-token in start-pos 'jsx-interpolation-start-token text)]
+      [(and (char? next)
+            (or (char=? next #\")
+                (char=? next #\')))
+       (define-values (text terminated?) (read-string-literal! in))
+       (raw-token in start-pos
+                  (if terminated?
+                      'string-token
+                      'bad-string-token)
+                  text)]
+      [(and (char? next)
+            (jsx-ident-start? next))
+       (raw-token in start-pos 'jsx-attribute-name-token (jsx-name-token-text! in))]
+      [(and (char? next)
+            (member next js-delimiter-characters))
+       (raw-token in start-pos 'delimiter-token (string (read-char in)))]
+      [(char? next)
+       (define maybe-operator (read-js-operator! in))
+       (cond
+         [maybe-operator
+          (raw-token in start-pos 'operator-token maybe-operator)]
+         [else
+          (raw-token in start-pos 'unknown-raw-token (string (read-char in)))])]
+      [else
+       (raw-token in start-pos 'unknown-raw-token (string (read-char in)))]))
   (lambda (in)
     (unless (input-port? in)
       (raise-argument-error 'make-javascript-raw-reader "input-port?" in))
@@ -387,6 +533,23 @@
       (cond
         [(pair? pending-raw-tokens)
          (dequeue-raw-token!)]
+        [(eq? jsx-mode 'jsx-children)
+         (define start-pos (current-stream-position in))
+         (define next (peek-char in))
+         (cond
+           [(eof-object? next) 'eof]
+           [(and (char? next) (char=? next #\<))
+            (jsx-read-tag-start! in)]
+           [(and (char? next) (char=? next #\{))
+            (define text (string (read-char in)))
+            (set! jsx-mode 'jsx-expr)
+            (set! jsx-expr-brace-depth 0)
+            (set! jsx-return-mode 'jsx-children)
+            (raw-token in start-pos 'jsx-interpolation-start-token text)]
+           [else
+            (raw-token in start-pos 'jsx-text-token (read-until-jsx-text-break! in))])]
+        [(eq? jsx-mode 'jsx-tag)
+         (jsx-read-tag-token! in)]
         [(eq? template-mode 'template)
          (define start-pos (current-stream-position in))
          (define-values (chunk-text chunk-end)
@@ -429,6 +592,13 @@
          (define start-pos (current-stream-position in))
          (define next (peek-char in))
          (cond
+           [(and jsx?
+                 (eq? jsx-mode 'normal)
+                 (char? next)
+                 (char=? next #\<)
+                 can-start-regex?
+                 (jsx-start-candidate? in))
+            (jsx-read-tag-start! in)]
            [(and (eq? template-mode 'normal)
                  (char? next)
                  (char=? next #\`))
@@ -442,6 +612,13 @@
             (define text (string (read-char in)))
             (set! template-mode 'template)
             (raw-token in start-pos 'template-interpolation-end-token text)]
+           [(and (eq? jsx-mode 'jsx-expr)
+                 (char? next)
+                 (char=? next #\})
+                 (zero? jsx-expr-brace-depth))
+            (define text (string (read-char in)))
+            (set! jsx-mode jsx-return-mode)
+            (raw-token in start-pos 'jsx-interpolation-end-token text)]
            [(and can-start-regex?
                  (char? next)
                  (char=? next #\/)
@@ -466,6 +643,16 @@
         [(and (string=? delimiter-text "}")
               (positive? template-brace-depth))
          (set! template-brace-depth (sub1 template-brace-depth))]))
+    (when (and (eq? jsx-mode 'jsx-expr)
+               (not (eq? decorated-result 'eof))
+               (eq? (javascript-raw-token-kind decorated-result) 'delimiter-token))
+      (define delimiter-text (javascript-raw-token-text decorated-result))
+      (cond
+        [(string=? delimiter-text "{")
+         (set! jsx-expr-brace-depth (add1 jsx-expr-brace-depth))]
+        [(and (string=? delimiter-text "}")
+              (positive? jsx-expr-brace-depth))
+         (set! jsx-expr-brace-depth (sub1 jsx-expr-brace-depth))]))
     (unless (eq? decorated-result 'eof)
       (update-regex-state! decorated-result))
     (unless (or (eq? decorated-result 'eof)
