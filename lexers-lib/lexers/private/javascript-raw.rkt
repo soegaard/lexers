@@ -4,7 +4,7 @@
 ;;; JavaScript Raw Tokens
 ;;;
 ;;
-;; Minimal JavaScript raw tokenization for the initial subset.
+;; JavaScript raw tokenization for the current shared subset.
 
 ;; javascript-raw-token?      : any/c -> boolean?
 ;;   Recognize a raw JavaScript token.
@@ -18,24 +18,39 @@
 ;;   Extract the ending source position.
 ;; read-javascript-raw-token  : input-port? -> (or/c javascript-raw-token? 'eof)
 ;;   Read the next raw JavaScript token from an input port.
+;; make-javascript-raw-reader : -> (input-port? -> (or/c javascript-raw-token? 'eof))
+;;   Construct a stateful JavaScript raw-token reader.
 
 (provide javascript-raw-token?
          javascript-raw-token-kind
          javascript-raw-token-text
          javascript-raw-token-start
          javascript-raw-token-end
-         read-javascript-raw-token)
+         read-javascript-raw-token
+         make-javascript-raw-reader)
 
 (require parser-tools/lex
          "parser-tools-compat.rkt")
 
 (struct javascript-raw-token (kind text start end) #:transparent)
 
+;; One-character delimiter tokens.
 (define js-delimiter-characters
-  '(#\( #\) #\[ #\] #\{ #\} #\, #\; #\.))
+  '(#\( #\) #\[ #\] #\{ #\} #\, #\; #\. #\:))
 
-(define js-operator-characters
-  '(#\= #\+ #\- #\* #\/))
+(define start-paren (string-ref "(" 0))
+
+;; Longest-match-first JavaScript operator spellings for the current subset.
+(define js-operators
+  '(">>>=" "<<=" ">>=" "&&=" "||=" "??=" "**=" "===" "!=="
+    ">>>" "<<" ">>" "==" "!=" "<=" ">=" "&&" "||" "??"
+    "++" "--" "+=" "-=" "*=" "/=" "%=" "&=" "|=" "^=" "=>"
+    "**" "?." "=" "<" ">" "!" "~" "+" "-" "*" "/" "%" "&"
+    "|" "^" "?" "@"))
+
+(define js-regex-context-keywords
+  '("return" "throw" "case" "delete" "void" "typeof" "new" "in" "instanceof"
+    "do" "else" "if" "while" "for" "switch" "catch" "await" "yield"))
 
 ;; js-ident-start? : char? -> boolean?
 ;;   Recognize a simplified JavaScript identifier start character.
@@ -49,6 +64,31 @@
 (define (js-ident-char? ch)
   (or (js-ident-start? ch)
       (char-numeric? ch)))
+
+;; string-prefix-at? : input-port? exact-nonnegative-integer? string? -> boolean?
+;;   Determine whether the input has the given prefix at the current offset.
+(define (string-prefix-at? in offset prefix)
+  (define n (string-length prefix))
+  (let loop ([i 0])
+    (cond
+      [(= i n) #t]
+      [else
+       (define next (peek-char in (+ offset i)))
+       (and (char? next)
+            (char=? next (string-ref prefix i))
+            (loop (add1 i)))])))
+
+;; peek-next-nonspace-char : input-port? -> (or/c char? #f)
+;;   Peek the next non-whitespace character without consuming input.
+(define (peek-next-nonspace-char in)
+  (let loop ([offset 0])
+    (define next (peek-char in offset))
+    (cond
+      [(eof-object? next) #f]
+      [(and (char? next) (char-whitespace? next))
+       (loop (add1 offset))]
+      [(char? next) next]
+      [else #f])))
 
 ;; current-stream-position : input-port? -> position?
 ;;   Read the current parser-tools-compatible source position from a port.
@@ -71,6 +111,16 @@
        (loop)]
       [else
        (get-output-string out)])))
+
+;; read-exactly! : input-port? exact-nonnegative-integer? -> string?
+;;   Consume exactly n characters from an input port.
+(define (read-exactly! in n)
+  (define out (open-output-string))
+  (for ([i (in-range n)])
+    (define next (read-char in))
+    (when (char? next)
+      (write-char next out)))
+  (get-output-string out))
 
 ;; raw-token : input-port? position? symbol? string? -> javascript-raw-token?
 ;;   Construct a raw JavaScript token with positions.
@@ -132,6 +182,43 @@
          [(char=? next #\newline)  (values (get-output-string out) #f)]
          [else                     (loop #f)])])))
 
+;; read-js-regex-literal! : input-port? -> (values string? boolean?)
+;;   Consume a JavaScript regex literal and report whether it terminated cleanly.
+(define (read-js-regex-literal! in)
+  (define out (open-output-string))
+  (write-char (read-char in) out)
+  (let loop ([escaped? #f] [in-class? #f])
+    (define next (read-char in))
+    (cond
+      [(eof-object? next) (values (get-output-string out) #f)]
+      [else
+       (write-char next out)
+       (cond
+         [(or (char=? next #\newline)
+              (char=? next #\return))
+          (values (get-output-string out) #f)]
+         [escaped?
+          (loop #f in-class?)]
+         [(char=? next #\\)
+          (loop #t in-class?)]
+         [(char=? next #\[)
+          (loop #f #t)]
+         [(and in-class? (char=? next #\]))
+          (loop #f #f)]
+         [(and (not in-class?) (char=? next #\/))
+          (display (read-while! in char-alphabetic?) out)
+          (values (get-output-string out) #t)]
+         [else
+          (loop #f in-class?)])])))
+
+;; read-private-name! : input-port? -> string?
+;;   Consume a JavaScript private name beginning with #.
+(define (read-private-name! in)
+  (define out (open-output-string))
+  (write-char (read-char in) out)
+  (display (read-while! in js-ident-char?) out)
+  (get-output-string out))
+
 ;; read-number-literal! : input-port? -> string?
 ;;   Consume a small JavaScript numeric literal subset.
 (define (read-number-literal! in)
@@ -148,6 +235,13 @@
 ;;   Consume a simplified JavaScript identifier.
 (define (identifier-token-text! in)
   (read-while! in js-ident-char?))
+
+;; read-js-operator! : input-port? -> (or/c string? #f)
+;;   Consume the longest matching JavaScript operator in the current subset.
+(define (read-js-operator! in)
+  (for/or ([op (in-list js-operators)])
+    (and (string-prefix-at? in 0 op)
+         (read-exactly! in (string-length op)))))
 
 ;; read-javascript-raw-token : input-port? -> (or/c javascript-raw-token? 'eof)
 ;;   Read the next raw JavaScript token from an input port.
@@ -188,14 +282,92 @@
           (char-numeric? next))
      (raw-token in start-pos 'number-token (read-number-literal! in))]
     [(and (char? next)
+          (char=? next #\#)
+          (let ([after (peek-char in 1)])
+            (and (char? after)
+                 (js-ident-start? after))))
+     (raw-token in start-pos 'private-name-token (read-private-name! in))]
+    [(and (char? next)
           (js-ident-start? next))
      (raw-token in start-pos 'identifier-token (identifier-token-text! in))]
     [(and (char? next)
           (member next js-delimiter-characters))
      (raw-token in start-pos 'delimiter-token (string (read-char in)))]
-    [(and (char? next)
-          (member next js-operator-characters))
-     (raw-token in start-pos 'operator-token (string (read-char in)))]
+    [(char? next)
+     (define maybe-operator
+       (read-js-operator! in))
+     (cond
+       [maybe-operator
+        (raw-token in start-pos 'operator-token maybe-operator)]
+       [else
+        (raw-token in start-pos 'unknown-raw-token (string (read-char in)))])]
     [else
      (raw-token in start-pos 'unknown-raw-token (string (read-char in)))]))
 
+;; make-javascript-raw-reader : -> (input-port? -> (or/c javascript-raw-token? 'eof))
+;;   Construct a stateful JavaScript raw-token reader.
+(define (make-javascript-raw-reader)
+  (define can-start-regex? #t)
+  (define previous-significant-token #f)
+  (define (update-regex-state! raw-token)
+    (define kind (javascript-raw-token-kind raw-token))
+    (define text (javascript-raw-token-text raw-token))
+    (unless (memq kind '(whitespace-token line-comment-token block-comment-token))
+      (set! can-start-regex?
+            (case kind
+              [(identifier-token)
+               (member text js-regex-context-keywords)]
+              [(private-name-token string-token number-token regex-token)
+               #f]
+              [(delimiter-token)
+               (member text '("(" "[" "{" "," ";" ":" "?"))]
+              [(operator-token)
+               (not (member text '("++" "--")))]
+              [else
+               #f]))))
+  (define (decorate-raw-token in raw-token)
+    (define kind (javascript-raw-token-kind raw-token))
+    (define text (javascript-raw-token-text raw-token))
+    (cond
+      [(and (memq kind '(identifier-token private-name-token))
+            previous-significant-token
+            (eq? (javascript-raw-token-kind previous-significant-token) 'delimiter-token)
+            (string=? (javascript-raw-token-text previous-significant-token) ".")
+            (let ([next (peek-next-nonspace-char in)])
+              (and (char? next)
+                   (char=? next start-paren))))
+       (javascript-raw-token 'method-name-token
+                             text
+                             (javascript-raw-token-start raw-token)
+                             (javascript-raw-token-end raw-token))]
+      [else
+       raw-token]))
+  (lambda (in)
+    (unless (input-port? in)
+      (raise-argument-error 'make-javascript-raw-reader "input-port?" in))
+    (port-count-lines! in)
+    (define start-pos (current-stream-position in))
+    (define next (peek-char in))
+    (define undecorated-raw-token
+      (cond
+        [(and can-start-regex?
+              (char? next)
+              (char=? next #\/)
+              (let ([after (peek-char in 1)])
+                (and (char? after)
+                     (not (member after '(#\/ #\*))))))
+         (define-values (text terminated?) (read-js-regex-literal! in))
+         (raw-token in start-pos (if terminated? 'regex-token 'unknown-raw-token) text)]
+        [else
+         (read-javascript-raw-token in)]))
+    (define raw-result
+      (if (eq? undecorated-raw-token 'eof)
+          'eof
+          (decorate-raw-token in undecorated-raw-token)))
+    (unless (eq? raw-result 'eof)
+      (update-regex-state! raw-result))
+    (unless (or (eq? raw-result 'eof)
+                (memq (javascript-raw-token-kind raw-result)
+                      '(whitespace-token line-comment-token block-comment-token)))
+      (set! previous-significant-token raw-result))
+    raw-result))

@@ -6,10 +6,10 @@
 ;;
 ;; Project raw JavaScript tokens into the reusable stream model.
 
-;; project-javascript-raw-token : (or/c javascript-raw-token? 'eof) javascript-config? -> token-like?
-;;   Convert a raw JavaScript token into a reusable-stream token-like value.
+;; project-javascript-derived-token : (or/c javascript-derived-token? 'eof) javascript-config? -> token-like?
+;;   Convert a derived JavaScript token into a reusable-stream token-like value.
 
-(provide project-javascript-raw-token)
+(provide project-javascript-derived-token)
 
 (require parser-tools/lex
          syntax/readerr
@@ -31,7 +31,7 @@
     [(whitespace-token)                   stream-category-whitespace]
     [(line-comment-token block-comment-token) stream-category-comment]
     [(identifier-token)                   stream-category-identifier]
-    [(string-token bad-string-token number-token) stream-category-literal]
+    [(string-token bad-string-token number-token regex-token) stream-category-literal]
     [(delimiter-token)                    stream-category-delimiter]
     [(operator-token)                     stream-category-operator]
     [(unknown-raw-token)                  stream-category-unknown]
@@ -48,7 +48,8 @@
     [(javascript-derived-token-has-tag? derived-token 'identifier)
      stream-category-identifier]
     [(or (javascript-derived-token-has-tag? derived-token 'string-literal)
-         (javascript-derived-token-has-tag? derived-token 'numeric-literal))
+         (javascript-derived-token-has-tag? derived-token 'numeric-literal)
+         (javascript-derived-token-has-tag? derived-token 'regex-literal))
      stream-category-literal]
     [(javascript-derived-token-has-tag? derived-token 'comment)
      stream-category-comment]
@@ -64,9 +65,11 @@
                        (make-stream-position 1 1 0)
                        (javascript-config-source-positions config)))
 
-;; malformed-token->result : javascript-raw-token? javascript-config? -> token-like?
-;;   Project malformed raw input or raise in strict mode.
-(define (malformed-token->result raw-token config)
+;; malformed-token->result : javascript-derived-token? javascript-config? -> token-like?
+;;   Project malformed input or raise in strict mode.
+(define (malformed-token->result derived-token config)
+  (define raw-token
+    (javascript-derived-token-raw derived-token))
   (case (javascript-config-errors config)
     [(emit-unknown)
      (wrap-token-with-pos
@@ -89,19 +92,20 @@
             "unsupported JavaScript error policy: ~a"
             (javascript-config-errors config))]))
 
-;; visible-raw-token? : javascript-raw-token? javascript-config? -> boolean?
-;;   Determine whether a raw token should be emitted in the current profile.
-(define (visible-raw-token? raw-token config)
-  (case (javascript-raw-token-kind raw-token)
+;; visible-derived-token? : javascript-derived-token? javascript-config? -> boolean?
+;;   Determine whether a derived token should be emitted in the current profile.
+(define (visible-derived-token? derived-token config)
+  (case (javascript-raw-token-kind (javascript-derived-token-raw derived-token))
     [(whitespace-token line-comment-token block-comment-token)
      (not (skip-trivia? config))]
     [else
      #t]))
 
-;; plain-raw-token->result : javascript-raw-token? javascript-config? -> token-like?
-;;   Project a non-error raw token to the reusable stream model.
-(define (plain-raw-token->result raw-token config)
-  (define derived-token (derive-javascript-token raw-token))
+;; plain-derived-token->result : javascript-derived-token? javascript-config? -> token-like?
+;;   Project a non-error derived token to the reusable stream model.
+(define (plain-derived-token->result derived-token config)
+  (define raw-token
+    (javascript-derived-token-raw derived-token))
   (wrap-token-with-pos
    (make-stream-token (derived->stream-category derived-token)
                       (javascript-raw-token-text raw-token))
@@ -109,20 +113,15 @@
    (javascript-raw-token-end raw-token)
    (javascript-config-source-positions config)))
 
-;; project-javascript-raw-token : (or/c javascript-raw-token? 'eof) javascript-config? -> token-like?
-;;   Convert a raw JavaScript token into a reusable-stream token-like value.
-(define (project-javascript-raw-token raw-token config)
-  (define derived-token
-    (and (not (eq? raw-token 'eof))
-         (derive-javascript-token raw-token)))
+;; project-javascript-derived-token : (or/c javascript-derived-token? 'eof) javascript-config? -> token-like?
+;;   Convert a derived JavaScript token into a reusable-stream token-like value.
+(define (project-javascript-derived-token derived-token config)
   (cond
-    [(eq? raw-token 'eof)
+    [(eq? derived-token 'eof)
      (raw-eof->token config)]
-    [(and derived-token
-          (javascript-derived-token-has-tag? derived-token 'malformed-token))
-     (malformed-token->result raw-token config)]
-    [(visible-raw-token? raw-token config)
-     (plain-raw-token->result raw-token config)]
+    [(javascript-derived-token-has-tag? derived-token 'malformed-token)
+     (malformed-token->result derived-token config)]
+    [(visible-derived-token? derived-token config)
+     (plain-derived-token->result derived-token config)]
     [else
      #f]))
-

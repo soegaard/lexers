@@ -82,6 +82,11 @@ as:
 
 - keyword
 - identifier
+- declaration name
+- parameter name
+- property name
+- private name
+- static keyword usage
 - string literal
 - numeric literal
 - comment
@@ -89,6 +94,31 @@ as:
 
 The projected consumer-facing layer should map those distinctions into the
 shared stream vocabulary from `DESIGN.md`.
+
+## Next Priorities
+
+After the first context-sensitive derived-token slice, the next JavaScript
+priorities should be:
+
+1. `object-key`
+2. `method-name`
+3. `regex-literal`
+
+These are the next best additions because they provide clear reusable
+language-level distinctions for consumers such as `peek` and
+`scribble-tools`, while still fitting the rule that derived-token tags should
+describe syntax role or reusable language meaning rather than presentation.
+
+Template-literal-specific roles and JSX-specific roles should remain deferred
+until after that slice.
+
+Template-literal-specific roles should be prioritized before JSX-specific
+roles. Template literals are a more central part of everyday JavaScript, and
+they can support both `peek` and `scribble-tools` without immediately
+expanding the lexer into a larger JavaScript-plus-JSX dialect commitment.
+
+Only after template-literal support is in place should the library decide
+explicitly whether JSX belongs in scope for `lexers/javascript`.
 
 ## Profile Differences
 

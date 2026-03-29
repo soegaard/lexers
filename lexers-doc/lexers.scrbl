@@ -555,20 +555,37 @@ The current JavaScript scaffold may attach tags such as:
 @itemlist[
  @item{@racket['keyword]}
  @item{@racket['identifier]}
+ @item{@racket['declaration-name]}
+ @item{@racket['parameter-name]}
+ @item{@racket['object-key]}
+ @item{@racket['property-name]}
+ @item{@racket['method-name]}
+ @item{@racket['private-name]}
+ @item{@racket['static-keyword-usage]}
  @item{@racket['string-literal]}
  @item{@racket['numeric-literal]}
+ @item{@racket['regex-literal]}
  @item{@racket['comment]}
  @item{@racket['malformed-token]}]
 
 @examples[#:eval javascript-eval
 (define derived-tokens
-  (javascript-string->derived-tokens "const name = 1"))
+  (javascript-string->derived-tokens
+   "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42 };\nreturn /ab+c/i;"))
 (map (lambda (token)
        (list (javascript-derived-token-text token)
              (javascript-derived-token-tags token)
              (javascript-derived-token-has-tag? token 'keyword)
              (javascript-derived-token-has-tag? token 'identifier)
-             (javascript-derived-token-has-tag? token 'numeric-literal)))
+             (javascript-derived-token-has-tag? token 'declaration-name)
+             (javascript-derived-token-has-tag? token 'parameter-name)
+             (javascript-derived-token-has-tag? token 'object-key)
+             (javascript-derived-token-has-tag? token 'property-name)
+             (javascript-derived-token-has-tag? token 'method-name)
+             (javascript-derived-token-has-tag? token 'private-name)
+             (javascript-derived-token-has-tag? token 'static-keyword-usage)
+             (javascript-derived-token-has-tag? token 'numeric-literal)
+             (javascript-derived-token-has-tag? token 'regex-literal)))
      derived-tokens)
 ]}
 

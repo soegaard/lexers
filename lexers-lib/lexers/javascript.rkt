@@ -47,6 +47,7 @@
                     [javascript-derived-token? private-javascript-derived-token?]
                     [javascript-derived-token-raw private-javascript-derived-token-raw]
                     [javascript-derived-token-tags private-javascript-derived-token-tags]
+                    [make-javascript-derived-classifier private-make-javascript-derived-classifier]
                     [javascript-derived-token-has-tag? private-javascript-derived-token-has-tag?])
          "private/javascript-raw.rkt"
          "private/javascript-tokenize.rkt"
@@ -93,17 +94,20 @@
     (make-javascript-config #:profile          profile
                             #:trivia           trivia
                             #:source-positions source-positions))
-  (lambda (in)
-    (read-javascript-token in config)))
+  (make-javascript-token-reader config))
 
 ;; make-javascript-derived-lexer : -> (input-port? -> (or/c javascript-derived-token? 'eof))
 ;;   Construct a port-based JavaScript lexer that returns derived token values.
 (define (make-javascript-derived-lexer)
+  (define classify-javascript-token
+    (private-make-javascript-derived-classifier))
+  (define read-javascript-raw
+    (make-javascript-raw-reader))
   (lambda (in)
-    (define raw-token (read-javascript-raw-token in))
+    (define raw-token (read-javascript-raw in))
     (cond
       [(eq? raw-token 'eof) 'eof]
-      [else                 (derive-javascript-token raw-token)])))
+      [else                 (classify-javascript-token raw-token)])))
 
 ;; javascript-string->tokens : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire JavaScript string using the JavaScript lexer.
@@ -157,21 +161,64 @@
     (javascript-string->tokens "   const" #:profile 'coloring))
   (define operator-tokens
     (javascript-string->tokens "=" #:profile 'compiler))
+  (define regex-tokens
+    (javascript-string->tokens "return /ab+c/i;" #:profile 'compiler #:source-positions #f))
   (define derived-lexer
     (make-javascript-derived-lexer))
   (define derived-tokens
-    (javascript-string->derived-tokens "const name = 1"))
+    (javascript-string->derived-tokens
+     "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42, run() {} };\nreturn /ab+c/i;"))
   (define (find-derived-token tag)
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token tag))
            derived-tokens))
   (define derived-keyword-token
-    (find-derived-token 'keyword))
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'keyword)
+                  (string=? (javascript-derived-token-text token) "class")))
+           derived-tokens))
   (define derived-identifier-token
     (find-derived-token 'identifier))
   (define derived-number-token
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token 'numeric-literal))
+           derived-tokens))
+  (define derived-class-name-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'declaration-name)
+                  (string=? (javascript-derived-token-text token) "Box")))
+           derived-tokens))
+  (define derived-param-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'parameter-name)
+                  (string=? (javascript-derived-token-text token) "name")))
+           derived-tokens))
+  (define derived-property-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'property-name)
+                  (string=? (javascript-derived-token-text token) "run")))
+           derived-tokens))
+  (define derived-method-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'method-name)
+                  (string=? (javascript-derived-token-text token) "run")))
+           derived-tokens))
+  (define derived-object-key-token
+    (findf (lambda (token)
+             (and (javascript-derived-token-has-tag? token 'object-key)
+                  (string=? (javascript-derived-token-text token) "answer")))
+           derived-tokens))
+  (define derived-private-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'private-name))
+           derived-tokens))
+  (define derived-static-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'static-keyword-usage))
+           derived-tokens))
+  (define derived-regex-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'regex-literal))
            derived-tokens))
 
   (check-true (pair? coloring-tokens))
@@ -184,6 +231,8 @@
   (check-equal? (stream-token-name (car compiler-no-trivia-tokens)) 'keyword)
   (check-equal? (stream-token-name (car coloring-with-trivia-tokens)) 'whitespace)
   (check-equal? (stream-token-name (car operator-tokens)) 'operator)
+  (check-equal? (stream-token-name (cadr regex-tokens)) 'literal)
+  (check-equal? (stream-token-value (cadr regex-tokens)) "/ab+c/i")
   (check-exn exn:fail:read?
              (lambda ()
                (javascript-string->tokens "\"unterminated" #:profile 'compiler)))
@@ -192,10 +241,18 @@
   (check-equal? (javascript-derived-token-tags derived-keyword-token)
                 '(keyword))
   (check-equal? (javascript-derived-token-text derived-keyword-token)
-                "const")
+                "class")
   (check-equal? (position-offset (javascript-derived-token-start derived-keyword-token))
                 1)
   (check-equal? (position-offset (javascript-derived-token-end derived-keyword-token))
                 6)
   (check-not-false (javascript-derived-token-has-tag? derived-identifier-token 'identifier))
-  (check-not-false (javascript-derived-token-has-tag? derived-number-token 'numeric-literal)))
+  (check-not-false (javascript-derived-token-has-tag? derived-number-token 'numeric-literal))
+  (check-not-false derived-class-name-token)
+  (check-not-false derived-param-token)
+  (check-not-false derived-property-token)
+  (check-not-false derived-method-token)
+  (check-not-false derived-object-key-token)
+  (check-not-false derived-private-token)
+  (check-not-false derived-static-token)
+  (check-not-false derived-regex-token))

@@ -6,24 +6,35 @@
 ;;
 ;; Public JavaScript token reading implemented as raw-tokenization plus projection.
 
-;; read-javascript-token : input-port? javascript-config? -> token-like?
-;;   Read the next JavaScript token-like value from an input port.
+;; make-javascript-token-reader : javascript-config? -> (input-port? -> token-like?)
+;;   Construct a stateful JavaScript token reader from raw tokenization plus projection.
 
-(provide read-javascript-token)
+(provide make-javascript-token-reader)
 
 (require "config.rkt"
+         "javascript-derived.rkt"
          "javascript-project.rkt"
          "javascript-raw.rkt")
 
-;; read-javascript-token : input-port? javascript-config? -> token-like?
-;;   Read the next JavaScript token-like value from an input port.
-(define (read-javascript-token in config)
-  (unless (input-port? in)
-    (raise-argument-error 'read-javascript-token "input-port?" 0 in config))
-  (let loop ()
-    (define projected
-      (project-javascript-raw-token (read-javascript-raw-token in) config))
-    (cond
+;; make-javascript-token-reader : javascript-config? -> (input-port? -> token-like?)
+;;   Construct a stateful JavaScript token reader from raw tokenization plus projection.
+(define (make-javascript-token-reader config)
+  (define classify-javascript-token
+    (make-javascript-derived-classifier))
+  (define read-javascript-raw
+    (make-javascript-raw-reader))
+  (lambda (in)
+    (unless (input-port? in)
+      (raise-argument-error 'make-javascript-token-reader "input-port?" in))
+    (let loop ()
+      (define raw-token
+        (read-javascript-raw in))
+      (define projected
+        (project-javascript-derived-token
+         (cond
+           [(eq? raw-token 'eof) 'eof]
+           [else                 (classify-javascript-token raw-token)])
+         config))
+      (cond
       [projected projected]
-      [else      (loop)])))
-
+      [else      (loop)]))))
