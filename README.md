@@ -5,6 +5,7 @@ A collection of lexers for a few select languages.
 Currently implemented language modules include:
 
 - `lexers/css`
+- `lexers/html`
 - `lexers/javascript`
 
 The long-term public-facing documentation is intended to live in `lexers-doc`.

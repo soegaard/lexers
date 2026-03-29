@@ -5,6 +5,7 @@
                      racket/contract/base
                      parser-tools/lex
                      lexers/css
+                     lexers/html
                      lexers/token
                      lexers/javascript))
 
@@ -24,6 +25,14 @@
                          lexers/javascript))
      the-eval))
 
+@(define html-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/html))
+     the-eval))
+
 @title{Lexers}
 
 This manual documents the public APIs in the @tt{lexers} packages.
@@ -41,6 +50,7 @@ The public language modules currently available are:
 @itemlist[
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/css]}
+ @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/javascript]}]
 
 Each language module currently exposes two related kinds of API:
@@ -224,10 +234,6 @@ malformed input is returned as @racket['unknown]. In @racket['compiler] mode,
 whitespace and comments are skipped by default, and malformed input raises an
 exception instead of producing an @racket['unknown] token.
 
-When @racket[#:jsx?] is enabled, JSX tag names and attribute names still
-project as @racket['identifier], JSX text projects as @racket['literal], and
-JSX punctuation and interpolation boundaries project as @racket['delimiter].
-
 For the current CSS scaffold, @racket[token-value] normally preserves the
 original source text of the emitted token. In particular:
 
@@ -364,6 +370,170 @@ The current CSS scaffold may attach tags such as:
 
 @defthing[css-profiles immutable-hash?]{
 The profile defaults used by the CSS lexer.}
+
+@section{HTML}
+
+@defmodule[lexers/html]
+
+The projected HTML API has two entry points:
+
+@itemlist[
+ @item{@racket[make-html-lexer] for streaming tokenization from an input port.}
+ @item{@racket[html-string->tokens] for eager tokenization of an entire string.}]
+
+@defproc[(make-html-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming HTML lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next token from the port and returns one projected token value.
+
+The projected HTML token stream includes ordinary markup tokens and inline
+delegated tokens from embedded @tt{<style>} and @tt{<script>} bodies.
+
+When @racket[#:source-positions] is true, each result is a
+@racket[position-token?]. When it is false, the result is either a bare symbol
+or a @racket[token?] directly.
+
+@examples[#:eval html-eval
+(define lexer
+  (make-html-lexer #:profile 'coloring))
+(define in
+  (open-input-string "<section id=main>Hi</section>"))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(html-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire HTML string using the projected token API.
+
+This is a convenience wrapper over @racket[make-html-lexer].}
+
+@subsection{HTML Returned Tokens}
+
+Common projected HTML categories include:
+
+@itemlist[
+ @item{@racket['comment]}
+ @item{@racket['keyword]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['operator]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current HTML scaffold:
+
+@itemlist[
+ @item{tag names and attribute names project as @racket['identifier]}
+ @item{attribute values, text nodes, entities, and delegated CSS/JS literals
+       project as @racket['literal]}
+ @item{punctuation such as @tt{<}, @tt{</}, @tt{>}, @tt{/>}, and embedded
+       interpolation boundaries project as @racket['delimiter] or
+       @racket['operator]}
+ @item{comments project as @racket['comment]}
+ @item{doctype/declaration markup projects as @racket['keyword]}]
+
+@examples[#:eval html-eval
+(define inspect-lexer
+  (make-html-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "<!doctype html><main id=\"app\">Hi &amp; bye</main>"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(lexer-token-has-positions? first-token)
+(lexer-token-name first-token)
+(lexer-token-value first-token)
+(position-offset (lexer-token-start first-token))
+(position-offset (lexer-token-end first-token))
+]}
+
+@defproc[(make-html-derived-lexer)
+         (input-port? . -> . (or/c 'eof html-derived-token?))]{
+Constructs a streaming HTML lexer for the derived-token layer.}
+
+@defproc[(html-string->derived-tokens [source string?])
+         (listof html-derived-token?)]{
+Tokenizes an entire HTML string into derived HTML token values.}
+
+@defproc[(html-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived HTML token values returned by
+@racket[make-html-derived-lexer] and
+@racket[html-string->derived-tokens].}
+
+@defproc[(html-derived-token-tags [token html-derived-token?])
+         (listof symbol?)]{
+Returns the HTML-specific classification tags attached to a derived HTML token.}
+
+@defproc[(html-derived-token-has-tag? [token html-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether a derived HTML token carries a given classification tag.}
+
+@defproc[(html-derived-token-text [token html-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived HTML token.}
+
+@defproc[(html-derived-token-start [token html-derived-token?])
+         position?]{
+Returns the starting source position for a derived HTML token.}
+
+@defproc[(html-derived-token-end [token html-derived-token?])
+         position?]{
+Returns the ending source position for a derived HTML token.}
+
+@subsection{HTML Derived Tokens}
+
+The current HTML scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['html-tag-name]}
+ @item{@racket['html-closing-tag-name]}
+ @item{@racket['html-attribute-name]}
+ @item{@racket['html-attribute-value]}
+ @item{@racket['html-text]}
+ @item{@racket['html-entity]}
+ @item{@racket['html-doctype]}
+ @item{@racket['comment]}
+ @item{@racket['embedded-css]}
+ @item{@racket['embedded-javascript]}
+ @item{@racket['malformed-token]}]
+
+Delegated CSS and JavaScript body tokens keep their reusable semantic tags and
+gain an additional language marker such as @racket['embedded-css] or
+@racket['embedded-javascript].
+
+@examples[#:eval html-eval
+(define derived-tokens
+  (html-string->derived-tokens
+   "<!doctype html><section id=main class=\"card\">Hi &amp; bye<style>.hero { color: #c33; }</style><script>const root = document.querySelector(\"#app\");</script></section>"))
+(map (lambda (token)
+       (list (html-derived-token-text token)
+             (html-derived-token-tags token)
+             (html-derived-token-has-tag? token 'html-tag-name)
+             (html-derived-token-has-tag? token 'html-attribute-name)
+             (html-derived-token-has-tag? token 'html-attribute-value)
+             (html-derived-token-has-tag? token 'html-text)
+             (html-derived-token-has-tag? token 'html-entity)
+             (html-derived-token-has-tag? token 'embedded-css)
+             (html-derived-token-has-tag? token 'embedded-javascript)))
+     derived-tokens)
+]}
+
+@defthing[html-profiles immutable-hash?]{
+The profile defaults used by the HTML lexer.}
 
 @section{JavaScript}
 

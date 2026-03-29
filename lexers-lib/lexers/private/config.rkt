@@ -8,6 +8,8 @@
 
 ;; css-profile-defaults  : immutable-hash?
 ;;   Default settings for named CSS lexer profiles.
+;; html-profile-defaults : immutable-hash?
+;;   Default settings for named HTML lexer profiles.
 ;; javascript-profile-defaults : immutable-hash?
 ;;   Default settings for named JavaScript lexer profiles.
 ;; css-config?           : any/c -> boolean?
@@ -21,6 +23,18 @@
 ;; css-config-errors     : css-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-css-config       : keyword-arguments -> css-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; html-config?          : any/c -> boolean?
+;;   Recognize HTML lexer configuration values.
+;; html-config-profile   : html-config? -> symbol?
+;;   Extract the configured profile name.
+;; html-config-trivia    : html-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; html-config-source-positions : html-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; html-config-errors    : html-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-html-config      : keyword-arguments -> html-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; javascript-config?    : any/c -> boolean?
 ;;   Recognize JavaScript lexer configuration values.
@@ -38,6 +52,7 @@
 ;;   Resolve profile defaults and explicit overrides into one config.
 
 (provide css-profile-defaults
+         html-profile-defaults
          javascript-profile-defaults
          css-config?
          css-config-profile
@@ -45,6 +60,12 @@
          css-config-source-positions
          css-config-errors
          make-css-config
+         html-config?
+         html-config-profile
+         html-config-trivia
+         html-config-source-positions
+         html-config-errors
+         make-html-config
          javascript-config?
          javascript-config-profile
          javascript-config-trivia
@@ -56,11 +77,23 @@
 ;; A resolved configuration for the public CSS lexer.
 (struct css-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public HTML lexer.
+(struct html-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public JavaScript lexer.
 (struct javascript-config (profile trivia source-positions jsx? errors) #:transparent)
 
 ;; Profile defaults for the CSS lexer.
 (define css-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the HTML lexer.
+(define html-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -102,6 +135,32 @@
               resolved-trivia
               resolved-source-positions
               resolved-errors))
+
+;; make-html-config : keyword-arguments -> html-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-html-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref html-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-html-config
+                                       "unknown HTML lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors (hash-ref defaults 'errors))
+  (html-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
 
 ;; make-javascript-config : keyword-arguments -> javascript-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
