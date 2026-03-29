@@ -211,6 +211,34 @@
          [else
           (loop #f in-class?)])])))
 
+;; read-template-chunk! : input-port? -> (values string? symbol?)
+;;   Consume one template chunk and report how it ended.
+(define (read-template-chunk! in)
+  (define out (open-output-string))
+  (let loop ([escaped? #f])
+    (define next (peek-char in))
+    (cond
+      [(eof-object? next)
+       (values (get-output-string out) 'eof)]
+      [(and (not escaped?)
+            (char? next)
+            (char=? next #\`))
+       (values (get-output-string out) 'template-end)]
+      [(and (not escaped?)
+            (char? next)
+            (char=? next #\$)
+            (let ([after (peek-char in 1)])
+              (and (char? after)
+                   (char=? after #\{))))
+       (values (get-output-string out) 'interpolation-start)]
+      [else
+       (define ch (read-char in))
+       (write-char ch out)
+       (cond
+         [escaped?          (loop #f)]
+         [(char=? ch #\\)   (loop #t)]
+         [else              (loop #f)])])))
+
 ;; read-private-name! : input-port? -> string?
 ;;   Consume a JavaScript private name beginning with #.
 (define (read-private-name! in)
@@ -309,6 +337,9 @@
 (define (make-javascript-raw-reader)
   (define can-start-regex? #t)
   (define previous-significant-token #f)
+  (define pending-raw-tokens '())
+  (define template-mode 'normal)
+  (define template-brace-depth 0)
   (define (update-regex-state! raw-token)
     (define kind (javascript-raw-token-kind raw-token))
     (define text (javascript-raw-token-text raw-token))
@@ -325,6 +356,12 @@
                (not (member text '("++" "--")))]
               [else
                #f]))))
+  (define (enqueue-raw-token! token)
+    (set! pending-raw-tokens (append pending-raw-tokens (list token))))
+  (define (dequeue-raw-token!)
+    (define next-token (car pending-raw-tokens))
+    (set! pending-raw-tokens (cdr pending-raw-tokens))
+    next-token)
   (define (decorate-raw-token in raw-token)
     (define kind (javascript-raw-token-kind raw-token))
     (define text (javascript-raw-token-text raw-token))
@@ -346,28 +383,93 @@
     (unless (input-port? in)
       (raise-argument-error 'make-javascript-raw-reader "input-port?" in))
     (port-count-lines! in)
-    (define start-pos (current-stream-position in))
-    (define next (peek-char in))
-    (define undecorated-raw-token
-      (cond
-        [(and can-start-regex?
-              (char? next)
-              (char=? next #\/)
-              (let ([after (peek-char in 1)])
-                (and (char? after)
-                     (not (member after '(#\/ #\*))))))
-         (define-values (text terminated?) (read-js-regex-literal! in))
-         (raw-token in start-pos (if terminated? 'regex-token 'unknown-raw-token) text)]
-        [else
-         (read-javascript-raw-token in)]))
     (define raw-result
-      (if (eq? undecorated-raw-token 'eof)
+      (cond
+        [(pair? pending-raw-tokens)
+         (dequeue-raw-token!)]
+        [(eq? template-mode 'template)
+         (define start-pos (current-stream-position in))
+         (define-values (chunk-text chunk-end)
+           (read-template-chunk! in))
+         (cond
+           [(positive? (string-length chunk-text))
+            (case chunk-end
+              [(template-end)
+               (define boundary-start (current-stream-position in))
+               (define boundary-text (string (read-char in)))
+               (set! template-mode 'normal)
+               (enqueue-raw-token!
+                (raw-token in boundary-start 'template-end-token boundary-text))]
+              [(interpolation-start)
+               (define boundary-start (current-stream-position in))
+               (define boundary-text (read-exactly! in 2))
+               (set! template-mode 'template-expr)
+               (set! template-brace-depth 0)
+               (enqueue-raw-token!
+                (raw-token in boundary-start 'template-interpolation-start-token boundary-text))]
+              [(eof)
+               (void)])
+            (raw-token in start-pos
+                       (if (eq? chunk-end 'eof)
+                           'unknown-raw-token
+                           'template-chunk-token)
+                       chunk-text)]
+           [(eq? chunk-end 'template-end)
+            (define boundary-text (string (read-char in)))
+            (set! template-mode 'normal)
+            (raw-token in start-pos 'template-end-token boundary-text)]
+           [(eq? chunk-end 'interpolation-start)
+            (define boundary-text (read-exactly! in 2))
+            (set! template-mode 'template-expr)
+            (set! template-brace-depth 0)
+            (raw-token in start-pos 'template-interpolation-start-token boundary-text)]
+           [else
+            'eof])]
+        [else
+         (define start-pos (current-stream-position in))
+         (define next (peek-char in))
+         (cond
+           [(and (eq? template-mode 'normal)
+                 (char? next)
+                 (char=? next #\`))
+            (define text (string (read-char in)))
+            (set! template-mode 'template)
+            (raw-token in start-pos 'template-start-token text)]
+           [(and (eq? template-mode 'template-expr)
+                 (char? next)
+                 (char=? next #\})
+                 (zero? template-brace-depth))
+            (define text (string (read-char in)))
+            (set! template-mode 'template)
+            (raw-token in start-pos 'template-interpolation-end-token text)]
+           [(and can-start-regex?
+                 (char? next)
+                 (char=? next #\/)
+                 (let ([after (peek-char in 1)])
+                   (and (char? after)
+                        (not (member after '(#\/ #\*))))))
+            (define-values (text terminated?) (read-js-regex-literal! in))
+            (raw-token in start-pos (if terminated? 'regex-token 'unknown-raw-token) text)]
+           [else
+            (read-javascript-raw-token in)])]))
+    (define decorated-result
+      (if (eq? raw-result 'eof)
           'eof
-          (decorate-raw-token in undecorated-raw-token)))
-    (unless (eq? raw-result 'eof)
-      (update-regex-state! raw-result))
-    (unless (or (eq? raw-result 'eof)
-                (memq (javascript-raw-token-kind raw-result)
+          (decorate-raw-token in raw-result)))
+    (when (and (eq? template-mode 'template-expr)
+               (not (eq? decorated-result 'eof))
+               (eq? (javascript-raw-token-kind decorated-result) 'delimiter-token))
+      (define delimiter-text (javascript-raw-token-text decorated-result))
+      (cond
+        [(string=? delimiter-text "{")
+         (set! template-brace-depth (add1 template-brace-depth))]
+        [(and (string=? delimiter-text "}")
+              (positive? template-brace-depth))
+         (set! template-brace-depth (sub1 template-brace-depth))]))
+    (unless (eq? decorated-result 'eof)
+      (update-regex-state! decorated-result))
+    (unless (or (eq? decorated-result 'eof)
+                (memq (javascript-raw-token-kind decorated-result)
                       '(whitespace-token line-comment-token block-comment-token)))
-      (set! previous-significant-token raw-result))
-    raw-result))
+      (set! previous-significant-token decorated-result))
+    decorated-result))

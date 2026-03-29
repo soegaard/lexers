@@ -31,8 +31,14 @@
     [(whitespace-token)                   stream-category-whitespace]
     [(line-comment-token block-comment-token) stream-category-comment]
     [(identifier-token)                   stream-category-identifier]
-    [(string-token bad-string-token number-token regex-token) stream-category-literal]
-    [(delimiter-token)                    stream-category-delimiter]
+    [(string-token bad-string-token number-token regex-token template-chunk-token)
+     stream-category-literal]
+    [(delimiter-token
+      template-start-token
+      template-end-token
+      template-interpolation-start-token
+      template-interpolation-end-token)
+     stream-category-delimiter]
     [(operator-token)                     stream-category-operator]
     [(unknown-raw-token)                  stream-category-unknown]
     [else                                 stream-category-unknown]))
@@ -49,7 +55,8 @@
      stream-category-identifier]
     [(or (javascript-derived-token-has-tag? derived-token 'string-literal)
          (javascript-derived-token-has-tag? derived-token 'numeric-literal)
-         (javascript-derived-token-has-tag? derived-token 'regex-literal))
+         (javascript-derived-token-has-tag? derived-token 'regex-literal)
+         (javascript-derived-token-has-tag? derived-token 'template-chunk))
      stream-category-literal]
     [(javascript-derived-token-has-tag? derived-token 'comment)
      stream-category-comment]

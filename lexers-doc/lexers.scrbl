@@ -565,13 +565,16 @@ The current JavaScript scaffold may attach tags such as:
  @item{@racket['string-literal]}
  @item{@racket['numeric-literal]}
  @item{@racket['regex-literal]}
+ @item{@racket['template-literal]}
+ @item{@racket['template-chunk]}
+ @item{@racket['template-interpolation-boundary]}
  @item{@racket['comment]}
  @item{@racket['malformed-token]}]
 
 @examples[#:eval javascript-eval
 (define derived-tokens
   (javascript-string->derived-tokens
-   "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42 };\nreturn /ab+c/i;"))
+   "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42 };\nconst greeting = `a ${name} b`;\nreturn /ab+c/i;"))
 (map (lambda (token)
        (list (javascript-derived-token-text token)
              (javascript-derived-token-tags token)
@@ -585,7 +588,10 @@ The current JavaScript scaffold may attach tags such as:
              (javascript-derived-token-has-tag? token 'private-name)
              (javascript-derived-token-has-tag? token 'static-keyword-usage)
              (javascript-derived-token-has-tag? token 'numeric-literal)
-             (javascript-derived-token-has-tag? token 'regex-literal)))
+             (javascript-derived-token-has-tag? token 'regex-literal)
+             (javascript-derived-token-has-tag? token 'template-literal)
+             (javascript-derived-token-has-tag? token 'template-chunk)
+             (javascript-derived-token-has-tag? token 'template-interpolation-boundary)))
      derived-tokens)
 ]}
 

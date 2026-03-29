@@ -60,6 +60,12 @@
       [(string-token) '(string-literal)]
       [(number-token) '(numeric-literal)]
       [(regex-token) '(regex-literal)]
+      [(template-chunk-token) '(template-literal template-chunk)]
+      [(template-start-token
+        template-end-token) '(template-literal)]
+      [(template-interpolation-start-token
+        template-interpolation-end-token)
+       '(template-literal template-interpolation-boundary)]
       [(line-comment-token block-comment-token) '(comment)]
       [else '()])
     (case kind

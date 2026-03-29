@@ -163,11 +163,13 @@
     (javascript-string->tokens "=" #:profile 'compiler))
   (define regex-tokens
     (javascript-string->tokens "return /ab+c/i;" #:profile 'compiler #:source-positions #f))
+  (define template-tokens
+    (javascript-string->tokens "`a ${name} b`" #:profile 'compiler #:source-positions #f))
   (define derived-lexer
     (make-javascript-derived-lexer))
   (define derived-tokens
     (javascript-string->derived-tokens
-     "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42, run() {} };\nreturn /ab+c/i;"))
+     "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42, run() {} };\nreturn /ab+c/i;\nconst greeting = `a ${name} b`;"))
   (define (find-derived-token tag)
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token tag))
@@ -220,6 +222,18 @@
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token 'regex-literal))
            derived-tokens))
+  (define derived-template-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'template-literal))
+           derived-tokens))
+  (define derived-template-chunk-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'template-chunk))
+           derived-tokens))
+  (define derived-template-boundary-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'template-interpolation-boundary))
+           derived-tokens))
 
   (check-true (pair? coloring-tokens))
   (check-true (position-token? (car coloring-tokens)))
@@ -233,6 +247,9 @@
   (check-equal? (stream-token-name (car operator-tokens)) 'operator)
   (check-equal? (stream-token-name (cadr regex-tokens)) 'literal)
   (check-equal? (stream-token-value (cadr regex-tokens)) "/ab+c/i")
+  (check-equal? (stream-token-name (car template-tokens)) 'delimiter)
+  (check-equal? (stream-token-name (cadr template-tokens)) 'literal)
+  (check-equal? (stream-token-value (cadr template-tokens)) "a ")
   (check-exn exn:fail:read?
              (lambda ()
                (javascript-string->tokens "\"unterminated" #:profile 'compiler)))
@@ -255,4 +272,7 @@
   (check-not-false derived-object-key-token)
   (check-not-false derived-private-token)
   (check-not-false derived-static-token)
-  (check-not-false derived-regex-token))
+  (check-not-false derived-regex-token)
+  (check-not-false derived-template-token)
+  (check-not-false derived-template-chunk-token)
+  (check-not-false derived-template-boundary-token))
