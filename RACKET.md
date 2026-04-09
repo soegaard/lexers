@@ -74,12 +74,11 @@ not know expansion-time bindings.
 
 ## Deferred Work
 
-The first Racket milestone defers:
+The first Racket milestone still defers:
 
-- Scribble-specific `@` tokenization
 - special handling of `racket-nobar-lexer`
 - renderer-facing distinctions
 
-If Scribble support is needed later, it should be added as a separate
+Scribble-specific `@` tokenization now lives in the separate
 `lexers/scribble` module built on the Scribble lexer family from
 `syntax-color`.

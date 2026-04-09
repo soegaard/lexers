@@ -5,9 +5,12 @@
                      racket/contract/base
                      parser-tools/lex
                      syntax-color/racket-lexer
+                     (only-in syntax-color/scribble-lexer
+                              make-scribble-inside-lexer)
                      lexers/css
                      lexers/html
                      lexers/racket
+                     lexers/scribble
                      lexers/token
                      lexers/javascript))
 
@@ -43,6 +46,14 @@
                          lexers/racket))
      the-eval))
 
+@(define scribble-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/scribble))
+     the-eval))
+
 @title{Lexers}
 
 This manual documents the public APIs in the @tt{lexers} packages.
@@ -62,7 +73,8 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/javascript]}
- @item{@racketmodname[lexers/racket]}]
+ @item{@racketmodname[lexers/racket]}
+ @item{@racketmodname[lexers/scribble]}]
 
 Each language module currently exposes two related kinds of API:
 
@@ -718,6 +730,176 @@ perform expansion or binding resolution.
 
 @defthing[racket-profiles immutable-hash?]{
 The profile defaults used by the Racket lexer.}
+
+@section{Scribble}
+
+@defmodule[lexers/scribble]
+
+The projected Scribble API has two entry points:
+
+@itemlist[
+ @item{@racket[make-scribble-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[scribble-string->tokens] for eager tokenization of an entire
+       string.}]
+
+This lexer is adapter-backed. It uses
+@racketmodname[syntax-color/scribble-lexer] as its raw engine and adapts that
+output into the public @tt{lexers} projected and derived APIs.
+
+The first implementation defaults to Scribble's inside/text mode via
+@racket[make-scribble-inside-lexer]. Command-character customization is
+intentionally deferred.
+
+@defproc[(make-scribble-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Scribble lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next token from the port and returns one projected token value.
+
+When @racket[#:source-positions] is true, each result is a
+@racket[position-token?]. When it is false, the result is either a bare symbol
+or a @racket[token?] directly.
+
+The intended use is to create the lexer once, then call it repeatedly on the
+same port until it returns an end-of-file token.
+
+@examples[#:eval scribble-eval
+(define lexer
+  (make-scribble-lexer #:profile 'coloring))
+(define in
+  (open-input-string "@title{Hi}\nText"))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(scribble-string->tokens [source string?]
+                                  [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                  [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                  [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire Scribble string using the projected token API.
+
+This is a convenience wrapper over @racket[make-scribble-lexer].}
+
+@subsection{Scribble Returned Tokens}
+
+Common projected Scribble categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current adapter:
+
+@itemlist[
+ @item{text, strings, and constants project as @racket['literal]}
+ @item{whitespace projects as @racket['whitespace]}
+ @item{symbol and @tt{other} tokens project as @racket['identifier]}
+ @item{parentheses, the command character, and body or optional delimiters
+       project as @racket['delimiter]}
+ @item{lexical errors project as @racket['unknown] in @racket['coloring] mode
+       and raise in @racket['compiler] mode}]
+
+@examples[#:eval scribble-eval
+(define inspect-lexer
+  (make-scribble-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "@title{Hi}"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(lexer-token-has-positions? first-token)
+(lexer-token-name first-token)
+(lexer-token-value first-token)
+]}
+
+@defproc[(make-scribble-derived-lexer)
+         (input-port? . -> . (or/c 'eof scribble-derived-token?))]{
+Constructs a streaming Scribble lexer for the derived-token layer.}
+
+@defproc[(scribble-string->derived-tokens [source string?])
+         (listof scribble-derived-token?)]{
+Tokenizes an entire Scribble string into derived Scribble token values.}
+
+@defproc[(scribble-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Scribble token values returned by
+@racket[make-scribble-derived-lexer] and
+@racket[scribble-string->derived-tokens].}
+
+@defproc[(scribble-derived-token-tags [token scribble-derived-token?])
+         (listof symbol?)]{
+Returns the Scribble-specific classification tags attached to a derived
+Scribble token.}
+
+@defproc[(scribble-derived-token-has-tag? [token scribble-derived-token?]
+                                          [tag symbol?])
+         boolean?]{
+Determines whether a derived Scribble token carries a given classification
+tag.}
+
+@defproc[(scribble-derived-token-text [token scribble-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived Scribble token.}
+
+@defproc[(scribble-derived-token-start [token scribble-derived-token?])
+         position?]{
+Returns the starting source position for a derived Scribble token.}
+
+@defproc[(scribble-derived-token-end [token scribble-derived-token?])
+         position?]{
+Returns the ending source position for a derived Scribble token.}
+
+@subsection{Scribble Derived Tokens}
+
+The current Scribble adapter may attach tags such as:
+
+@itemlist[
+ @item{@racket['scribble-comment]}
+ @item{@racket['scribble-whitespace]}
+ @item{@racket['scribble-text]}
+ @item{@racket['scribble-string]}
+ @item{@racket['scribble-constant]}
+ @item{@racket['scribble-symbol]}
+ @item{@racket['scribble-parenthesis]}
+ @item{@racket['scribble-other]}
+ @item{@racket['scribble-error]}
+ @item{@racket['scribble-command]}
+ @item{@racket['scribble-command-char]}
+ @item{@racket['scribble-body-delimiter]}
+ @item{@racket['scribble-optional-delimiter]}
+ @item{@racket['scribble-racket-escape]}]
+
+These tags describe reusable Scribble structure, not presentation. In
+particular, @racket['scribble-command] only means that a symbol-like token is
+being used as a command name after @racket["@"]. It does not mean the lexer has
+inferred higher-level document semantics for commands such as
+@racket[title] or @racket[itemlist].
+
+@examples[#:eval scribble-eval
+(define derived-tokens
+  (scribble-string->derived-tokens
+   "@title{Hi}\n@racket[(define x 1)]"))
+(map (lambda (token)
+       (list (scribble-derived-token-text token)
+             (scribble-derived-token-tags token)))
+     derived-tokens)
+]}
+
+@defthing[scribble-profiles immutable-hash?]{
+The profile defaults used by the Scribble lexer.}
 
 @section{JavaScript}
 

@@ -12,6 +12,8 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; racket-profile-defaults : immutable-hash?
 ;;   Default settings for named Racket lexer profiles.
+;; scribble-profile-defaults : immutable-hash?
+;;   Default settings for named Scribble lexer profiles.
 ;; javascript-profile-defaults : immutable-hash?
 ;;   Default settings for named JavaScript lexer profiles.
 ;; css-config?           : any/c -> boolean?
@@ -50,6 +52,18 @@
 ;;   Extract the configured error policy.
 ;; make-racket-config    : keyword-arguments -> racket-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; scribble-config?      : any/c -> boolean?
+;;   Recognize Scribble lexer configuration values.
+;; scribble-config-profile : scribble-config? -> symbol?
+;;   Extract the configured profile name.
+;; scribble-config-trivia : scribble-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; scribble-config-source-positions : scribble-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; scribble-config-errors : scribble-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-scribble-config  : keyword-arguments -> scribble-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; javascript-config?    : any/c -> boolean?
 ;;   Recognize JavaScript lexer configuration values.
 ;; javascript-config-profile : javascript-config? -> symbol?
@@ -68,6 +82,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          racket-profile-defaults
+         scribble-profile-defaults
          javascript-profile-defaults
          css-config?
          css-config-profile
@@ -87,6 +102,12 @@
          racket-config-source-positions
          racket-config-errors
          make-racket-config
+         scribble-config?
+         scribble-config-profile
+         scribble-config-trivia
+         scribble-config-source-positions
+         scribble-config-errors
+         make-scribble-config
          javascript-config?
          javascript-config-profile
          javascript-config-trivia
@@ -103,6 +124,9 @@
 
 ;; A resolved configuration for the public Racket lexer.
 (struct racket-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Scribble lexer.
+(struct scribble-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public JavaScript lexer.
 (struct javascript-config (profile trivia source-positions jsx? errors) #:transparent)
@@ -127,6 +151,15 @@
 
 ;; Profile defaults for the Racket lexer.
 (define racket-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Scribble lexer.
+(define scribble-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -220,6 +253,32 @@
                  resolved-trivia
                  resolved-source-positions
                  resolved-errors))
+
+;; make-scribble-config : keyword-arguments -> scribble-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-scribble-config #:profile          [profile 'coloring]
+                              #:trivia           [trivia 'profile-default]
+                              #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref scribble-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-scribble-config
+                                       "unknown Scribble lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors (hash-ref defaults 'errors))
+  (scribble-config profile
+                   resolved-trivia
+                   resolved-source-positions
+                   resolved-errors))
 
 ;; make-javascript-config : keyword-arguments -> javascript-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

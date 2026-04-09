@@ -8,6 +8,7 @@ Currently implemented language modules include:
 - `lexers/html`
 - `lexers/javascript`
 - `lexers/racket`
+- `lexers/scribble`
 
 The long-term public-facing documentation is intended to live in `lexers-doc`.
 
