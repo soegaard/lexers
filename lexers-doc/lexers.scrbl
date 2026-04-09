@@ -4,8 +4,10 @@
           (for-label racket/base
                      racket/contract/base
                      parser-tools/lex
+                     syntax-color/racket-lexer
                      lexers/css
                      lexers/html
+                     lexers/racket
                      lexers/token
                      lexers/javascript))
 
@@ -33,6 +35,14 @@
                          lexers/html))
      the-eval))
 
+@(define racket-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/racket))
+     the-eval))
+
 @title{Lexers}
 
 This manual documents the public APIs in the @tt{lexers} packages.
@@ -51,7 +61,8 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
- @item{@racketmodname[lexers/javascript]}]
+ @item{@racketmodname[lexers/javascript]}
+ @item{@racketmodname[lexers/racket]}]
 
 Each language module currently exposes two related kinds of API:
 
@@ -136,8 +147,10 @@ The current defaults are:
        (list @racket['compiler] @racket['skip] @racket[#t] "raise an exception"))]
 
 For the keyword arguments accepted by @racket[make-css-lexer],
-@racket[css-string->tokens], @racket[make-javascript-lexer], and
-@racket[javascript-string->tokens]:
+@racket[css-string->tokens], @racket[make-html-lexer],
+@racket[html-string->tokens], @racket[make-javascript-lexer],
+@racket[javascript-string->tokens], @racket[make-racket-lexer], and
+@racket[racket-string->tokens]:
 
 @itemlist[
  @item{@racket[#:profile] selects the named default bundle.}
@@ -534,6 +547,165 @@ gain an additional language marker such as @racket['embedded-css] or
 
 @defthing[html-profiles immutable-hash?]{
 The profile defaults used by the HTML lexer.}
+
+@section{Racket}
+
+@defmodule[lexers/racket]
+
+The projected Racket API has two entry points:
+
+@itemlist[
+ @item{@racket[make-racket-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[racket-string->tokens] for eager tokenization of an entire
+       string.}]
+
+This lexer is adapter-backed. It uses the lexer from
+@racketmodname[syntax-color/racket-lexer] as its raw engine and adapts that
+output into the public @tt{lexers} projected and derived APIs.
+
+@defproc[(make-racket-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                            [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Racket lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next token from the port and returns one projected token value.
+
+When @racket[#:source-positions] is true, each result is a
+@racket[position-token?]. When it is false, the result is either a bare symbol
+or a @racket[token?] directly.
+
+The intended use is to create the lexer once, then call it repeatedly on the
+same port until it returns an end-of-file token.
+
+@examples[#:eval racket-eval
+(define lexer
+  (make-racket-lexer #:profile 'coloring))
+(define in
+  (open-input-string "#:x \"hi\""))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(racket-string->tokens [source string?]
+                                [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire Racket string using the projected token API.
+
+This is a convenience wrapper over @racket[make-racket-lexer].}
+
+@subsection{Racket Returned Tokens}
+
+Common projected Racket categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current adapter:
+
+@itemlist[
+ @item{comments and sexp comments project as @racket['comment]}
+ @item{whitespace projects as @racket['whitespace]}
+ @item{strings, constants, and hash-colon keywords project as
+       @racket['literal]}
+ @item{symbols, @tt{other}, and @tt{no-color} tokens project as
+       @racket['identifier]}
+ @item{parentheses project as @racket['delimiter]}
+ @item{lexical errors project as @racket['unknown] in @racket['coloring] mode
+       and raise in @racket['compiler] mode}]
+
+@examples[#:eval racket-eval
+(define inspect-lexer
+  (make-racket-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "#;(+ 1 2) #:x"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(lexer-token-has-positions? first-token)
+(lexer-token-name first-token)
+(lexer-token-value first-token)
+]}
+
+@defproc[(make-racket-derived-lexer)
+         (input-port? . -> . (or/c 'eof racket-derived-token?))]{
+Constructs a streaming Racket lexer for the derived-token layer.}
+
+@defproc[(racket-string->derived-tokens [source string?])
+         (listof racket-derived-token?)]{
+Tokenizes an entire Racket string into derived Racket token values.}
+
+@defproc[(racket-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Racket token values returned by
+@racket[make-racket-derived-lexer] and
+@racket[racket-string->derived-tokens].}
+
+@defproc[(racket-derived-token-tags [token racket-derived-token?])
+         (listof symbol?)]{
+Returns the Racket-specific classification tags attached to a derived Racket
+token.}
+
+@defproc[(racket-derived-token-has-tag? [token racket-derived-token?]
+                                        [tag symbol?])
+         boolean?]{
+Determines whether a derived Racket token carries a given classification tag.}
+
+@defproc[(racket-derived-token-text [token racket-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived Racket token.}
+
+@defproc[(racket-derived-token-start [token racket-derived-token?])
+         position?]{
+Returns the starting source position for a derived Racket token.}
+
+@defproc[(racket-derived-token-end [token racket-derived-token?])
+         position?]{
+Returns the ending source position for a derived Racket token.}
+
+@subsection{Racket Derived Tokens}
+
+The current Racket adapter may attach tags such as:
+
+@itemlist[
+ @item{@racket['racket-comment]}
+ @item{@racket['racket-sexp-comment]}
+ @item{@racket['racket-whitespace]}
+ @item{@racket['racket-constant]}
+ @item{@racket['racket-string]}
+ @item{@racket['racket-symbol]}
+ @item{@racket['racket-parenthesis]}
+ @item{@racket['racket-hash-colon-keyword]}
+ @item{@racket['racket-commented-out]}
+ @item{@racket['racket-datum]}
+ @item{@racket['racket-open]}
+ @item{@racket['racket-close]}
+ @item{@racket['racket-continue]}
+ @item{@racket['racket-error]}]
+
+@examples[#:eval racket-eval
+(define derived-tokens
+  (racket-string->derived-tokens "#;(+ 1 2) #:x \"hi\""))
+(map (lambda (token)
+       (list (racket-derived-token-text token)
+             (racket-derived-token-tags token)))
+     derived-tokens)
+]}
+
+@defthing[racket-profiles immutable-hash?]{
+The profile defaults used by the Racket lexer.}
 
 @section{JavaScript}
 

@@ -10,6 +10,8 @@
 ;;   Default settings for named CSS lexer profiles.
 ;; html-profile-defaults : immutable-hash?
 ;;   Default settings for named HTML lexer profiles.
+;; racket-profile-defaults : immutable-hash?
+;;   Default settings for named Racket lexer profiles.
 ;; javascript-profile-defaults : immutable-hash?
 ;;   Default settings for named JavaScript lexer profiles.
 ;; css-config?           : any/c -> boolean?
@@ -36,6 +38,18 @@
 ;;   Extract the configured error policy.
 ;; make-html-config      : keyword-arguments -> html-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; racket-config?        : any/c -> boolean?
+;;   Recognize Racket lexer configuration values.
+;; racket-config-profile : racket-config? -> symbol?
+;;   Extract the configured profile name.
+;; racket-config-trivia  : racket-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; racket-config-source-positions : racket-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; racket-config-errors  : racket-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-racket-config    : keyword-arguments -> racket-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; javascript-config?    : any/c -> boolean?
 ;;   Recognize JavaScript lexer configuration values.
 ;; javascript-config-profile : javascript-config? -> symbol?
@@ -53,6 +67,7 @@
 
 (provide css-profile-defaults
          html-profile-defaults
+         racket-profile-defaults
          javascript-profile-defaults
          css-config?
          css-config-profile
@@ -66,6 +81,12 @@
          html-config-source-positions
          html-config-errors
          make-html-config
+         racket-config?
+         racket-config-profile
+         racket-config-trivia
+         racket-config-source-positions
+         racket-config-errors
+         make-racket-config
          javascript-config?
          javascript-config-profile
          javascript-config-trivia
@@ -79,6 +100,9 @@
 
 ;; A resolved configuration for the public HTML lexer.
 (struct html-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Racket lexer.
+(struct racket-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public JavaScript lexer.
 (struct javascript-config (profile trivia source-positions jsx? errors) #:transparent)
@@ -94,6 +118,15 @@
 
 ;; Profile defaults for the HTML lexer.
 (define html-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Racket lexer.
+(define racket-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -161,6 +194,32 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-racket-config : keyword-arguments -> racket-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-racket-config #:profile          [profile 'coloring]
+                            #:trivia           [trivia 'profile-default]
+                            #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref racket-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-racket-config
+                                       "unknown Racket lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors (hash-ref defaults 'errors))
+  (racket-config profile
+                 resolved-trivia
+                 resolved-source-positions
+                 resolved-errors))
 
 ;; make-javascript-config : keyword-arguments -> javascript-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
