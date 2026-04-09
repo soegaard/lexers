@@ -693,7 +693,19 @@ The current Racket adapter may attach tags such as:
  @item{@racket['racket-open]}
  @item{@racket['racket-close]}
  @item{@racket['racket-continue]}
+ @item{@racket['racket-usual-special-form]}
+ @item{@racket['racket-definition-form]}
+ @item{@racket['racket-binding-form]}
+ @item{@racket['racket-conditional-form]}
  @item{@racket['racket-error]}]
+
+The `usual special form` tags are heuristic. They are meant to help ordinary
+Racket tooling recognize common built-in forms such as @racket[define],
+@racket[define-values], @racket[if], and @racket[let], but they are not
+guarantees about expanded meaning. In particular, a token whose text is
+@racket["define"] may still receive @racket['racket-usual-special-form] even in
+a program where @racket[define] has been rebound, because the lexer does not
+perform expansion or binding resolution.
 
 @examples[#:eval racket-eval
 (define derived-tokens

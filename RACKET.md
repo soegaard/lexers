@@ -53,6 +53,25 @@ The first reusable Racket-specific derived tags include:
 
 These tags describe reusable lexical and reader roles, not presentation.
 
+The derived layer may also attach a small heuristic layer for identifiers that
+are usually special forms in ordinary Racket code. These tags are deliberately
+not claims about expanded meaning, since macro expansion can redefine names
+such as `define` or `if`.
+
+The first heuristic tags are:
+
+- `racket-usual-special-form`
+- `racket-definition-form`
+- `racket-binding-form`
+- `racket-conditional-form`
+
+These tags are only added when the token is already a symbol-like datum token
+and its source text matches one of the configured “usual” form names.
+
+For example, the token text `define` may still be tagged as a usual special
+form even in a program where `define` has been rebound, because the lexer does
+not know expansion-time bindings.
+
 ## Deferred Work
 
 The first Racket milestone defers:

@@ -99,6 +99,69 @@
     [(bad)      '(racket-bad)]
     [else       '()]))
 
+;; Usual special-form name tables used as a small heuristic layer.
+(define usual-definition-forms
+  '("define"
+    "define-values"
+    "define-syntax"
+    "define-syntaxes"
+    "define-for-syntax"
+    "define-module-boundary-contract"
+    "struct"))
+
+(define usual-binding-forms
+  '("lambda"
+    "let"
+    "let*"
+    "letrec"
+    "let-values"
+    "let*-values"
+    "letrec-values"
+    "parameterize"))
+
+(define usual-conditional-forms
+  '("if"
+    "when"
+    "unless"
+    "cond"
+    "case"
+    "and"
+    "or"))
+
+(define usual-special-forms
+  (append usual-definition-forms
+          usual-binding-forms
+          usual-conditional-forms
+          '("begin"
+            "begin0"
+            "set!"
+            "quote"
+            "quasiquote"
+            "syntax"
+            "quasisyntax"
+            "module"
+            "module*"
+            "require"
+            "provide")))
+
+;; heuristic-form-tags : string? (listof symbol?) -> (listof symbol?)
+;;   Add clearly heuristic tags for usual Racket special forms.
+(define (heuristic-form-tags text base-tags)
+  (cond
+    [(or (not (member 'racket-symbol base-tags))
+         (not (member 'racket-datum base-tags)))
+     '()]
+    [(member text usual-definition-forms)
+     '(racket-usual-special-form racket-definition-form)]
+    [(member text usual-binding-forms)
+     '(racket-usual-special-form racket-binding-form)]
+    [(member text usual-conditional-forms)
+     '(racket-usual-special-form racket-conditional-form)]
+    [(member text usual-special-forms)
+     '(racket-usual-special-form)]
+    [else
+     '()]))
+
 ;; derived-token-from-result : ... -> racket-derived-token?
 ;;   Construct a derived token from one syntax-color token result.
 (define (derived-token-from-result text cls start-pos end-pos paren status)
@@ -114,11 +177,15 @@
             (if commented-out?
                 '(comment racket-commented-out)
                 '())))
+  (define heuristic-tags
+    (heuristic-form-tags text
+                         (append base-tags extra-tags)))
   (racket-derived-token normalized-class
                         text
                         start-pos
                         end-pos
-                        (remove-duplicates (append base-tags extra-tags))))
+                        (remove-duplicates
+                         (append base-tags extra-tags heuristic-tags))))
 
 ;; make-racket-derived-reader : -> (input-port? -> (or/c racket-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Racket tokens.

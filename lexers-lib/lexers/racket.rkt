@@ -178,6 +178,29 @@
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-hash-colon-keyword))
            derived-tokens))
+  (define form-derived-tokens
+    (racket-string->derived-tokens
+     "(define x 1) (define-values (a b) (values 1 2)) (if x a b) (let ([x 1]) x)"))
+  (define derived-define
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "define"))
+           form-derived-tokens))
+  (define derived-define-values
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "define-values"))
+           form-derived-tokens))
+  (define derived-if
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "if"))
+           form-derived-tokens))
+  (define derived-let
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "let"))
+           form-derived-tokens))
+  (define derived-x
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "x"))
+           form-derived-tokens))
   (define derived-string
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-string))
@@ -211,12 +234,34 @@
   (check-not-false derived-sexp-comment)
   (check-not-false derived-commented-out)
   (check-not-false derived-hash-colon)
+  (check-not-false derived-define)
+  (check-not-false derived-define-values)
+  (check-not-false derived-if)
+  (check-not-false derived-let)
   (check-not-false derived-string)
   (check-not-false derived-open)
   (check-not-false derived-close)
   (check-not-false derived-continue)
   (check-equal? (racket-derived-token-text derived-hash-colon)
                 "#:x")
+  (check-not-false (racket-derived-token-has-tag? derived-define
+                                                  'racket-usual-special-form))
+  (check-not-false (racket-derived-token-has-tag? derived-define
+                                                  'racket-definition-form))
+  (check-not-false (racket-derived-token-has-tag? derived-define-values
+                                                  'racket-usual-special-form))
+  (check-not-false (racket-derived-token-has-tag? derived-define-values
+                                                  'racket-definition-form))
+  (check-not-false (racket-derived-token-has-tag? derived-if
+                                                  'racket-usual-special-form))
+  (check-not-false (racket-derived-token-has-tag? derived-if
+                                                  'racket-conditional-form))
+  (check-not-false (racket-derived-token-has-tag? derived-let
+                                                  'racket-usual-special-form))
+  (check-not-false (racket-derived-token-has-tag? derived-let
+                                                  'racket-binding-form))
+  (check-false (racket-derived-token-has-tag? derived-x
+                                              'racket-usual-special-form))
   (check-true (< (position-offset (racket-derived-token-start derived-string))
                  (position-offset (racket-derived-token-end derived-string))))
   (check-true (position-token? (car (racket-string->tokens "(x)"
