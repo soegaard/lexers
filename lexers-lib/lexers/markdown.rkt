@@ -247,6 +247,14 @@
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
   (define fenced-webracket-derived-tokens
     (markdown-string->derived-tokens "```webracket.rkt\n(test)\n```\n"))
+  (define lone-fence-derived-tokens
+    (markdown-string->derived-tokens "```"))
+  (define lone-fence+newline-derived-tokens
+    (markdown-string->derived-tokens "```\n"))
+  (define unterminated-fence-with-content-derived-tokens
+    (markdown-string->derived-tokens "```js\nconst x = 1;\n"))
+  (define closed-fence-derived-tokens
+    (markdown-string->derived-tokens "```js\nconst x = 1;\n```\n"))
   (define fenced-bash-newline
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'whitespace)
@@ -297,6 +305,30 @@
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
   (check-not-false fenced-webracket-newline)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text lone-fence-derived-tokens))
+                "```")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text lone-fence+newline-derived-tokens))
+                "```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text unterminated-fence-with-content-derived-tokens))
+                "```js\nconst x = 1;\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text closed-fence-derived-tokens))
+                "```js\nconst x = 1;\n```\n")
+  (check-not-false
+   (findf (lambda (token)
+            (markdown-derived-token-has-tag? token 'markdown-code-fence))
+          lone-fence-derived-tokens))
+  (check-not-false
+   (findf (lambda (token)
+            (markdown-derived-token-has-tag? token 'markdown-code-block))
+          unterminated-fence-with-content-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
-  (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens)))
+  (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
+  (check-true (contiguous-derived-stream? lone-fence-derived-tokens))
+  (check-true (contiguous-derived-stream? lone-fence+newline-derived-tokens))
+  (check-true (contiguous-derived-stream? unterminated-fence-with-content-derived-tokens))
+  (check-true (contiguous-derived-stream? closed-fence-derived-tokens)))

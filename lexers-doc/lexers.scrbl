@@ -668,6 +668,8 @@ For the current Markdown scaffold:
 
 For source continuity, the derived Markdown stream preserves the newline after a
 fenced-code info string as an explicit whitespace token before the code body.
+Incomplete fenced-code blocks are tokenized best-effort instead of raising an
+internal error.
 
 @examples[#:eval markdown-eval
 (define inspect-lexer

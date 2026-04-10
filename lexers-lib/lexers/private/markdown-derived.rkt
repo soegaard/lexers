@@ -192,8 +192,14 @@
 ;; known-fence-language : string? -> (or/c symbol? #f)
 ;;   Normalize a fenced-code info string to a known embedded language.
 (define (known-fence-language info)
+  (define parts
+    (string-split (string-trim info)))
   (define primary
-    (string-downcase (car (string-split (string-trim info)))))
+    (cond
+      [(pair? parts)
+       (string-downcase (car parts))]
+      [else
+       ""]))
   (cond
     [(equal? primary "")                 #f]
     [(member primary '("css"))           'css]
@@ -639,8 +645,16 @@
                                   (regexp-quote fence-char)
                                   fence-len)))
                (define after-open full-line-end)
-               (define close-match
+               (define raw-close-match
                  (regexp-match-positions close-rx source after-open))
+               (define close-match
+                 (cond
+                   [(and (list? raw-close-match)
+                         (pair? raw-close-match)
+                         (pair? (car raw-close-match)))
+                    raw-close-match]
+                   [else
+                    #f]))
                (define body-end
                  (if close-match (caar close-match) len))
                (define close-line-end
