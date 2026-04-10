@@ -601,6 +601,28 @@
     (set! tokens
           (append tokens
                   (list (make-md-token starts start end kind text tags)))))
+  ;; emit-inline-with-hard-break : string? exact-nonnegative-integer? -> void?
+  ;;   Emit inline Markdown tokens, splitting a trailing two-space hard break
+  ;;   into its own token without duplicating source text.
+  (define (emit-inline-with-hard-break text start)
+    (define text-len
+      (string-length text))
+    (define hard-break?
+      (regexp-match? #px"  $" text))
+    (define inline-end
+      (cond
+        [hard-break? (- text-len 2)]
+        [else        text-len]))
+    (when (positive? inline-end)
+      (set! tokens
+            (append tokens
+                    (parse-inline (substring text 0 inline-end)
+                                  start
+                                  starts))))
+    (when hard-break?
+      (emit (+ start inline-end) (+ start text-len)
+            'delimiter "  "
+            '(delimiter markdown-hard-line-break))))
   (let loop ([index 0])
     (cond
       [(>= index len)
@@ -815,20 +837,12 @@
                    (emit cursor (+ cursor (string-length marker))
                          'delimiter marker '(delimiter markdown-blockquote-marker))
                    (set! cursor (+ cursor (string-length marker)))
-                   (set! tokens
-                         (append tokens
-                                 (parse-inline rest cursor starts)))
+                   (emit-inline-with-hard-break rest cursor)
                    (unless (string=? nl "")
                      (emit line-end full-line-end 'whitespace nl '(whitespace)))
                    (loop full-line-end)]
                   [else
-                   (set! tokens
-                         (append tokens
-                                 (parse-inline line index starts)))
-                   (when (regexp-match? #px"  $" line)
-                     (emit (- line-end 2) line-end
-                           'delimiter "  "
-                           '(delimiter markdown-hard-line-break)))
+                   (emit-inline-with-hard-break line index)
                    (unless (string=? nl "")
                      (emit line-end full-line-end 'whitespace nl '(whitespace)))
                    (loop full-line-end)])))]
@@ -864,13 +878,9 @@
                      (emit cursor (+ cursor (string-length task-gap))
                            'whitespace task-gap '(whitespace))
                      (set! cursor (+ cursor (string-length task-gap)))
-                     (set! tokens
-                           (append tokens
-                                   (parse-inline task-rest cursor starts))))]
+                     (emit-inline-with-hard-break task-rest cursor))]
                [else
-                (set! tokens
-                      (append tokens
-                              (parse-inline rest cursor starts)))])
+                (emit-inline-with-hard-break rest cursor)])
              (unless (string=? nl "")
                (emit line-end full-line-end 'whitespace nl '(whitespace)))
              (loop full-line-end)]
@@ -886,20 +896,12 @@
              (emit cursor (+ cursor (string-length marker))
                    'delimiter marker '(delimiter markdown-blockquote-marker))
              (set! cursor (+ cursor (string-length marker)))
-             (set! tokens
-                   (append tokens
-                           (parse-inline rest cursor starts)))
+             (emit-inline-with-hard-break rest cursor)
              (unless (string=? nl "")
                (emit line-end full-line-end 'whitespace nl '(whitespace)))
              (loop full-line-end)]
             [else
-             (set! tokens
-                   (append tokens
-                           (parse-inline line index starts)))
-             (when (regexp-match? #px"  $" line)
-               (emit (- line-end 2) line-end
-                     'delimiter "  "
-                     '(delimiter markdown-hard-line-break)))
+             (emit-inline-with-hard-break line index)
              (unless (string=? nl "")
                (emit line-end full-line-end 'whitespace nl '(whitespace)))
              (loop full-line-end)])])])))

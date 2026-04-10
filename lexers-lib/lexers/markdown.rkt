@@ -270,6 +270,23 @@
              (and (markdown-derived-token-has-tag? token 'whitespace)
                   (string=? (markdown-derived-token-text token) "\n")))
            fenced-webracket-derived-tokens))
+  (define hard-break-source
+    "alpha  \nbeta\n")
+  (define hard-break-derived-tokens
+    (markdown-string->derived-tokens hard-break-source))
+  (define hard-break-projected-tokens
+    (markdown-string->tokens hard-break-source
+                             #:profile 'coloring
+                             #:source-positions #t))
+  (define hard-break-token
+    (findf (lambda (token)
+             (markdown-derived-token-has-tag? token 'markdown-hard-line-break))
+           hard-break-derived-tokens))
+  (define hard-break-text-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'markdown-text)
+                  (string=? (markdown-derived-token-text token) "alpha")))
+           hard-break-derived-tokens))
 
   (check-equal? (map stream-token-name heading-tokens)
                 '(delimiter whitespace literal whitespace literal delimiter whitespace eof))
@@ -305,6 +322,18 @@
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
   (check-not-false fenced-webracket-newline)
+  (check-not-false hard-break-token)
+  (check-not-false hard-break-text-token)
+  (check-equal? (markdown-derived-token-text hard-break-token)
+                "  ")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text hard-break-derived-tokens))
+                hard-break-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list hard-break-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (stream-token-value token)))
+                hard-break-source)
   (check-equal? (apply string-append
                        (map markdown-derived-token-text lone-fence-derived-tokens))
                 "```")
@@ -328,6 +357,7 @@
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
+  (check-true (contiguous-derived-stream? hard-break-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence+newline-derived-tokens))
   (check-true (contiguous-derived-stream? unterminated-fence-with-content-derived-tokens))
