@@ -135,9 +135,17 @@
       [else
        (loop (cons token tokens))])))
 
-(module+ test
+  (module+ test
   (require rackunit
            racket/list)
+
+  ;; contiguous-derived-stream? : (listof markdown-derived-token?) -> boolean?
+  ;;   Determine whether adjacent derived tokens cover the source contiguously.
+  (define (contiguous-derived-stream? tokens)
+    (for/and ([left  (in-list tokens)]
+              [right (in-list (cdr tokens))])
+      (= (position-offset (markdown-derived-token-end left))
+         (position-offset (markdown-derived-token-start right)))))
 
   (define heading-tokens
     (markdown-string->tokens "# Title\nParagraph  \n"
@@ -227,6 +235,27 @@
     (findf (lambda (token)
              (markdown-derived-token-has-tag? token 'markdown-hard-line-break))
            (markdown-string->derived-tokens "a  \nb")))
+  (define fenced-bash-derived-tokens
+    (markdown-string->derived-tokens "```bash\necho hi\n```\n"))
+  (define fenced-racket-derived-tokens
+    (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
+  (define fenced-webracket-derived-tokens
+    (markdown-string->derived-tokens "```webracket.rkt\n(test)\n```\n"))
+  (define fenced-bash-newline
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'whitespace)
+                  (string=? (markdown-derived-token-text token) "\n")))
+           fenced-bash-derived-tokens))
+  (define fenced-racket-newline
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'whitespace)
+                  (string=? (markdown-derived-token-text token) "\n")))
+           fenced-racket-derived-tokens))
+  (define fenced-webracket-newline
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'whitespace)
+                  (string=? (markdown-derived-token-text token) "\n")))
+           fenced-webracket-derived-tokens))
 
   (check-equal? (map stream-token-name heading-tokens)
                 '(delimiter whitespace literal whitespace literal delimiter whitespace eof))
@@ -257,4 +286,10 @@
   (check-not-false derived-racket-token)
   (check-not-false derived-html-token)
   (check-not-false derived-css-token)
-  (check-not-false derived-hard-break))
+  (check-not-false derived-hard-break)
+  (check-not-false fenced-bash-newline)
+  (check-not-false fenced-racket-newline)
+  (check-not-false fenced-webracket-newline)
+  (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens)))

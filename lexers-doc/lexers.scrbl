@@ -655,6 +655,9 @@ For the current Markdown scaffold:
  @item{recoverable malformed constructs project as @racket['unknown] in
        @racket['coloring] mode and raise in @racket['compiler] mode}]
 
+For source continuity, the derived Markdown stream preserves the newline after a
+fenced-code info string as an explicit whitespace token before the code body.
+
 @examples[#:eval markdown-eval
 (define inspect-lexer
   (make-markdown-lexer #:profile 'coloring))

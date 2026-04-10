@@ -608,6 +608,13 @@
                        'identifier
                        info
                        '(identifier markdown-code-info-string)))
+               (define header-end
+                 (+ index (string-length line)))
+               (when (< header-end full-line-end)
+                 (emit header-end full-line-end
+                       'whitespace
+                       (substring source header-end full-line-end)
+                       '(whitespace)))
                (define lang (known-fence-language info))
                (define close-rx
                  (pregexp (format "(?m:^[ \t]{0,3}~a{~a,}[ \t]*$)"
