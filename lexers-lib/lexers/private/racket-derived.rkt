@@ -33,6 +33,7 @@
 (require parser-tools/lex
          racket/list
          racket/match
+         racket/port
          syntax-color/racket-lexer
          "parser-tools-compat.rkt")
 
@@ -162,6 +163,18 @@
     [else
      '()]))
 
+;; token-text : string? any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
+;;   Recover the exact token text from the consumed source span whenever
+;;   possible.
+(define (token-text source raw-text start-index end-index)
+  (cond
+    [(<= 0 start-index end-index (string-length source))
+     (substring source start-index end-index)]
+    [(string? raw-text)
+     raw-text]
+    [else
+     (format "~a" raw-text)]))
+
 ;; derived-token-from-result : ... -> racket-derived-token?
 ;;   Construct a derived token from one syntax-color token result.
 (define (derived-token-from-result text cls start-pos end-pos paren status)
@@ -190,26 +203,59 @@
 ;; make-racket-derived-reader : -> (input-port? -> (or/c racket-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Racket tokens.
 (define (make-racket-derived-reader)
-  (define offset 0)
-  (define mode   #f)
+  (define source      #f)
+  (define source-port #f)
+  (define offset      0)
+  (define mode        #f)
+
+  ;; initialize-source! : input-port? -> void?
+  ;;   Buffer the remaining input into an internal string port so the adapter
+  ;;   can recover exact token text spans.
+  (define (initialize-source! in)
+    (when (not source-port)
+      (let-values ([(line col raw-offset) (port-next-location in)])
+        (define base-line
+          (cond
+            [(exact-positive-integer? line)   line]
+            [else                             1]))
+        (define base-col
+          (cond
+            [(exact-nonnegative-integer? col) col]
+            [else                             0]))
+        (define base-offset
+          (cond
+            [(exact-positive-integer? raw-offset) raw-offset]
+            [else                                 1]))
+        (set! source (port->string in))
+        (set! source-port (open-input-string source))
+        (port-count-lines! source-port)
+        (set-port-next-location! source-port
+                                 base-line
+                                 base-col
+                                 base-offset))))
+
   (lambda (in)
     (unless (input-port? in)
       (raise-argument-error 'make-racket-derived-reader "input-port?" in))
-    (port-count-lines! in)
+    (initialize-source! in)
     (define start-pos
-      (current-stream-position in))
+      (current-stream-position source-port))
+    (define start-index
+      (file-position source-port))
     (define-values (text cls paren _raw-start _raw-end next-offset next-mode status)
-      (racket-lexer*/status in offset mode))
+      (racket-lexer*/status source-port offset mode))
     (set! offset next-offset)
     (set! mode   next-mode)
     (cond
       [(eof-object? text)
        'eof]
       [else
-       (derived-token-from-result text
+       (define end-index
+         (file-position source-port))
+       (derived-token-from-result (token-text source text start-index end-index)
                                   cls
                                   start-pos
-                                  (current-stream-position in)
+                                  (current-stream-position source-port)
                                   paren
                                   status)])))
 

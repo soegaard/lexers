@@ -205,6 +205,30 @@
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-string))
            derived-tokens))
+  (define triple-comment-source
+    ";;;\n")
+  (define triple-comment-tokens
+    (racket-string->tokens triple-comment-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define triple-comment-derived-tokens
+    (racket-string->derived-tokens triple-comment-source))
+  (define header-comment-source
+    ";;; ASSEMBLER\n")
+  (define header-comment-tokens
+    (racket-string->tokens header-comment-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define header-comment-derived-tokens
+    (racket-string->derived-tokens header-comment-source))
+  (define ordinary-comment-source
+    ";; comment\n")
+  (define ordinary-comment-tokens
+    (racket-string->tokens ordinary-comment-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define ordinary-comment-derived-tokens
+    (racket-string->derived-tokens ordinary-comment-source))
   (define derived-open
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-open))
@@ -262,6 +286,36 @@
                                                   'racket-binding-form))
   (check-false (racket-derived-token-has-tag? derived-x
                                               'racket-usual-special-form))
+  (check-equal? (map stream-token-value triple-comment-tokens)
+                '(";;;" "\n" #f))
+  (check-equal? (map racket-derived-token-text triple-comment-derived-tokens)
+                '(";;;" "\n"))
+  (check-equal? (map stream-token-value header-comment-tokens)
+                '(";;; ASSEMBLER" "\n" #f))
+  (check-equal? (map racket-derived-token-text header-comment-derived-tokens)
+                '(";;; ASSEMBLER" "\n"))
+  (check-equal? (map stream-token-value ordinary-comment-tokens)
+                '(";; comment" "\n" #f))
+  (check-equal? (map racket-derived-token-text ordinary-comment-derived-tokens)
+                '(";; comment" "\n"))
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value triple-comment-tokens) 1))
+                triple-comment-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value header-comment-tokens) 1))
+                header-comment-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value ordinary-comment-tokens) 1))
+                ordinary-comment-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text triple-comment-derived-tokens))
+                triple-comment-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text header-comment-derived-tokens))
+                header-comment-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text ordinary-comment-derived-tokens))
+                ordinary-comment-source)
   (check-true (< (position-offset (racket-derived-token-start derived-string))
                  (position-offset (racket-derived-token-end derived-string))))
   (check-true (position-token? (car (racket-string->tokens "(x)"

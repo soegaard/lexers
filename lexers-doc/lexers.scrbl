@@ -1017,6 +1017,9 @@ For the current adapter:
  @item{lexical errors project as @racket['unknown] in @racket['coloring] mode
        and raise in @racket['compiler] mode}]
 
+Projected and derived Racket token text preserve the exact consumed source
+slice, including multi-semicolon comment headers such as @tt{;;;}.
+
 @examples[#:eval racket-eval
 (define inspect-lexer
   (make-racket-lexer #:profile 'coloring))
