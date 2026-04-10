@@ -34,7 +34,8 @@
          racket/string
          "../css.rkt"
          "../javascript.rkt"
-         "parser-tools-compat.rkt")
+         "parser-tools-compat.rkt"
+         "string-compat.rkt")
 
 ;; A derived HTML token with reusable tags and source positions.
 (struct html-derived-token (kind text start end tags) #:transparent)
@@ -105,9 +106,9 @@
        (write-char next out)
        (define current (get-output-string out))
        (if (and (>= (string-length current) sent-len)
-                (string-ci=? (substring current
-                                        (- (string-length current) sent-len))
-                             sentinel))
+                (substring-ci=? current
+                                (- (string-length current) sent-len)
+                                sentinel))
            current
            (loop))])))
 

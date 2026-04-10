@@ -53,6 +53,8 @@ Coding guidelines for Racket code in `lexers`:
     `procedure?`.
 24. In documentation, prefer precise types over broad placeholders such as
     `any/c`.
+25. In hot paths, prefer shared non-allocating substring comparison helpers
+    over patterns such as `(string=? (substring ...) ...)`.
 
 ## Packages
 

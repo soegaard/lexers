@@ -12,6 +12,8 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; racket-profile-defaults : immutable-hash?
 ;;   Default settings for named Racket lexer profiles.
+;; markdown-profile-defaults : immutable-hash?
+;;   Default settings for named Markdown lexer profiles.
 ;; scribble-profile-defaults : immutable-hash?
 ;;   Default settings for named Scribble lexer profiles.
 ;; javascript-profile-defaults : immutable-hash?
@@ -52,6 +54,18 @@
 ;;   Extract the configured error policy.
 ;; make-racket-config    : keyword-arguments -> racket-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; markdown-config?      : any/c -> boolean?
+;;   Recognize Markdown lexer configuration values.
+;; markdown-config-profile : markdown-config? -> symbol?
+;;   Extract the configured profile name.
+;; markdown-config-trivia : markdown-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; markdown-config-source-positions : markdown-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; markdown-config-errors : markdown-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-markdown-config  : keyword-arguments -> markdown-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; scribble-config?      : any/c -> boolean?
 ;;   Recognize Scribble lexer configuration values.
 ;; scribble-config-profile : scribble-config? -> symbol?
@@ -82,6 +96,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          racket-profile-defaults
+         markdown-profile-defaults
          scribble-profile-defaults
          javascript-profile-defaults
          css-config?
@@ -102,6 +117,12 @@
          racket-config-source-positions
          racket-config-errors
          make-racket-config
+         markdown-config?
+         markdown-config-profile
+         markdown-config-trivia
+         markdown-config-source-positions
+         markdown-config-errors
+         make-markdown-config
          scribble-config?
          scribble-config-profile
          scribble-config-trivia
@@ -124,6 +145,9 @@
 
 ;; A resolved configuration for the public Racket lexer.
 (struct racket-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Markdown lexer.
+(struct markdown-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Scribble lexer.
 (struct scribble-config (profile trivia source-positions errors) #:transparent)
@@ -151,6 +175,15 @@
 
 ;; Profile defaults for the Racket lexer.
 (define racket-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Markdown lexer.
+(define markdown-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -253,6 +286,32 @@
                  resolved-trivia
                  resolved-source-positions
                  resolved-errors))
+
+;; make-markdown-config : keyword-arguments -> markdown-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-markdown-config #:profile          [profile 'coloring]
+                              #:trivia           [trivia 'profile-default]
+                              #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref markdown-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-markdown-config
+                                       "unknown Markdown lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors (hash-ref defaults 'errors))
+  (markdown-config profile
+                   resolved-trivia
+                   resolved-source-positions
+                   resolved-errors))
 
 ;; make-scribble-config : keyword-arguments -> scribble-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

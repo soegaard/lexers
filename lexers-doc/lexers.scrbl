@@ -9,6 +9,7 @@
                               make-scribble-inside-lexer)
                      lexers/css
                      lexers/html
+                     lexers/markdown
                      lexers/racket
                      lexers/scribble
                      lexers/token
@@ -36,6 +37,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/html))
+     the-eval))
+
+@(define markdown-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/markdown))
      the-eval))
 
 @(define racket-eval
@@ -73,6 +82,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/javascript]}
+ @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/racket]}
  @item{@racketmodname[lexers/scribble]}]
 
@@ -144,8 +154,7 @@ of input.}
 
 @subsection{Profiles}
 
-Both the CSS and JavaScript projected APIs currently support the same profile
-names:
+The public projected APIs currently support the same profile names:
 
 @itemlist[
  @item{@racket['coloring]}
@@ -161,8 +170,10 @@ The current defaults are:
 For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[css-string->tokens], @racket[make-html-lexer],
 @racket[html-string->tokens], @racket[make-javascript-lexer],
-@racket[javascript-string->tokens], @racket[make-racket-lexer], and
-@racket[racket-string->tokens]:
+@racket[javascript-string->tokens], @racket[make-markdown-lexer],
+@racket[markdown-string->tokens], @racket[make-racket-lexer],
+@racket[racket-string->tokens], @racket[make-scribble-lexer], and
+@racket[scribble-string->tokens]:
 
 @itemlist[
  @item{@racket[#:profile] selects the named default bundle.}
@@ -559,6 +570,196 @@ gain an additional language marker such as @racket['embedded-css] or
 
 @defthing[html-profiles immutable-hash?]{
 The profile defaults used by the HTML lexer.}
+
+@section{Markdown}
+
+@defmodule[lexers/markdown]
+
+The projected Markdown API has two entry points:
+
+@itemlist[
+ @item{@racket[make-markdown-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[markdown-string->tokens] for eager tokenization of an entire
+       string.}]
+
+The first Markdown implementation is a handwritten, parser-lite,
+GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
+and known fenced-code languages to the existing HTML, CSS, JavaScript, Racket,
+and Scribble lexers.
+
+@defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Markdown lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next projected Markdown token from the port and returns one projected token
+value.
+
+When @racket[#:source-positions] is true, each result is a
+@racket[position-token?]. When it is false, the result is either a bare symbol
+or a @racket[token?] directly.
+
+The intended use is to create the lexer once, then call it repeatedly on the
+same port until it returns an end-of-file token.
+
+@examples[#:eval markdown-eval
+(define lexer
+  (make-markdown-lexer #:profile 'coloring))
+(define in
+  (open-input-string "# Title\n\n```js\nconst x = 1;\n```\n"))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(markdown-string->tokens [source string?]
+                                  [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                  [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                  [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire Markdown string using the projected token API.
+
+This is a convenience wrapper over @racket[make-markdown-lexer].}
+
+@subsection{Markdown Returned Tokens}
+
+Common projected Markdown categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['keyword]}
+ @item{@racket['operator]}
+ @item{@racket['delimiter]}
+ @item{@racket['comment]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current Markdown scaffold:
+
+@itemlist[
+ @item{ordinary prose, inline code text, code-block text, and link or image
+       payload text project mostly as @racket['literal]}
+ @item{language names and delegated name-like tokens project as
+       @racket['identifier] or @racket['keyword], depending on the delegated
+       lexer}
+ @item{structural markers such as heading markers, list markers, brackets,
+       pipes, backticks, and fence delimiters project as @racket['delimiter]}
+ @item{comments only appear through delegated embedded HTML}
+ @item{recoverable malformed constructs project as @racket['unknown] in
+       @racket['coloring] mode and raise in @racket['compiler] mode}]
+
+@examples[#:eval markdown-eval
+(define inspect-lexer
+  (make-markdown-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string "# Title\n\nText with <span class=\"x\">hi</span>\n"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(lexer-token-has-positions? first-token)
+(lexer-token-name first-token)
+(lexer-token-value first-token)
+(position-offset (lexer-token-start first-token))
+(position-offset (lexer-token-end first-token))
+]}
+
+@defproc[(make-markdown-derived-lexer)
+         (input-port? . -> . (or/c 'eof markdown-derived-token?))]{
+Constructs a streaming Markdown lexer for the derived-token layer.}
+
+@defproc[(markdown-string->derived-tokens [source string?])
+         (listof markdown-derived-token?)]{
+Tokenizes an entire Markdown string into derived Markdown token values.}
+
+@defproc[(markdown-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Markdown token values returned by
+@racket[make-markdown-derived-lexer] and
+@racket[markdown-string->derived-tokens].}
+
+@defproc[(markdown-derived-token-tags [token markdown-derived-token?])
+         (listof symbol?)]{
+Returns the Markdown-specific classification tags attached to a derived
+Markdown token.}
+
+@defproc[(markdown-derived-token-has-tag? [token markdown-derived-token?]
+                                          [tag symbol?])
+         boolean?]{
+Determines whether a derived Markdown token carries a given classification
+tag.}
+
+@defproc[(markdown-derived-token-text [token markdown-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived Markdown token.}
+
+@defproc[(markdown-derived-token-start [token markdown-derived-token?])
+         position?]{
+Returns the starting source position for a derived Markdown token.}
+
+@defproc[(markdown-derived-token-end [token markdown-derived-token?])
+         position?]{
+Returns the ending source position for a derived Markdown token.}
+
+@subsection{Markdown Derived Tokens}
+
+The current Markdown scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['markdown-text]}
+ @item{@racket['markdown-heading-marker]}
+ @item{@racket['markdown-heading-text]}
+ @item{@racket['markdown-blockquote-marker]}
+ @item{@racket['markdown-list-marker]}
+ @item{@racket['markdown-task-marker]}
+ @item{@racket['markdown-thematic-break]}
+ @item{@racket['markdown-code-span]}
+ @item{@racket['markdown-code-fence]}
+ @item{@racket['markdown-code-block]}
+ @item{@racket['markdown-code-info-string]}
+ @item{@racket['markdown-emphasis-delimiter]}
+ @item{@racket['markdown-strong-delimiter]}
+ @item{@racket['markdown-strikethrough-delimiter]}
+ @item{@racket['markdown-link-text]}
+ @item{@racket['markdown-link-destination]}
+ @item{@racket['markdown-link-title]}
+ @item{@racket['markdown-image-marker]}
+ @item{@racket['markdown-autolink]}
+ @item{@racket['markdown-table-pipe]}
+ @item{@racket['markdown-table-alignment]}
+ @item{@racket['markdown-table-cell]}
+ @item{@racket['markdown-escape]}
+ @item{@racket['markdown-hard-line-break]}
+ @item{@racket['embedded-html]}
+ @item{@racket['embedded-css]}
+ @item{@racket['embedded-javascript]}
+ @item{@racket['embedded-racket]}
+ @item{@racket['embedded-scribble]}
+ @item{@racket['malformed-token]}]
+
+Delegated raw HTML and recognized fenced-code languages keep their reusable
+derived tags and gain Markdown embedding markers such as
+@racket['embedded-html], @racket['embedded-javascript], or
+@racket['embedded-racket].
+
+@examples[#:eval markdown-eval
+(define derived-tokens
+  (markdown-string->derived-tokens
+   "# Title\n\n- [x] done\n\n```js\nconst x = 1;\n```\n\nText <span class=\"x\">hi</span>\n"))
+(map (lambda (token)
+       (list (markdown-derived-token-text token)
+             (markdown-derived-token-tags token)))
+     derived-tokens)
+]}
+
+@defthing[markdown-profiles immutable-hash?]{
+The profile defaults used by the Markdown lexer.}
 
 @section{Racket}
 

@@ -7,6 +7,7 @@ Currently implemented language modules include:
 - `lexers/css`
 - `lexers/html`
 - `lexers/javascript`
+- `lexers/markdown`
 - `lexers/racket`
 - `lexers/scribble`
 
