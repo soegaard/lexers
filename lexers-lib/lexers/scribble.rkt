@@ -137,7 +137,17 @@
 
 (module+ test
   (require rackunit
-           racket/list)
+           racket/list
+           lexers/token)
+
+  ;; token-source-slice : string? (or/c symbol? token? position-token?) -> string?
+  ;;   Extract the exact source slice covered by one projected token.
+  (define (token-source-slice source token)
+    (define start (lexer-token-start token))
+    (define end   (lexer-token-end token))
+    (substring source
+               (sub1 (position-offset start))
+               (sub1 (position-offset end))))
 
   (define simple-tokens
     (scribble-string->tokens "@title{Hi}\nText"
@@ -159,6 +169,28 @@
     (scribble-string->tokens "@title{Hi}\nText"
                              #:profile 'compiler
                              #:source-positions #f))
+  (define fidelity-source
+    "#lang scribble/manual\n\n@title{peek Scribble Demo}\n\nThis is plain text.\n\nInline Racket: @racket[(define x 1)]\n")
+  (define fidelity-projected-tokens
+    (scribble-string->tokens fidelity-source
+                             #:profile 'coloring
+                             #:source-positions #t))
+  (define fidelity-derived-tokens
+    (scribble-string->derived-tokens fidelity-source))
+  (define projected-whitespace-token
+    (findf (lambda (token)
+             (and (eq? (lexer-token-name token) 'whitespace)
+                  (> (- (position-line (lexer-token-end token))
+                        (position-line (lexer-token-start token)))
+                     0)))
+           fidelity-projected-tokens))
+  (define derived-whitespace-token
+    (findf (lambda (token)
+             (and (scribble-derived-token-has-tag? token 'whitespace)
+                  (> (- (position-line (scribble-derived-token-end token))
+                        (position-line (scribble-derived-token-start token)))
+                     0)))
+           fidelity-derived-tokens))
   (define derived-tokens
     (scribble-string->derived-tokens
      "@title{Hi}\nText\n@itemlist[@item{One} @item{Two}]\n@racket[(define x 1)]"))
@@ -216,6 +248,14 @@
   (check-equal? (map stream-token-name compiler-no-trivia-tokens)
                 '(delimiter identifier delimiter literal delimiter literal eof))
   (check-true (stream-token-has-positions? (car (scribble-string->tokens "@title{Hi}"))))
+  (check-not-false projected-whitespace-token)
+  (check-not-false derived-whitespace-token)
+  (check-equal? (lexer-token-value projected-whitespace-token)
+                (token-source-slice fidelity-source projected-whitespace-token))
+  (check-equal? (scribble-derived-token-text derived-whitespace-token)
+                (substring fidelity-source
+                           (sub1 (position-offset (scribble-derived-token-start derived-whitespace-token)))
+                           (sub1 (position-offset (scribble-derived-token-end derived-whitespace-token)))))
   (check-not-false derived-command-char)
   (check-not-false derived-title)
   (check-not-false derived-item)

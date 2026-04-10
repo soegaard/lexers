@@ -73,15 +73,14 @@
     [else          '()]))
 
 ;; token-text : string? any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
-;;   Recover the exact token text, including text spans represented by the
-;;   symbol 'text in the syntax-color API.
+;;   Recover the exact token text from the consumed source span whenever
+;;   possible.
 (define (token-text source raw-text start-index end-index)
   (cond
+    [(<= 0 start-index end-index (string-length source))
+     (substring source start-index end-index)]
     [(string? raw-text)
      raw-text]
-    [(and (eq? raw-text 'text)
-          (<= 0 start-index end-index (string-length source)))
-     (substring source start-index end-index)]
     [else
      (format "~a" raw-text)]))
 

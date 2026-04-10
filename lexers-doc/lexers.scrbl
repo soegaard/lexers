@@ -1016,6 +1016,10 @@ For the current adapter:
  @item{lexical errors project as @racket['unknown] in @racket['coloring] mode
        and raise in @racket['compiler] mode}]
 
+For source fidelity, the Scribble adapter preserves the exact source slice for
+projected and derived token text, including whitespace spans that contain one
+or more newlines.
+
 @examples[#:eval scribble-eval
 (define inspect-lexer
   (make-scribble-lexer #:profile 'coloring))
