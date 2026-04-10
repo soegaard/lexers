@@ -39,6 +39,7 @@
          "../javascript.rkt"
          "../racket.rkt"
          "../scribble.rkt"
+         "../wat.rkt"
          "parser-tools-compat.rkt"
          "string-compat.rkt")
 
@@ -118,7 +119,8 @@
           (member 'racket-no-color tags)
           (member 'racket-other tags)
           (member 'scribble-symbol tags)
-          (member 'scribble-command tags))
+          (member 'scribble-command tags)
+          (member 'wat-identifier tags))
       '(identifier)]
      [(or (member 'literal tags)
           (member 'string-literal tags)
@@ -139,8 +141,14 @@
           (member 'racket-hash-colon-keyword tags)
           (member 'scribble-text tags)
           (member 'scribble-string tags)
-          (member 'scribble-constant tags))
+          (member 'scribble-constant tags)
+          (member 'wat-string-literal tags)
+          (member 'wat-numeric-literal tags))
       '(literal)]
+     [(or (member 'wat-form tags)
+          (member 'wat-type tags)
+          (member 'wat-instruction tags))
+      '(keyword)]
      [(or (member 'delimiter tags)
           (member 'racket-parenthesis tags)
           (member 'scribble-parenthesis tags)
@@ -194,6 +202,7 @@
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
     [(member primary '("scribble" "scrbl")) 'scribble]
+    [(member primary '("wat" "wasm"))    'wat]
     [else                                #f]))
 
 ;; capture->string : (or/c bytes? string? #f) -> string?
@@ -273,6 +282,15 @@
                           scribble-derived-token-end
                           scribble-derived-token-tags
                           '(embedded-scribble markdown-code-block))]
+    [(wat)
+     (wrap-derived-tokens (wat-string->derived-tokens body)
+                          body-start
+                          starts
+                          wat-derived-token-text
+                          wat-derived-token-start
+                          wat-derived-token-end
+                          wat-derived-token-tags
+                          '(embedded-wat markdown-code-block))]
     [else
      null]))
 

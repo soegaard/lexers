@@ -187,7 +187,7 @@
      #:source-positions #f))
   (define mixed-derived-tokens
     (markdown-string->derived-tokens
-     "# Title\n- [ ] task\n| A | B |\n| :- | -: |\n| 1 | 2 |\n\n```js\nconst x = 1;\n```\n\n```rkt\n(define x 1)\n```\n\n```html\n<style>.x { color: #fff; }</style><script>const y = 2;</script>\n```\n\nText <span class=\"x\">hi</span>\n"))
+     "# Title\n- [ ] task\n| A | B |\n| :- | -: |\n| 1 | 2 |\n\n```js\nconst x = 1;\n```\n\n```rkt\n(define x 1)\n```\n\n```wat\n(module (func (result i32) (i32.const 42)))\n```\n\n```html\n<style>.x { color: #fff; }</style><script>const y = 2;</script>\n```\n\nText <span class=\"x\">hi</span>\n"))
   (define derived-heading-marker
     (findf (lambda (token)
              (markdown-derived-token-has-tag? token 'markdown-heading-marker))
@@ -230,6 +230,12 @@
              (and (markdown-derived-token-has-tag? token 'embedded-html)
                   (markdown-derived-token-has-tag? token 'embedded-css)
                   (markdown-derived-token-has-tag? token 'color-literal)))
+           mixed-derived-tokens))
+  (define derived-wat-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-wat)
+                  (markdown-derived-token-has-tag? token 'wat-instruction)
+                  (string=? (markdown-derived-token-text token) "i32.const")))
            mixed-derived-tokens))
   (define derived-hard-break
     (findf (lambda (token)
@@ -286,6 +292,7 @@
   (check-not-false derived-racket-token)
   (check-not-false derived-html-token)
   (check-not-false derived-css-token)
+  (check-not-false derived-wat-token)
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)

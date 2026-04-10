@@ -10,6 +10,7 @@ Currently implemented language modules include:
 - `lexers/markdown`
 - `lexers/racket`
 - `lexers/scribble`
+- `lexers/wat`
 
 The long-term public-facing documentation is intended to live in `lexers-doc`.
 

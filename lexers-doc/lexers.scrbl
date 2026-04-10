@@ -13,7 +13,8 @@
                      lexers/racket
                      lexers/scribble
                      lexers/token
-                     lexers/javascript))
+                     lexers/javascript
+                     lexers/wat))
 
 @(define css-eval
    (let ([the-eval (make-base-eval)])
@@ -55,6 +56,14 @@
                          lexers/racket))
      the-eval))
 
+@(define wat-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/wat))
+     the-eval))
+
 @(define scribble-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -84,7 +93,8 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/racket]}
- @item{@racketmodname[lexers/scribble]}]
+ @item{@racketmodname[lexers/scribble]}
+ @item{@racketmodname[lexers/wat]}]
 
 Each language module currently exposes two related kinds of API:
 
@@ -172,8 +182,9 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[html-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
 @racket[markdown-string->tokens], @racket[make-racket-lexer],
-@racket[racket-string->tokens], @racket[make-scribble-lexer], and
-@racket[scribble-string->tokens]:
+@racket[racket-string->tokens], @racket[make-scribble-lexer],
+@racket[scribble-string->tokens], @racket[make-wat-lexer], and
+@racket[wat-string->tokens]:
 
 @itemlist[
  @item{@racket[#:profile] selects the named default bundle.}
@@ -586,7 +597,7 @@ The projected Markdown API has two entry points:
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
 and known fenced-code languages to the existing HTML, CSS, JavaScript, Racket,
-and Scribble lexers.
+Scribble, and WAT lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -744,12 +755,13 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-scribble]}
+ @item{@racket['embedded-wat]}
  @item{@racket['malformed-token]}]
 
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
-@racket['embedded-html], @racket['embedded-javascript], or
-@racket['embedded-racket].
+@racket['embedded-html], @racket['embedded-javascript],
+@racket['embedded-racket], or @racket['embedded-wat].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -763,6 +775,164 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{WAT}
+
+@defmodule[lexers/wat]
+
+The projected WAT API has two entry points:
+
+@itemlist[
+ @item{@racket[make-wat-lexer] for streaming tokenization from an input port.}
+ @item{@racket[wat-string->tokens] for eager tokenization of an entire string.}]
+
+The first WAT implementation is a handwritten lexer for WebAssembly text
+format. It targets WAT only, not binary @tt{.wasm} files.
+
+@defproc[(make-wat-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming WAT lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next projected WAT token from the port and returns one projected token value.
+
+When @racket[#:source-positions] is true, each result is a
+@racket[position-token?]. When it is false, the result is either a bare symbol
+or a @racket[token?] directly.
+
+The intended use is to create the lexer once, then call it repeatedly on the
+same port until it returns an end-of-file token.
+
+@examples[#:eval wat-eval
+(define lexer
+  (make-wat-lexer #:profile 'coloring))
+(define in
+  (open-input-string "(module (func (result i32) (i32.const 42)))"))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(wat-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire WAT string using the projected token API.
+
+This is a convenience wrapper over @racket[make-wat-lexer].}
+
+@subsection{WAT Returned Tokens}
+
+Common projected WAT categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['identifier]}
+ @item{@racket['keyword]}
+ @item{@racket['literal]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current WAT scaffold:
+
+@itemlist[
+ @item{form names, type names, and instruction names project as
+       @racket['keyword]}
+ @item{$-prefixed names and remaining word-like names project as
+       @racket['identifier]}
+ @item{strings and numeric literals project as @racket['literal]}
+ @item{parentheses project as @racket['delimiter]}
+ @item{comments project as @racket['comment]}
+ @item{malformed input projects as @racket['unknown] in @racket['coloring]
+       mode and raises in @racket['compiler] mode}]
+
+Projected and derived token text preserve the exact source slice, including
+whitespace and comments.
+
+@examples[#:eval wat-eval
+(define inspect-lexer
+  (make-wat-lexer #:profile 'coloring))
+(define inspect-in
+  (open-input-string ";; line comment\n(module (func (result i32) (i32.const 42)))"))
+(port-count-lines! inspect-in)
+(define first-token
+  (inspect-lexer inspect-in))
+(lexer-token-has-positions? first-token)
+(lexer-token-name first-token)
+(lexer-token-value first-token)
+(position-offset (lexer-token-start first-token))
+(position-offset (lexer-token-end first-token))
+]}
+
+@defproc[(make-wat-derived-lexer)
+         (input-port? . -> . (or/c 'eof wat-derived-token?))]{
+Constructs a streaming WAT lexer for the derived-token layer.}
+
+@defproc[(wat-string->derived-tokens [source string?])
+         (listof wat-derived-token?)]{
+Tokenizes an entire WAT string into derived WAT token values.}
+
+@defproc[(wat-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived WAT token values returned by
+@racket[make-wat-derived-lexer] and
+@racket[wat-string->derived-tokens].}
+
+@defproc[(wat-derived-token-tags [token wat-derived-token?])
+         (listof symbol?)]{
+Returns the WAT-specific classification tags attached to a derived WAT token.}
+
+@defproc[(wat-derived-token-has-tag? [token wat-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether a derived WAT token carries a given classification tag.}
+
+@defproc[(wat-derived-token-text [token wat-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived WAT token.}
+
+@defproc[(wat-derived-token-start [token wat-derived-token?])
+         position?]{
+Returns the starting source position for a derived WAT token.}
+
+@defproc[(wat-derived-token-end [token wat-derived-token?])
+         position?]{
+Returns the ending source position for a derived WAT token.}
+
+@subsection{WAT Derived Tokens}
+
+The current WAT scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['wat-form]}
+ @item{@racket['wat-type]}
+ @item{@racket['wat-instruction]}
+ @item{@racket['wat-identifier]}
+ @item{@racket['wat-string-literal]}
+ @item{@racket['wat-numeric-literal]}
+ @item{@racket['comment]}
+ @item{@racket['whitespace]}
+ @item{@racket['malformed-token]}]
+
+@examples[#:eval wat-eval
+(define derived-tokens
+  (wat-string->derived-tokens
+   "(module (func $answer (result i32) i32.const 42))"))
+(map (lambda (token)
+       (list (wat-derived-token-text token)
+             (wat-derived-token-tags token)))
+     derived-tokens)
+]}
+
+@defthing[wat-profiles immutable-hash?]{
+The profile defaults used by the WAT lexer.}
 
 @section{Racket}
 

@@ -10,6 +10,8 @@
 ;;   Default settings for named CSS lexer profiles.
 ;; html-profile-defaults : immutable-hash?
 ;;   Default settings for named HTML lexer profiles.
+;; wat-profile-defaults : immutable-hash?
+;;   Default settings for named WAT lexer profiles.
 ;; racket-profile-defaults : immutable-hash?
 ;;   Default settings for named Racket lexer profiles.
 ;; markdown-profile-defaults : immutable-hash?
@@ -41,6 +43,18 @@
 ;; html-config-errors    : html-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-html-config      : keyword-arguments -> html-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; wat-config?           : any/c -> boolean?
+;;   Recognize WAT lexer configuration values.
+;; wat-config-profile    : wat-config? -> symbol?
+;;   Extract the configured profile name.
+;; wat-config-trivia     : wat-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; wat-config-source-positions : wat-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; wat-config-errors     : wat-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-wat-config       : keyword-arguments -> wat-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; racket-config?        : any/c -> boolean?
 ;;   Recognize Racket lexer configuration values.
@@ -95,6 +109,7 @@
 
 (provide css-profile-defaults
          html-profile-defaults
+         wat-profile-defaults
          racket-profile-defaults
          markdown-profile-defaults
          scribble-profile-defaults
@@ -111,6 +126,12 @@
          html-config-source-positions
          html-config-errors
          make-html-config
+         wat-config?
+         wat-config-profile
+         wat-config-trivia
+         wat-config-source-positions
+         wat-config-errors
+         make-wat-config
          racket-config?
          racket-config-profile
          racket-config-trivia
@@ -143,6 +164,9 @@
 ;; A resolved configuration for the public HTML lexer.
 (struct html-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public WAT lexer.
+(struct wat-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public Racket lexer.
 (struct racket-config (profile trivia source-positions errors) #:transparent)
 
@@ -166,6 +190,15 @@
 
 ;; Profile defaults for the HTML lexer.
 (define html-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the WAT lexer.
+(define wat-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -260,6 +293,32 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-wat-config : keyword-arguments -> wat-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-wat-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref wat-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-wat-config
+                                       "unknown WAT lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors (hash-ref defaults 'errors))
+  (wat-config profile
+              resolved-trivia
+              resolved-source-positions
+              resolved-errors))
 
 ;; make-racket-config : keyword-arguments -> racket-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
