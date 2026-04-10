@@ -566,7 +566,7 @@
     (define next-token (car pending-tokens))
     (set! pending-tokens (cdr pending-tokens))
     next-token)
-  (lambda (in)
+  (define (read-next in)
     (unless (input-port? in)
       (raise-argument-error 'make-html-derived-reader "input-port?" in))
     (port-count-lines! in)
@@ -576,11 +576,11 @@
       [(eq? mode 'style-body)
        (set! mode 'text)
        (enqueue! (enqueue-embedded-body! in 'style-body '()))
-       (if (pair? pending-tokens) (dequeue!) 'eof)]
+       (if (pair? pending-tokens) (dequeue!) (read-next in))]
       [(eq? mode 'script-body)
        (set! mode 'text)
        (enqueue! (enqueue-embedded-body! in 'script-body '()))
-       (if (pair? pending-tokens) (dequeue!) 'eof)]
+       (if (pair? pending-tokens) (dequeue!) (read-next in))]
       [else
        (define start-pos (current-stream-position in))
        (define next (peek-char in))
@@ -612,7 +612,9 @@
          [(char=? next #\&)
           (derived-token in start-pos 'entity (read-html-entity! in) '(literal html-entity))]
          [else
-          (derived-token in start-pos 'text (read-html-text! in) '(literal html-text))])])))
+          (derived-token in start-pos 'text (read-html-text! in) '(literal html-text))])]))
+  (lambda (in)
+    (read-next in)))
 
 ;; html-derived-token-has-tag? : html-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived HTML token has a given classification tag.

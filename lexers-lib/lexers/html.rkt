@@ -162,6 +162,22 @@
     (html-string->tokens "<!doctype html><main id=\"app\">Hi &amp; bye<style>.x { color: #fff; }</style><script>const root = document.querySelector(\"#app\");</script><!-- note --></main>"
                          #:profile 'coloring
                          #:source-positions #f))
+  (define external-script-source
+    "<!DOCTYPE html><html><head><script type=\"module\" crossorigin src=\"/a.js\"></script><link rel=\"stylesheet\" href=\"/a.css\"></head><body><div id=\"root\"></div></body></html>")
+  (define external-script-tokens
+    (html-string->tokens external-script-source
+                         #:profile 'coloring
+                         #:source-positions #f))
+  (define external-script-derived-tokens
+    (html-string->derived-tokens external-script-source))
+  (define empty-script-followed-source
+    "<script></script><div>ok</div>")
+  (define empty-script-followed-tokens
+    (html-string->tokens empty-script-followed-source
+                         #:profile 'compiler
+                         #:source-positions #f))
+  (define empty-script-followed-derived-tokens
+    (html-string->derived-tokens empty-script-followed-source))
 
   (define derived-tokens
     (html-string->derived-tokens
@@ -219,6 +235,21 @@
                   (html-derived-token-has-tag? token 'keyword)
                   (string=? (html-derived-token-text token) "const")))
            derived-tokens))
+  (define external-script-closing-token
+    (findf (lambda (token)
+             (and (html-derived-token-has-tag? token 'html-closing-tag-name)
+                  (string=? (html-derived-token-text token) "script")))
+           external-script-derived-tokens))
+  (define external-link-tag-token
+    (findf (lambda (token)
+             (and (html-derived-token-has-tag? token 'html-tag-name)
+                  (string=? (html-derived-token-text token) "link")))
+           external-script-derived-tokens))
+  (define external-root-div-token
+    (findf (lambda (token)
+             (and (html-derived-token-has-tag? token 'html-tag-name)
+                  (string=? (html-derived-token-text token) "div")))
+           external-script-derived-tokens))
 
   (check-equal? (map stream-token-name basic-tokens)
                 '(delimiter identifier whitespace identifier operator literal
@@ -248,6 +279,18 @@
                                           script-tokens))
                 'literal)
   (check-equal? (stream-token-name (last mixed-tokens)) 'eof)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value external-script-tokens) 1))
+                external-script-source)
+  (check-equal? (apply string-append
+                       (map html-derived-token-text external-script-derived-tokens))
+                external-script-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value empty-script-followed-tokens) 1))
+                empty-script-followed-source)
+  (check-equal? (apply string-append
+                       (map html-derived-token-text empty-script-followed-derived-tokens))
+                empty-script-followed-source)
   (check-not-false derived-tag-token)
   (check-not-false derived-closing-tag-token)
   (check-not-false derived-attribute-token)
@@ -259,6 +302,9 @@
   (check-not-false derived-css-token)
   (check-not-false derived-js-token)
   (check-not-false derived-js-keyword-token)
+  (check-not-false external-script-closing-token)
+  (check-not-false external-link-tag-token)
+  (check-not-false external-root-div-token)
   (check-equal? (position-offset (html-derived-token-start derived-doctype-token))
                 1)
   (check-true (< (position-offset (html-derived-token-start derived-css-token))
