@@ -229,6 +229,50 @@
                            #:source-positions #f))
   (define ordinary-comment-derived-tokens
     (racket-string->derived-tokens ordinary-comment-source))
+  (define regex-heavy-source
+    (string-append
+     "      'char_alphabetic': ((cp) =>\n"
+     "        Number(/\\p{Alphabetic}/u.test(String.fromCodePoint(cp)))),\n"
+     "      'char_lower_case': ((cp) =>\n"
+     "        Number(/\\p{Lowercase}/u.test(String.fromCodePoint(cp)))),\n"
+     "      'char_upper_case': ((cp) =>\n"
+     "        Number(/\\p{Uppercase}/u.test(String.fromCodePoint(cp)))),\n"
+     "      'char_title_case': ((cp) =>\n"
+     "        Number(/\\p{gc=Lt}/u.test(String.fromCodePoint(cp)))),\n"
+     "      'char_numeric': ((cp) =>\n"
+     "        Number(/\\p{Number}/u.test(String.fromCodePoint(cp)))),\n"
+     "      'char_symbolic': ((cp) =>\n"
+     "        Number(/\\p{gc=Sm}|\\p{gc=Sc}|\\p{gc=Sk}|\\p{gc=So}/u.test(String.fromCodePoint(cp)))),\n"))
+  (define at-exp-regex-source
+    (string-append
+     "#lang at-exp racket\n"
+     "(define (runtime-common)\n"
+     "  @~a{\n"
+     "function fasl_to_js_value(arr, i = 0) {\n"
+     "  switch(tag) {\n"
+     "    case @|fasl-fixnum|: {\n"
+     "      const raw = u32();\n"
+     "      return [(raw << 2) >> 2, i];\n"
+     "    }\n"
+     "    case @|fasl-character|:\n"
+     "      return [String.fromCodePoint(u32()), i];\n"
+     "  }\n"
+     "}\n"
+     "      'char_symbolic': ((cp) =>\n"
+     "        Number(/\\p{gc=Sm}|\\p{gc=Sc}|\\p{gc=Sk}|\\p{gc=So}/u.test(String.fromCodePoint(cp)))),\n"
+     "})\n"))
+  (define regex-heavy-tokens
+    (racket-string->tokens regex-heavy-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define regex-heavy-derived-tokens
+    (racket-string->derived-tokens regex-heavy-source))
+  (define at-exp-regex-tokens
+    (racket-string->tokens at-exp-regex-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define at-exp-regex-derived-tokens
+    (racket-string->derived-tokens at-exp-regex-source))
   (define derived-open
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-open))
@@ -308,6 +352,12 @@
                        (drop-right (map stream-token-value ordinary-comment-tokens) 1))
                 ordinary-comment-source)
   (check-equal? (apply string-append
+                       (drop-right (map stream-token-value regex-heavy-tokens) 1))
+                regex-heavy-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value at-exp-regex-tokens) 1))
+                at-exp-regex-source)
+  (check-equal? (apply string-append
                        (map racket-derived-token-text triple-comment-derived-tokens))
                 triple-comment-source)
   (check-equal? (apply string-append
@@ -316,6 +366,12 @@
   (check-equal? (apply string-append
                        (map racket-derived-token-text ordinary-comment-derived-tokens))
                 ordinary-comment-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text regex-heavy-derived-tokens))
+                regex-heavy-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text at-exp-regex-derived-tokens))
+                at-exp-regex-source)
   (check-true (< (position-offset (racket-derived-token-start derived-string))
                  (position-offset (racket-derived-token-end derived-string))))
   (check-true (position-token? (car (racket-string->tokens "(x)"

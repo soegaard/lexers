@@ -163,12 +163,20 @@
     [else
      '()]))
 
-;; token-text : string? any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
-;;   Recover the exact token text from the consumed source span whenever
-;;   possible.
-(define (token-text source raw-text start-index end-index)
+;; token-text : string? any/c any/c any/c any/c any/c -> string?
+;;   Recover the exact token text from the raw syntax-color offsets whenever
+;;   possible, falling back to source-port indices and finally the raw text.
+(define (token-text source raw-text raw-start raw-end start-index end-index)
+  (define (valid-slice? start end)
+    (and (exact-integer? start)
+         (exact-integer? end)
+         (<= 0 start end (string-length source))))
   (cond
-    [(<= 0 start-index end-index (string-length source))
+    [(and (exact-integer? raw-start)
+          (exact-integer? raw-end)
+          (valid-slice? (sub1 raw-start) (sub1 raw-end)))
+     (substring source (sub1 raw-start) (sub1 raw-end))]
+    [(valid-slice? start-index end-index)
      (substring source start-index end-index)]
     [(string? raw-text)
      raw-text]
@@ -242,7 +250,7 @@
       (current-stream-position source-port))
     (define start-index
       (file-position source-port))
-    (define-values (text cls paren _raw-start _raw-end next-offset next-mode status)
+    (define-values (text cls paren raw-start raw-end next-offset next-mode status)
       (racket-lexer*/status source-port offset mode))
     (set! offset next-offset)
     (set! mode   next-mode)
@@ -252,7 +260,12 @@
       [else
        (define end-index
          (file-position source-port))
-       (derived-token-from-result (token-text source text start-index end-index)
+       (derived-token-from-result (token-text source
+                                              text
+                                              raw-start
+                                              raw-end
+                                              start-index
+                                              end-index)
                                   cls
                                   start-pos
                                   (current-stream-position source-port)
