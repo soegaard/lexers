@@ -805,6 +805,9 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
+The streaming port readers emit tokens incrementally. They do not buffer the
+entire remaining input before producing the first token.
+
 @examples[#:eval wat-eval
 (define lexer
   (make-wat-lexer #:profile 'coloring))

@@ -198,6 +198,10 @@
                         #:source-positions #t))
   (define fidelity-derived-tokens
     (wat-string->derived-tokens fidelity-source))
+  (define incremental-source
+    (string-append "(module"
+                   (make-string 20000 #\space)
+                   "(func))"))
 
   (define folded-form-token
     (findf (lambda (token)
@@ -254,6 +258,22 @@
                   (string=? (wat-derived-token-text token) "i32.add")))
            id-derived-tokens))
 
+  (define incremental-derived-lexer
+    (make-wat-derived-lexer))
+  (define incremental-derived-in
+    (open-input-string incremental-source))
+  (port-count-lines! incremental-derived-in)
+  (define incremental-derived-first
+    (incremental-derived-lexer incremental-derived-in))
+
+  (define incremental-projected-lexer
+    (make-wat-lexer #:profile 'coloring))
+  (define incremental-projected-in
+    (open-input-string incremental-source))
+  (port-count-lines! incremental-projected-in)
+  (define incremental-projected-first
+    (incremental-projected-lexer incremental-projected-in))
+
   (check-equal? (map stream-token-name basic-tokens)
                 '(delimiter keyword delimiter keyword delimiter keyword keyword
                   delimiter delimiter keyword literal delimiter delimiter delimiter eof))
@@ -289,4 +309,12 @@
                 fidelity-source)
   (check-equal? (apply string-append (map wat-derived-token-text fidelity-derived-tokens))
                 fidelity-source)
-  (check-true (contiguous-derived-stream? fidelity-derived-tokens)))
+  (check-true (contiguous-derived-stream? fidelity-derived-tokens))
+  (check-equal? (wat-derived-token-text incremental-derived-first)
+                "(")
+  (check-equal? (lexer-token-value incremental-projected-first)
+                "(")
+  (check-true (< (file-position incremental-derived-in)
+                 (string-length incremental-source)))
+  (check-true (< (file-position incremental-projected-in)
+                 (string-length incremental-source))))
