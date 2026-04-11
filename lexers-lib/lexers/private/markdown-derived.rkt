@@ -660,23 +660,63 @@
           (emit index full-line-end 'whitespace (substring source index full-line-end)
                 '(whitespace))
           (loop full-line-end)]
-         [(regexp-match #px"^[ \t]{0,3}([`~]{3,})([^`]*)$" line)
+         [(regexp-match #px"^([ \t]{0,3})([`~]{3,})(.*)$" line)
           => (lambda (m)
-               (define fence (capture->string (cadr m)))
-               (define info  (string-trim (capture->string (caddr m))))
+               (define indent (capture->string (cadr m)))
+               (define fence  (capture->string (caddr m)))
+               (define rest   (capture->string (cadddr m)))
+               (define info   (string-trim rest))
+               (define cursor index)
+               (unless (string=? indent "")
+                 (emit cursor (+ cursor (string-length indent))
+                       'whitespace
+                       indent
+                       '(whitespace))
+                 (set! cursor (+ cursor (string-length indent))))
                (define fence-char (substring fence 0 1))
                (define fence-len (string-length fence))
-               (emit index (+ index (string-length fence))
+               (emit cursor (+ cursor (string-length fence))
                      'delimiter
                      fence
                      '(delimiter markdown-code-fence))
+               (set! cursor (+ cursor (string-length fence)))
+               (define leading-gap
+                 (let loop-gap ([i 0])
+                   (cond
+                     [(>= i (string-length rest))
+                      i]
+                     [(or (char=? (string-ref rest i) #\space)
+                          (char=? (string-ref rest i) #\tab))
+                      (loop-gap (add1 i))]
+                     [else
+                      i])))
+               (define trailing-gap
+                 (let loop-gap ([i (string-length rest)])
+                   (cond
+                     [(<= i leading-gap)
+                      i]
+                     [(or (char=? (string-ref rest (sub1 i)) #\space)
+                          (char=? (string-ref rest (sub1 i)) #\tab))
+                      (loop-gap (sub1 i))]
+                     [else
+                      i])))
+               (when (positive? leading-gap)
+                 (emit cursor (+ cursor leading-gap)
+                       'whitespace
+                       (substring rest 0 leading-gap)
+                       '(whitespace))
+                 (set! cursor (+ cursor leading-gap)))
                (when (not (string=? info ""))
-                 (define info-start
-                   (+ index (string-length line) (- (string-length info))))
-                 (emit info-start (+ info-start (string-length info))
+                 (emit cursor (+ cursor (string-length info))
                        'identifier
                        info
                        '(identifier markdown-code-info-string)))
+               (set! cursor (+ cursor (string-length info)))
+               (when (< trailing-gap (string-length rest))
+                 (emit cursor (+ cursor (- (string-length rest) trailing-gap))
+                       'whitespace
+                       (substring rest trailing-gap)
+                       '(whitespace)))
                (define header-end
                  (+ index (string-length line)))
                (when (< header-end full-line-end)

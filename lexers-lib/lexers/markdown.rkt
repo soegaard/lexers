@@ -162,6 +162,14 @@
       (= (position-offset (markdown-derived-token-end left))
          (position-offset (markdown-derived-token-start right)))))
 
+  ;; has-adjacent-texts? : (listof markdown-derived-token?) string? string? -> boolean?
+  ;;   Determine whether adjacent token texts occur in order.
+  (define (has-adjacent-texts? tokens left-text right-text)
+    (for/or ([left  (in-list tokens)]
+             [right (in-list (cdr tokens))])
+      (and (string=? (markdown-derived-token-text left) left-text)
+           (string=? (markdown-derived-token-text right) right-text))))
+
   (define heading-tokens
     (markdown-string->tokens "# Title\nParagraph  \n"
                              #:profile 'coloring
@@ -299,6 +307,18 @@
     "Trailing slash \\\n")
   (define prose-backslash-derived-tokens
     (derive-with-timeout prose-backslash-source 2))
+  (define nested-fence-source
+    "### Minimal example\n\n```racket\n(define x 1)\n```\n\n- item\n  ```racket\n  (define y 2)\n  ```\n")
+  (define nested-fence-derived-tokens
+    (markdown-string->derived-tokens nested-fence-source))
+  (define nested-fence-projected-tokens
+    (markdown-string->tokens nested-fence-source
+                             #:profile 'coloring
+                             #:source-positions #f))
+  (define exact-canvas-slice-source
+    "### Minimal example\n\n```racket\n(define window   (js-window-window))\n(define document (js-window-document))\n(define canvas   (js-get-element-by-id document \"app-canvas\"))\n(define ctx      (js-canvas-get-context canvas \"2d\" (void)))\n\n(js-set-canvas-width! canvas 640)\n(js-set-canvas-height! canvas 480)\n(js-set-canvas2d-fill-style! ctx \"#4cc9f0\")\n(js-canvas2d-fill-rect ctx 40 40 200 120)\n```\n\nThe remainder of this guide documents every canvas-related binding and shows a short usage example.\n\n## HTMLCanvasElement bindings\n\n- **`(js-canvas-capture-stream canvas fps)`** – Start streaming the canvas contents at `fps` frames per second. Returns a `MediaStream`.\n  ```racket\n  (define stream (js-canvas-capture-stream canvas 30.0))\n  ```\n")
+  (define exact-canvas-slice-derived-tokens
+    (markdown-string->derived-tokens exact-canvas-slice-source))
   (define hard-break-derived-tokens
     (markdown-string->derived-tokens hard-break-source))
   (define hard-break-projected-tokens
@@ -314,6 +334,15 @@
              (and (markdown-derived-token-has-tag? token 'markdown-text)
                   (string=? (markdown-derived-token-text token) "alpha")))
            hard-break-derived-tokens))
+  (define indented-opening-fence-whitespace
+    (has-adjacent-texts? nested-fence-derived-tokens
+                         "  "
+                         "```"))
+  (define indented-closing-fence
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'markdown-code-fence)
+                  (string=? (markdown-derived-token-text token) "  ```")))
+           nested-fence-derived-tokens))
 
   (check-equal? (map stream-token-name heading-tokens)
                 '(delimiter whitespace literal whitespace literal delimiter whitespace eof))
@@ -354,6 +383,8 @@
   (check-not-false prose-exclamation-derived-tokens)
   (check-not-false prose-tilde-derived-tokens)
   (check-not-false prose-backslash-derived-tokens)
+  (check-not-false indented-opening-fence-whitespace)
+  (check-not-false indented-closing-fence)
   (check-equal? (markdown-derived-token-text hard-break-token)
                 "  ")
   (check-equal? (apply string-append
@@ -365,6 +396,17 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text prose-backslash-derived-tokens))
                 prose-backslash-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text nested-fence-derived-tokens))
+                nested-fence-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list nested-fence-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (stream-token-value token)))
+                nested-fence-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text exact-canvas-slice-derived-tokens))
+                exact-canvas-slice-source)
   (check-equal? (apply string-append
                        (map markdown-derived-token-text hard-break-derived-tokens))
                 hard-break-source)
@@ -400,6 +442,8 @@
   (check-true (contiguous-derived-stream? prose-exclamation-derived-tokens))
   (check-true (contiguous-derived-stream? prose-tilde-derived-tokens))
   (check-true (contiguous-derived-stream? prose-backslash-derived-tokens))
+  (check-true (contiguous-derived-stream? nested-fence-derived-tokens))
+  (check-true (contiguous-derived-stream? exact-canvas-slice-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence+newline-derived-tokens))
   (check-true (contiguous-derived-stream? unterminated-fence-with-content-derived-tokens))
