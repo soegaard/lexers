@@ -177,6 +177,22 @@
                              #:source-positions #t))
   (define fidelity-derived-tokens
     (scribble-string->derived-tokens fidelity-source))
+  (define contracts-line-source
+    "                opaque (e.g, @racket[new-∀/c]).\n")
+  (define contracts-line-projected-tokens
+    (scribble-string->tokens contracts-line-source
+                             #:profile 'coloring
+                             #:source-positions #t))
+  (define contracts-line-derived-tokens
+    (scribble-string->derived-tokens contracts-line-source))
+  (define contracts-excerpt-source
+    "@item{@deftech{Impersonator @tech{contracts}} may wrap values and do\n                not provide any guarantees. Impersonator contracts\n                may hide properties of values, or even make them completely\n                opaque (e.g, @racket[new-∀/c]).\n")
+  (define contracts-excerpt-projected-tokens
+    (scribble-string->tokens contracts-excerpt-source
+                             #:profile 'coloring
+                             #:source-positions #t))
+  (define contracts-excerpt-derived-tokens
+    (scribble-string->derived-tokens contracts-excerpt-source))
   (define projected-whitespace-token
     (findf (lambda (token)
              (and (eq? (lexer-token-name token) 'whitespace)
@@ -252,6 +268,22 @@
   (check-not-false derived-whitespace-token)
   (check-equal? (lexer-token-value projected-whitespace-token)
                 (token-source-slice fidelity-source projected-whitespace-token))
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list contracts-line-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (lexer-token-value token)))
+                contracts-line-source)
+  (check-equal? (apply string-append
+                       (map scribble-derived-token-text contracts-line-derived-tokens))
+                contracts-line-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list contracts-excerpt-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (lexer-token-value token)))
+                contracts-excerpt-source)
+  (check-equal? (apply string-append
+                       (map scribble-derived-token-text contracts-excerpt-derived-tokens))
+                contracts-excerpt-source)
   (check-equal? (scribble-derived-token-text derived-whitespace-token)
                 (substring fidelity-source
                            (sub1 (position-offset (scribble-derived-token-start derived-whitespace-token)))

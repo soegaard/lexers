@@ -39,6 +39,48 @@
 ;; A derived Scribble token with reusable tags and source positions.
 (struct scribble-derived-token (type text start end tags) #:transparent)
 
+;; line-starts : string? -> (vectorof exact-nonnegative-integer?)
+;;   Compute the starting index of each line in a buffered source string.
+(define (line-starts source)
+  (list->vector
+   (let loop ([i 0] [starts '(0)])
+     (cond
+       [(>= i (string-length source))
+        (reverse starts)]
+       [(char=? (string-ref source i) #\newline)
+        (loop (add1 i) (cons (add1 i) starts))]
+       [else
+        (loop (add1 i) starts)]))))
+
+;; position-at : (vectorof exact-nonnegative-integer?) exact-nonnegative-integer? exact-positive-integer? exact-nonnegative-integer? exact-positive-integer? -> position?
+;;   Convert a buffered-source index into a parser-tools-compatible position.
+(define (position-at starts index base-line base-col base-offset)
+  (define len (vector-length starts))
+  (let loop ([line-idx 0])
+    (cond
+      [(= line-idx (sub1 len))
+       (define line-start
+         (vector-ref starts line-idx))
+       (make-stream-position (+ base-offset index)
+                             (+ base-line line-idx)
+                             (cond
+                               [(zero? line-idx)
+                                (+ base-col index)]
+                               [else
+                                (- index line-start)]))]
+      [(< index (vector-ref starts (add1 line-idx)))
+       (define line-start
+         (vector-ref starts line-idx))
+       (make-stream-position (+ base-offset index)
+                             (+ base-line line-idx)
+                             (cond
+                               [(zero? line-idx)
+                                (+ base-col index)]
+                               [else
+                                (- index line-start)]))]
+      [else
+       (loop (add1 line-idx))])))
+
 ;; current-stream-position : input-port? -> position?
 ;;   Read the current parser-tools-compatible source position from a port.
 (define (current-stream-position in)
@@ -72,12 +114,20 @@
     [(error)       '(malformed-token scribble-error)]
     [else          '()]))
 
-;; token-text : string? any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
-;;   Recover the exact token text from the consumed source span whenever
-;;   possible.
-(define (token-text source raw-text start-index end-index)
+;; token-text : string? any/c any/c any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
+;;   Recover the exact token text from the raw syntax-color offsets whenever
+;;   possible, falling back to source-port indices and finally the raw text.
+(define (token-text source raw-text raw-start raw-end start-index end-index)
+  (define (valid-slice? start end)
+    (and (exact-integer? start)
+         (exact-integer? end)
+         (<= 0 start end (string-length source))))
   (cond
-    [(<= 0 start-index end-index (string-length source))
+    [(and (exact-integer? raw-start)
+          (exact-integer? raw-end)
+          (valid-slice? (sub1 raw-start) (sub1 raw-end)))
+     (substring source (sub1 raw-start) (sub1 raw-end))]
+    [(valid-slice? start-index end-index)
      (substring source start-index end-index)]
     [(string? raw-text)
      raw-text]
@@ -162,8 +212,12 @@
 ;;   Construct a stateful port-based reader for derived Scribble tokens.
 (define (make-scribble-derived-reader)
   (define source           #f)
+  (define starts           #f)
   (define source-port      #f)
   (define lexer            #f)
+  (define base-line        1)
+  (define base-col         0)
+  (define base-offset      1)
   (define offset           0)
   (define mode             #f)
   (define pending-command? #f)
@@ -176,19 +230,20 @@
   (define (initialize-source! in)
     (when (not source-port)
       (let-values ([(line col raw-offset) (port-next-location in)])
-        (define base-line
-          (cond
-            [(exact-positive-integer? line)   line]
-            [else                             1]))
-        (define base-col
-          (cond
-            [(exact-nonnegative-integer? col) col]
-            [else                             0]))
-        (define base-offset
-          (cond
-            [(exact-positive-integer? raw-offset) raw-offset]
-            [else                                 1]))
+        (set! base-line
+              (cond
+                [(exact-positive-integer? line)   line]
+                [else                             1]))
+        (set! base-col
+              (cond
+                [(exact-nonnegative-integer? col) col]
+                [else                             0]))
+        (set! base-offset
+              (cond
+                [(exact-positive-integer? raw-offset) raw-offset]
+                [else                                 1]))
         (set! source (port->string in))
+        (set! starts (line-starts source))
         (set! source-port (open-input-string source))
         (port-count-lines! source-port)
         (set-port-next-location! source-port
@@ -201,8 +256,6 @@
     (unless (input-port? in)
       (raise-argument-error 'make-scribble-derived-reader "input-port?" in))
     (initialize-source! in)
-    (define start-pos
-      (current-stream-position source-port))
     (define start-index
       (file-position source-port))
     (define-values (raw-text cls _paren _raw-start _raw-end next-offset next-mode)
@@ -215,10 +268,26 @@
       [(eof-object? raw-text)
        'eof]
       [else
+       (define raw-start
+         (cond
+           [(and (exact-integer? _raw-start)
+                 (<= 1 _raw-start (add1 (string-length source))))
+            _raw-start]
+           [else
+            (add1 start-index)]))
+       (define raw-end
+         (cond
+           [(and (exact-integer? _raw-end)
+                 (<= 1 _raw-end (add1 (string-length source))))
+            _raw-end]
+           [else
+            (add1 end-index)]))
        (define text
-         (token-text source raw-text start-index end-index))
+         (token-text source raw-text raw-start raw-end start-index end-index))
+       (define start-pos
+         (position-at starts (sub1 raw-start) base-line base-col base-offset))
        (define end-pos
-         (current-stream-position source-port))
+         (position-at starts (sub1 raw-end) base-line base-col base-offset))
        (define base-token
          (scribble-derived-token cls
                                  text
