@@ -390,31 +390,47 @@
 (define (parse-inline line line-start starts)
   (define len (string-length line))
   (define tokens '())
+  ;; emit-many! : (listof markdown-derived-token?) -> void?
+  ;;   Prepend a forward-order token list into the reversed accumulator.
+  (define (emit-many! more)
+    (set! tokens
+          (append (reverse more)
+                  tokens)))
   (define (emit start end kind text tags)
     (set! tokens
-          (append tokens
-                  (list (make-md-token starts
-                                       (+ line-start start)
-                                       (+ line-start end)
-                                       kind
-                                       text
-                                       tags)))))
+          (cons (make-md-token starts
+                               (+ line-start start)
+                               (+ line-start end)
+                               kind
+                               text
+                               tags)
+                tokens)))
   (let loop ([i 0])
     (cond
       [(>= i len)
-       tokens]
+       (reverse tokens)]
       [else
        (define ch (string-ref line i))
        (cond
-         [(and (char=? ch #\\) (< (add1 i) len))
-          (emit i (+ i 2) 'delimiter (substring line i (+ i 2))
-                '(delimiter markdown-escape))
-          (loop (+ i 2))]
+         [(char=? ch #\\)
+          (cond
+            [(< (add1 i) len)
+             (emit i (+ i 2) 'delimiter (substring line i (+ i 2))
+                   '(delimiter markdown-escape))
+             (loop (+ i 2))]
+            [else
+             (emit i (add1 i) 'literal "\\"
+                   '(literal markdown-text))
+             (loop (add1 i))])]
          [(and (<= (+ i 2) len)
                (regexp-match? #px"^~~" (substring line i)))
           (emit i (+ i 2) 'delimiter "~~"
                 '(delimiter markdown-strikethrough-delimiter))
           (loop (+ i 2))]
+         [(char=? ch #\~)
+          (emit i (add1 i) 'literal "~"
+                '(literal markdown-text))
+          (loop (add1 i))]
          [(and (<= (+ i 2) len)
                (or (regexp-match? #px"^\\*\\*" (substring line i))
                    (regexp-match? #px"^__" (substring line i))))
@@ -434,45 +450,50 @@
           (emit i token-end 'literal (substring line i token-end)
                 '(literal markdown-code-span))
           (loop token-end)]
-         [(and (char=? ch #\!)
-               (< (add1 i) len)
-               (char=? (string-ref line (add1 i)) #\[))
-          (emit i (add1 i) 'delimiter "!"
-                '(delimiter markdown-image-marker))
-          (define rb (string-index-of line "]" (+ i 2)))
-          (define lp (and rb (< (add1 rb) len)
-                          (char=? (string-ref line (add1 rb)) #\()
-                          (add1 rb)))
-          (define rp (and lp (string-index-of line ")" (add1 lp))))
+         [(char=? ch #\!)
           (cond
-            [(and rb lp rp)
-             (emit (add1 i) (+ i 2) 'delimiter "["
-                   '(delimiter))
-             (emit (+ i 2) rb 'literal (substring line (+ i 2) rb)
-                   '(literal markdown-link-text))
-             (emit rb (add1 rb) 'delimiter "]"
-                   '(delimiter))
-             (emit lp (add1 lp) 'delimiter "("
-                   '(delimiter))
-             (define-values (dest title)
-               (simple-link-title-split (substring line (+ lp 1) rp)))
-             (emit (+ lp 1) (+ lp 1 (string-length dest))
-                   'literal
-                   dest
-                   '(literal markdown-link-destination))
-             (when title
-               (define title-start
-                 (+ (+ lp 1 (string-length dest))
-                    (string-length (regexp-replace #px"^([^ \t]+)([ \t]+).*$"
-                                                  (substring line (+ lp 1) rp)
-                                                  "\\2"))))
-               (emit title-start (+ title-start (string-length title))
-                     'literal
-                     title
-                     '(literal markdown-link-title)))
-             (emit rp (add1 rp) 'delimiter ")"
-                   '(delimiter))
-             (loop (add1 rp))]
+            [(and (< (add1 i) len)
+                  (char=? (string-ref line (add1 i)) #\[))
+             (emit i (add1 i) 'delimiter "!"
+                   '(delimiter markdown-image-marker))
+             (define rb (string-index-of line "]" (+ i 2)))
+             (define lp (and rb (< (add1 rb) len)
+                             (char=? (string-ref line (add1 rb)) #\()
+                             (add1 rb)))
+             (define rp (and lp (string-index-of line ")" (add1 lp))))
+             (cond
+               [(and rb lp rp)
+                (emit (add1 i) (+ i 2) 'delimiter "["
+                      '(delimiter))
+                (emit (+ i 2) rb 'literal (substring line (+ i 2) rb)
+                      '(literal markdown-link-text))
+                (emit rb (add1 rb) 'delimiter "]"
+                      '(delimiter))
+                (emit lp (add1 lp) 'delimiter "("
+                      '(delimiter))
+                (define-values (dest title)
+                  (simple-link-title-split (substring line (+ lp 1) rp)))
+                (emit (+ lp 1) (+ lp 1 (string-length dest))
+                      'literal
+                      dest
+                      '(literal markdown-link-destination))
+                (when title
+                  (define title-start
+                    (+ (+ lp 1 (string-length dest))
+                       (string-length (regexp-replace #px"^([^ \t]+)([ \t]+).*$"
+                                                     (substring line (+ lp 1) rp)
+                                                     "\\2"))))
+                  (emit title-start (+ title-start (string-length title))
+                        'literal
+                        title
+                        '(literal markdown-link-title)))
+                (emit rp (add1 rp) 'delimiter ")"
+                      '(delimiter))
+                (loop (add1 rp))]
+               [else
+                (emit i (add1 i) 'literal "!"
+                      '(literal markdown-text))
+                (loop (add1 i))])]
             [else
              (emit i (add1 i) 'literal "!"
                    '(literal markdown-text))
@@ -528,12 +549,10 @@
             (simple-inline-html-end line i))
           (cond
             [html-end
-             (set! tokens
-                   (append tokens
-                           (delegate-html-region (substring line i html-end)
-                                                 (+ line-start i)
-                                                 starts
-                                                 null)))
+             (emit-many! (delegate-html-region (substring line i html-end)
+                                               (+ line-start i)
+                                               starts
+                                               null))
              (loop html-end)]
             [else
              (emit i (add1 i) 'literal "<"
@@ -560,13 +579,13 @@
   (define len (string-length line))
   (define (emit start end kind text tags)
     (set! tokens
-          (append tokens
-                  (list (make-md-token starts
-                                       (+ line-start start)
-                                       (+ line-start end)
-                                       kind
-                                       text
-                                       tags)))))
+          (cons (make-md-token starts
+                               (+ line-start start)
+                               (+ line-start end)
+                               kind
+                               text
+                               tags)
+                tokens)))
   (let loop ([i 0] [cell-start 0])
     (cond
       [(>= i len)
@@ -577,7 +596,7 @@
                (if alignment?
                    '(literal markdown-table-alignment)
                    '(literal markdown-table-cell))))
-       tokens]
+       (reverse tokens)]
       [(char=? (string-ref line i) #\|)
        (when (< cell-start i)
          (emit cell-start i
@@ -597,10 +616,16 @@
   (define starts (line-starts source))
   (define tokens '())
   (define len (string-length source))
+  ;; emit-many! : (listof markdown-derived-token?) -> void?
+  ;;   Prepend a forward-order token list into the reversed accumulator.
+  (define (emit-many! more)
+    (set! tokens
+          (append (reverse more)
+                  tokens)))
   (define (emit start end kind text tags)
     (set! tokens
-          (append tokens
-                  (list (make-md-token starts start end kind text tags)))))
+          (cons (make-md-token starts start end kind text tags)
+                tokens)))
   ;; emit-inline-with-hard-break : string? exact-nonnegative-integer? -> void?
   ;;   Emit inline Markdown tokens, splitting a trailing two-space hard break
   ;;   into its own token without duplicating source text.
@@ -614,11 +639,9 @@
         [hard-break? (- text-len 2)]
         [else        text-len]))
     (when (positive? inline-end)
-      (set! tokens
-            (append tokens
-                    (parse-inline (substring text 0 inline-end)
-                                  start
-                                  starts))))
+      (emit-many! (parse-inline (substring text 0 inline-end)
+                                start
+                                starts)))
     (when hard-break?
       (emit (+ start inline-end) (+ start text-len)
             'delimiter "  "
@@ -626,7 +649,7 @@
   (let loop ([index 0])
     (cond
       [(>= index len)
-       tokens]
+       (reverse tokens)]
       [else
        (define-values (line nl line-end next-index)
          (next-line-range source index))
@@ -681,12 +704,10 @@
                  (if close-match (caar close-match) len))
                (define close-line-end
                  (if close-match (cdar close-match) len))
-               (define body (substring source after-open body-end))
-               (cond
-                 [lang
-                  (set! tokens
-                        (append tokens
-                                (delegated-fence-tokens lang body after-open starts)))]
+                 (define body (substring source after-open body-end))
+                 (cond
+                   [lang
+                    (emit-many! (delegated-fence-tokens lang body after-open starts))]
                  [else
                   (when (positive? (string-length body))
                     (emit after-open body-end
@@ -729,12 +750,10 @@
           (define region-end
                 (or (closing-tag-index source tag index)
                     (or (string-index-of source ">" index) full-line-end)))
-          (set! tokens
-                (append tokens
-                        (delegate-html-region (substring source index region-end)
-                                              index
-                                              starts
-                                              null)))
+          (emit-many! (delegate-html-region (substring source index region-end)
+                                            index
+                                            starts
+                                            null))
           (loop region-end)]
          [(and (regexp-match? #px"^[ \t]{0,3}#{1,6}[ \t]+" line))
           (define m (regexp-match #px"^([ \t]{0,3})(#{1,6})([ \t]+)(.*?)([ \t]+#+[ \t]*)?$" line))
@@ -777,10 +796,8 @@
                         (or (blank-line? row)
                             (not (string-contains? row "|"))))
                    (loop cursor)]
-                  [else
-                   (set! tokens
-                         (append tokens
-                                 (parse-table-row row cursor starts alignment?)))
+                 [else
+                   (emit-many! (parse-table-row row cursor starts alignment?))
                    (unless (string=? row-nl "")
                      (emit row-end row-next 'whitespace row-nl '(whitespace)))
                    (table-loop row-next #f (not first?))]))
@@ -815,13 +832,9 @@
                            (emit cursor (+ cursor (string-length task-gap))
                                  'whitespace task-gap '(whitespace))
                            (set! cursor (+ cursor (string-length task-gap)))
-                           (set! tokens
-                                 (append tokens
-                                         (parse-inline task-rest cursor starts))))]
+                           (emit-many! (parse-inline task-rest cursor starts)))]
                      [else
-                      (set! tokens
-                            (append tokens
-                                    (parse-inline rest cursor starts)))])
+                      (emit-many! (parse-inline rest cursor starts))])
                    (unless (string=? nl "")
                      (emit line-end full-line-end 'whitespace nl '(whitespace)))
                    (loop full-line-end)]

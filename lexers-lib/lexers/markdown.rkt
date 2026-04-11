@@ -135,9 +135,24 @@
       [else
        (loop (cons token tokens))])))
 
-  (module+ test
+(module+ test
   (require rackunit
            racket/list)
+
+  ;; derive-with-timeout : string? real? -> (or/c (listof markdown-derived-token?) #f)
+  ;;   Tokenize source in a worker thread and fail fast on accidental hangs.
+  (define (derive-with-timeout source seconds)
+    (define result-channel
+      (make-channel))
+    (define worker
+      (thread (lambda ()
+                (channel-put result-channel
+                             (markdown-string->derived-tokens source)))))
+    (define result
+      (sync/timeout seconds result-channel))
+    (unless result
+      (kill-thread worker))
+    result)
 
   ;; contiguous-derived-stream? : (listof markdown-derived-token?) -> boolean?
   ;;   Determine whether adjacent derived tokens cover the source contiguously.
@@ -272,6 +287,18 @@
            fenced-webracket-derived-tokens))
   (define hard-break-source
     "alpha  \nbeta\n")
+  (define prose-exclamation-source
+    "Compiled and executed the first example will most likely print \"Hello World!\" correctly.\n")
+  (define prose-exclamation-derived-tokens
+    (derive-with-timeout prose-exclamation-source 2))
+  (define prose-tilde-source
+    "Ordinary prose with a lone ~ tilde.\n")
+  (define prose-tilde-derived-tokens
+    (derive-with-timeout prose-tilde-source 2))
+  (define prose-backslash-source
+    "Trailing slash \\\n")
+  (define prose-backslash-derived-tokens
+    (derive-with-timeout prose-backslash-source 2))
   (define hard-break-derived-tokens
     (markdown-string->derived-tokens hard-break-source))
   (define hard-break-projected-tokens
@@ -324,8 +351,20 @@
   (check-not-false fenced-webracket-newline)
   (check-not-false hard-break-token)
   (check-not-false hard-break-text-token)
+  (check-not-false prose-exclamation-derived-tokens)
+  (check-not-false prose-tilde-derived-tokens)
+  (check-not-false prose-backslash-derived-tokens)
   (check-equal? (markdown-derived-token-text hard-break-token)
                 "  ")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text prose-exclamation-derived-tokens))
+                prose-exclamation-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text prose-tilde-derived-tokens))
+                prose-tilde-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text prose-backslash-derived-tokens))
+                prose-backslash-source)
   (check-equal? (apply string-append
                        (map markdown-derived-token-text hard-break-derived-tokens))
                 hard-break-source)
@@ -358,6 +397,9 @@
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
   (check-true (contiguous-derived-stream? hard-break-derived-tokens))
+  (check-true (contiguous-derived-stream? prose-exclamation-derived-tokens))
+  (check-true (contiguous-derived-stream? prose-tilde-derived-tokens))
+  (check-true (contiguous-derived-stream? prose-backslash-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence+newline-derived-tokens))
   (check-true (contiguous-derived-stream? unterminated-fence-with-content-derived-tokens))
