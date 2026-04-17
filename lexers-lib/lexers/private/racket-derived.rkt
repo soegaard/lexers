@@ -35,6 +35,7 @@
          racket/match
          racket/port
          syntax-color/racket-lexer
+         syntax-color/scribble-lexer
          "parser-tools-compat.rkt")
 
 ;; A derived Racket token with reusable tags and source positions.
@@ -81,6 +82,7 @@
     [(white-space)        '(whitespace racket-whitespace)]
     [(constant)           '(literal racket-constant)]
     [(string)             '(literal racket-string)]
+    [(text)               '(literal scribble-text)]
     [(symbol)             '(identifier racket-symbol)]
     [(hash-colon-keyword) '(literal racket-hash-colon-keyword)]
     [(parenthesis)        '(delimiter racket-parenthesis)]
@@ -99,6 +101,77 @@
     [(continue) '(racket-continue)]
     [(bad)      '(racket-bad)]
     [else       '()]))
+
+;; at-exp-command-char? : symbol? string? -> boolean?
+;;   Determine whether one token is the Scribble command character in at-exp mode.
+(define (at-exp-command-char? cls text)
+  (and (eq? cls 'parenthesis)
+       (string=? text "@")))
+
+;; at-exp-structure-tags : symbol? string? boolean? exact-nonnegative-integer? -> (listof symbol?)
+;;   Add Scribble structure tags when lexing a #lang at-exp source.
+(define (at-exp-structure-tags cls text pending-command? bracket-depth)
+  (append
+   (cond
+     [(at-exp-command-char? cls text)
+      '(scribble-command-char)]
+     [else
+      '()])
+   (cond
+     [(and pending-command?
+           (eq? cls 'symbol))
+      '(scribble-command)]
+     [else
+      '()])
+   (cond
+     [(or (string=? text "{")
+          (string=? text "}"))
+      '(scribble-body-delimiter)]
+     [else
+      '()])
+   (cond
+     [(or (string=? text "[")
+          (string=? text "]"))
+      '(scribble-optional-delimiter)]
+     [else
+      '()])
+   (cond
+     [(positive? bracket-depth)
+      '(scribble-racket-escape)]
+     [else
+      '()])))
+
+;; update-at-exp-command-state : symbol? string? boolean? -> boolean?
+;;   Advance the small @command state machine in at-exp mode.
+(define (update-at-exp-command-state cls text pending-command?)
+  (cond
+    [(at-exp-command-char? cls text)
+     #t]
+    [pending-command?
+     #f]
+    [else
+     #f]))
+
+;; update-at-exp-command-bracket-state : symbol? string? -> boolean?
+;;   Determine whether the next token may begin a @command[...] escape.
+(define (update-at-exp-command-bracket-state cls text)
+  (and (eq? cls 'symbol)
+       (not (string=? text "@"))))
+
+;; update-at-exp-bracket-depth : string? boolean? exact-nonnegative-integer? -> exact-nonnegative-integer?
+;;   Track bracket-delimited @command[...] escapes in at-exp mode.
+(define (update-at-exp-bracket-depth text after-command? bracket-depth)
+  (cond
+    [(and after-command? (string=? text "["))
+     1]
+    [(and (positive? bracket-depth)
+          (string=? text "["))
+     (add1 bracket-depth)]
+    [(and (positive? bracket-depth)
+          (string=? text "]"))
+     (sub1 bracket-depth)]
+    [else
+     bracket-depth]))
 
 ;; Usual special-form name tables used as a small heuristic layer.
 (define usual-definition-forms
@@ -185,7 +258,10 @@
 
 ;; derived-token-from-result : ... -> racket-derived-token?
 ;;   Construct a derived token from one syntax-color token result.
-(define (derived-token-from-result text cls start-pos end-pos paren status)
+(define (derived-token-from-result text cls start-pos end-pos paren status
+                                   #:at-exp?            [at-exp? #f]
+                                   #:pending-command?   [pending-command? #f]
+                                   #:bracket-depth      [bracket-depth 0])
   (define normalized-class
     (normalized-token-class cls))
   (define commented-out?
@@ -201,12 +277,27 @@
   (define heuristic-tags
     (heuristic-form-tags text
                          (append base-tags extra-tags)))
+  (define at-exp-tags
+    (cond
+      [at-exp?
+       (at-exp-structure-tags normalized-class
+                              text
+                              pending-command?
+                              bracket-depth)]
+      [else
+       '()]))
   (racket-derived-token normalized-class
                         text
                         start-pos
                         end-pos
                         (remove-duplicates
-                         (append base-tags extra-tags heuristic-tags))))
+                         (append base-tags extra-tags heuristic-tags at-exp-tags))))
+
+;; at-exp-source-prefix? : string? -> boolean?
+;;   Recognize a #lang at-exp language line at the start of a source file.
+(define (at-exp-source-prefix? prefix)
+  (regexp-match? #px"^#lang[ \t]+at-exp(?:[ \t]|$)"
+                 prefix))
 
 ;; make-racket-derived-reader : -> (input-port? -> (or/c racket-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Racket tokens.
@@ -215,11 +306,15 @@
     #:transparent)
 
   (define lexer-port  #f)
+  (define lexer-kind  'racket)
   (define offset      0)
   (define mode        #f)
   (define chunks      '())
   (define chunk-lock  (make-semaphore 1))
   (define next-logical-start 0)
+  (define pending-command? #f)
+  (define after-command?   #f)
+  (define bracket-depth    0)
 
   ;; string-logical-length : string? -> exact-nonnegative-integer?
   ;;   Count source characters in syntax-color's logical newline space.
@@ -449,6 +544,34 @@
          [else
           (format "~a" raw-text)])]))
 
+  ;; read-initial-prefix : input-port? -> string?
+  ;;   Read the initial #lang line eagerly so we can choose the right lexer.
+  (define (read-initial-prefix in)
+    (define out
+      (open-output-string))
+    (define first-char
+      (read-char in))
+    (cond
+      [(eof-object? first-char)
+       ""]
+      [else
+       (write-char first-char out)
+       (let loop ()
+         (cond
+           [(char=? (string-ref (get-output-string out)
+                                (sub1 (string-length (get-output-string out))))
+                     #\newline)
+            (get-output-string out)]
+           [(char-ready? in)
+            (define next-char
+              (read-char in))
+            (unless (eof-object? next-char)
+              (write-char next-char out)
+              (loop))
+            (get-output-string out)]
+           [else
+            (get-output-string out)]))]))
+
   ;; initialize-source! : input-port? -> void?
   ;;   Stream the original input into a pipe and a small exact-text buffer.
   (define (initialize-source! in)
@@ -466,6 +589,12 @@
           (cond
             [(exact-positive-integer? raw-offset) raw-offset]
             [else                                 1]))
+        (define initial-prefix
+          (read-initial-prefix in))
+        (set! lexer-kind
+              (cond
+                [(at-exp-source-prefix? initial-prefix) 'at-exp]
+                [else                                   'racket]))
         (define-values (pipe-in pipe-out)
           (make-pipe))
         (port-count-lines! pipe-in)
@@ -473,9 +602,12 @@
                                  base-line
                                  base-col
                                  initial-offset)
+        (append-chunk! 0 initial-prefix)
+        (write-string initial-prefix pipe-out)
+        (flush-output pipe-out)
         (thread
          (lambda ()
-           (let loop ([local-start 0])
+           (let loop ([local-start (string-length initial-prefix)])
              (define first-char
                (read-char in))
              (cond
@@ -506,26 +638,76 @@
     (initialize-source! in)
     (define start-pos
       (current-stream-position lexer-port))
-    (define-values (text cls paren raw-start raw-end next-offset next-mode status)
-      (racket-lexer*/status lexer-port offset mode))
-    (set! offset next-offset)
-    (set! mode   next-mode)
-    (cond
-      [(eof-object? text)
-       'eof]
+    (case lexer-kind
+      [(at-exp)
+       (define-values (text cls paren raw-start raw-end next-offset next-mode)
+         (scribble-lexer lexer-port offset mode))
+       (set! offset next-offset)
+       (set! mode   next-mode)
+       (cond
+         [(eof-object? text)
+          'eof]
+         [else
+          (define normalized-class
+            (normalized-token-class cls))
+          (define end-pos
+            (current-stream-position lexer-port))
+          (define exact-text
+            (source-text text normalized-class start-pos end-pos))
+          (define token
+            (derived-token-from-result
+             exact-text
+             cls
+             start-pos
+             end-pos
+             paren
+             (cond
+               [(eq? normalized-class 'white-space) 'continue]
+               [(and (eq? normalized-class 'parenthesis)
+                     (member paren '(|(| |[| |{|)))
+                'open]
+               [(and (eq? normalized-class 'parenthesis)
+                     (member paren '(|)| |]| |}|)))
+                'close]
+               [(eq? normalized-class 'text) 'continue]
+               [(eq? normalized-class 'comment) 'continue]
+               [else 'datum])
+             #:at-exp?          #t
+             #:pending-command? pending-command?
+             #:bracket-depth    bracket-depth))
+          (define normalized-after-command?
+            (update-at-exp-command-bracket-state normalized-class exact-text))
+          (set! bracket-depth
+                (update-at-exp-bracket-depth exact-text
+                                            after-command?
+                                            bracket-depth))
+          (set! pending-command?
+                (update-at-exp-command-state normalized-class
+                                             exact-text
+                                             pending-command?))
+          (set! after-command? normalized-after-command?)
+          token])]
       [else
-       (define normalized-class
-         (normalized-token-class cls))
-       (define end-pos
-         (current-stream-position lexer-port))
-       (define exact-text
-         (source-text text normalized-class start-pos end-pos))
-       (derived-token-from-result exact-text
-                                  cls
-                                  start-pos
-                                  end-pos
-                                  paren
-                                  status)])))
+       (define-values (text cls paren raw-start raw-end next-offset next-mode status)
+         (racket-lexer*/status lexer-port offset mode))
+       (set! offset next-offset)
+       (set! mode   next-mode)
+       (cond
+         [(eof-object? text)
+          'eof]
+         [else
+          (define normalized-class
+            (normalized-token-class cls))
+          (define end-pos
+            (current-stream-position lexer-port))
+          (define exact-text
+            (source-text text normalized-class start-pos end-pos))
+          (derived-token-from-result exact-text
+                                     cls
+                                     start-pos
+                                     end-pos
+                                     paren
+                                     status)])])))
 
 ;; racket-derived-token-has-tag? : racket-derived-token? symbol? -> boolean?
 ;;   Determine whether a derived Racket token has a given classification tag.

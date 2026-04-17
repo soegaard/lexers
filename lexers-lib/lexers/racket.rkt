@@ -271,6 +271,28 @@
                            #:source-positions #f))
   (define register-script-events-derived-tokens
     (racket-string->derived-tokens register-script-events-source))
+  (define at-exp-source
+    "#lang at-exp racket\n(define x @bold{hi})\n")
+  (define at-exp-tokens
+    (racket-string->tokens at-exp-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define at-exp-derived-tokens
+    (racket-string->derived-tokens at-exp-source))
+  (define at-exp-command-char
+    (findf (lambda (token)
+             (string=? (racket-derived-token-text token) "@"))
+           at-exp-derived-tokens))
+  (define at-exp-command
+    (findf (lambda (token)
+             (and (string=? (racket-derived-token-text token) "bold")
+                  (racket-derived-token-has-tag? token 'scribble-command)))
+           at-exp-derived-tokens))
+  (define at-exp-text
+    (findf (lambda (token)
+             (and (string=? (racket-derived-token-text token) "hi")
+                  (racket-derived-token-has-tag? token 'scribble-text)))
+           at-exp-derived-tokens))
   (define regex-heavy-source
     (string-append
      "      'char_alphabetic': ((cp) =>\n"
@@ -356,6 +378,9 @@
   (check-not-false derived-open)
   (check-not-false derived-close)
   (check-not-false derived-continue)
+  (check-not-false at-exp-command-char)
+  (check-not-false at-exp-command)
+  (check-not-false at-exp-text)
   (check-not-false streaming-first-token)
   (check-equal? (racket-derived-token-text derived-hash-colon)
                 "#:x")
@@ -407,6 +432,9 @@
                        (drop-right (map stream-token-value register-script-events-tokens) 1))
                 register-script-events-source)
   (check-equal? (apply string-append
+                       (drop-right (map stream-token-value at-exp-tokens) 1))
+                at-exp-source)
+  (check-equal? (apply string-append
                        (drop-right (map stream-token-value regex-heavy-tokens) 1))
                 regex-heavy-source)
   (check-equal? (apply string-append
@@ -427,6 +455,9 @@
   (check-equal? (apply string-append
                        (map racket-derived-token-text register-script-events-derived-tokens))
                 register-script-events-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text at-exp-derived-tokens))
+                at-exp-source)
   (check-equal? (apply string-append
                        (map racket-derived-token-text regex-heavy-derived-tokens))
                 regex-heavy-source)

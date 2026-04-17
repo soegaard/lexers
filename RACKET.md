@@ -14,8 +14,9 @@ token engine and adapts that output into the public `lexers` API shape:
 - a projected token API
 - a derived-token API
 
-The first milestone targets ordinary Racket source, not Scribble-specific
-`@` notation.
+The first milestone targets ordinary Racket source and also recognizes
+`#lang at-exp ...` sources, where `@` switches from Racket mode into
+Scribble-style text mode.
 
 ## Why An Adapter
 
@@ -51,6 +52,17 @@ The first reusable Racket-specific derived tags include:
 - `racket-close`
 - `racket-continue`
 
+When a source starts with `#lang at-exp`, the adapter uses the Scribble lexer
+family from `syntax-color` in Racket mode. In that case, derived Racket tokens
+may also carry reusable Scribble structure tags such as:
+
+- `scribble-text`
+- `scribble-command-char`
+- `scribble-command`
+- `scribble-body-delimiter`
+- `scribble-optional-delimiter`
+- `scribble-racket-escape`
+
 These tags describe reusable lexical and reader roles, not presentation.
 
 The derived layer may also attach a small heuristic layer for identifiers that
@@ -79,6 +91,5 @@ The first Racket milestone still defers:
 - special handling of `racket-nobar-lexer`
 - renderer-facing distinctions
 
-Scribble-specific `@` tokenization now lives in the separate
-`lexers/scribble` module built on the Scribble lexer family from
-`syntax-color`.
+Standalone Scribble documents still live in the separate `lexers/scribble`
+module built on the Scribble lexer family from `syntax-color`.

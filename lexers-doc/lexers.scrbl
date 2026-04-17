@@ -955,6 +955,10 @@ This lexer is adapter-backed. It uses the lexer from
 @racketmodname[syntax-color/racket-lexer] as its raw engine and adapts that
 output into the public @tt{lexers} projected and derived APIs.
 
+When a source starts with @racket["#lang at-exp"], the adapter switches to
+the Scribble lexer family in Racket mode so that @tt|{@litchar["@"]}| forms
+are tokenized as Scribble escapes instead of ordinary symbol text.
+
 @defproc[(make-racket-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
@@ -1091,7 +1095,15 @@ The current Racket adapter may attach tags such as:
  @item{@racket['racket-definition-form]}
  @item{@racket['racket-binding-form]}
  @item{@racket['racket-conditional-form]}
- @item{@racket['racket-error]}]
+ @item{@racket['racket-error]}
+ @item{@racket['scribble-text] for @racket["#lang at-exp"] text regions}
+ @item{@racket['scribble-command-char] for @tt|{@litchar["@"]}| in
+       @racket["#lang at-exp"] sources}
+ @item{@racket['scribble-command] for command names such as
+       @tt|{@litchar["@"]bold}| in @racket["#lang at-exp"] sources}
+ @item{@racket['scribble-body-delimiter]}
+ @item{@racket['scribble-optional-delimiter]}
+ @item{@racket['scribble-racket-escape]}]
 
 The `usual special form` tags are heuristic. They are meant to help ordinary
 Racket tooling recognize common built-in forms such as @racket[define],
@@ -1108,6 +1120,13 @@ perform expansion or binding resolution.
        (list (racket-derived-token-text token)
              (racket-derived-token-tags token)))
      derived-tokens)
+
+(define at-exp-derived-tokens
+  (racket-string->derived-tokens "#lang at-exp racket\n(define x @bold{hi})\n"))
+(map (lambda (token)
+       (list (racket-derived-token-text token)
+             (racket-derived-token-tags token)))
+     at-exp-derived-tokens)
 ]}
 
 @defthing[racket-profiles immutable-hash?]{
