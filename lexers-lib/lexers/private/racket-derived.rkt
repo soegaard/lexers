@@ -211,12 +211,32 @@
 ;; make-racket-derived-reader : -> (input-port? -> (or/c racket-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Racket tokens.
 (define (make-racket-derived-reader)
+  (struct source-chunk (actual-start logical-start text logical-length)
+    #:transparent)
+
   (define lexer-port  #f)
   (define offset      0)
   (define mode        #f)
-  (define base-offset 1)
   (define chunks      '())
   (define chunk-lock  (make-semaphore 1))
+  (define next-logical-start 0)
+
+  ;; string-logical-length : string? -> exact-nonnegative-integer?
+  ;;   Count source characters in syntax-color's logical newline space.
+  (define (string-logical-length text)
+    (define len
+      (string-length text))
+    (let loop ([i 0]
+               [count 0])
+      (cond
+        [(= i len)
+         count]
+        [(and (char=? (string-ref text i) #\return)
+              (< (add1 i) len)
+              (char=? (string-ref text (add1 i)) #\newline))
+         (loop (+ i 2) (add1 count))]
+        [else
+         (loop (add1 i) (add1 count))])))
 
   ;; append-chunk! : exact-nonnegative-integer? string? -> void?
   ;;   Record one streamed source chunk for later exact-slice recovery.
@@ -224,22 +244,29 @@
     (call-with-semaphore
      chunk-lock
      (lambda ()
+       (define logical-length
+         (string-logical-length chunk))
        (set! chunks
              (append chunks
-                     (list (cons start chunk)))))))
+                     (list (source-chunk start
+                                         next-logical-start
+                                         chunk
+                                         logical-length))))
+       (set! next-logical-start
+             (+ next-logical-start logical-length)))))
 
   ;; slice-text : exact-nonnegative-integer? exact-nonnegative-integer? -> (or/c string? #f)
   ;;   Recover a source slice from the incrementally buffered chunks.
   (define (slice-text start end)
     (call-with-semaphore
      chunk-lock
-     (lambda ()
+      (lambda ()
        (define pieces '())
        (for ([chunk (in-list chunks)])
          (define chunk-start
-           (car chunk))
+           (source-chunk-actual-start chunk))
          (define chunk-text
-           (cdr chunk))
+           (source-chunk-text chunk))
          (define chunk-end
            (+ chunk-start (string-length chunk-text)))
          (when (and (< start chunk-end)
@@ -261,33 +288,166 @@
          [else
           #f]))))
 
-  ;; source-text : any/c any/c any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
-  ;;   Recover exact token text from the incremental buffer when possible.
-  (define (source-text raw-text raw-start raw-end start-index end-index)
-    (define (valid-local-range? start end)
-      (and (exact-integer? start)
-           (exact-integer? end)
-           (<= 0 start end)))
-    (define local-start
-      (cond
-        [(exact-integer? raw-start)
-         (- raw-start base-offset)]
-        [else
-         start-index]))
-    (define local-end
-      (cond
-        [(exact-integer? raw-end)
-         (- raw-end base-offset)]
-        [else
-         end-index]))
+  ;; logical-index->actual-index : exact-nonnegative-integer? -> (or/c exact-nonnegative-integer? #f)
+  ;;   Convert one logical syntax-color offset into one exact source index.
+  (define (logical-index->actual-index logical-index)
+    (call-with-semaphore
+     chunk-lock
+     (lambda ()
+       (define found
+         (for/first ([chunk (in-list chunks)]
+                     #:when (<= (source-chunk-logical-start chunk)
+                                logical-index
+                                (+ (source-chunk-logical-start chunk)
+                                   (source-chunk-logical-length chunk))))
+           chunk))
+       (cond
+         [(not found)
+          #f]
+         [else
+          (define text
+            (source-chunk-text found))
+          (define target
+            (- logical-index
+               (source-chunk-logical-start found)))
+          (let loop ([actual-delta 0]
+                     [logical-delta 0])
+            (cond
+              [(= logical-delta target)
+               (+ (source-chunk-actual-start found) actual-delta)]
+              [(>= actual-delta (string-length text))
+               (+ (source-chunk-actual-start found) actual-delta)]
+              [(and (char=? (string-ref text actual-delta) #\return)
+                    (< (add1 actual-delta) (string-length text))
+                    (char=? (string-ref text (add1 actual-delta)) #\newline))
+               (loop (+ actual-delta 2) (add1 logical-delta))]
+              [else
+               (loop (add1 actual-delta) (add1 logical-delta))]))]))))
+
+  ;; source-char : exact-nonnegative-integer? -> (or/c char? #f)
+  ;;   Read one exact source character from the buffered chunks.
+  (define (source-char index)
+    (define piece
+      (slice-text index (add1 index)))
     (cond
-      [(and (valid-local-range? local-start local-end)
-            (slice-text local-start local-end))
+      [(and piece (= (string-length piece) 1))
+       (string-ref piece 0)]
+      [else
+       #f]))
+
+  ;; source-prefix=? : exact-nonnegative-integer? string? -> boolean?
+  ;;   Determine whether the buffered source matches one string at one index.
+  (define (source-prefix=? index text)
+    (define piece
+      (slice-text index (+ index (string-length text))))
+    (and piece
+         (string=? piece text)))
+
+  ;; next-newline-unit-length : exact-nonnegative-integer? -> exact-positive-integer?
+  ;;   Measure one logical newline unit from the buffered exact source.
+  (define (next-newline-unit-length index)
+    (define ch
+      (source-char index))
+    (cond
+      [(not ch) 1]
+      [(char=? ch #\return)
+       (cond
+         [(equal? (source-char (add1 index)) #\newline) 2]
+         [else                                          1])]
+      [else 1]))
+
+  ;; consume-line-comment : exact-nonnegative-integer? -> string?
+  ;;   Recover one source-faithful ; line comment without its trailing newline.
+  (define (consume-line-comment index)
+    (let loop ([end index])
+      (define ch
+        (source-char end))
+      (cond
+        [(or (not ch)
+             (char=? ch #\newline))
+         (or (slice-text index end) "")]
+        [else
+         (loop (add1 end))])))
+
+  ;; consume-horizontal-whitespace : exact-nonnegative-integer? -> string?
+  ;;   Recover one horizontal whitespace run from the buffered exact source.
+  (define (consume-horizontal-whitespace index)
+    (let loop ([end index])
+      (define ch
+        (source-char end))
+      (cond
+        [(and ch
+              (char-whitespace? ch)
+              (not (char=? ch #\newline))
+              (not (char=? ch #\return)))
+         (loop (add1 end))]
+        [else
+         (or (slice-text index end) "")])))
+
+  ;; consume-newlines : exact-nonnegative-integer? exact-positive-integer? -> string?
+  ;;   Recover one or more logical newline units from the buffered exact source.
+  (define (consume-newlines index count)
+    (let loop ([remaining count]
+               [end       index])
+      (cond
+        [(zero? remaining)
+         (or (slice-text index end) "")]
+        [else
+         (loop (sub1 remaining)
+               (+ end (next-newline-unit-length end)))])))
+
+  ;; source-text : any/c symbol? position? position? -> string?
+  ;;   Recover exact token text from the incremental buffer using the current
+  ;;   stream positions as the primary exact coordinate system.
+  (define (source-text raw-text normalized-class start-pos end-pos)
+    (define logical-start
+      (max 0 (sub1 (position-offset start-pos))))
+    (define logical-end
+      (max logical-start (sub1 (position-offset end-pos))))
+    (define start-index
+      (or (logical-index->actual-index logical-start)
+          logical-start))
+    (define end-index
+      (or (logical-index->actual-index logical-end)
+          start-index))
+    (cond
+      [(and (< start-index end-index)
+            (slice-text start-index end-index))
        => values]
-      [(string? raw-text)
+      [(and (memq normalized-class '(comment sexp-comment))
+            (equal? (source-char start-index) #\;))
+       (consume-line-comment start-index)]
+      [(eq? normalized-class 'white-space)
+       (cond
+         [(and (string? raw-text)
+               (positive? (string-length raw-text))
+               (source-prefix=? start-index raw-text))
+          raw-text]
+         [else
+          (define ch
+            (source-char start-index))
+          (cond
+            [(not ch) ""]
+            [(or (char=? ch #\newline)
+                 (char=? ch #\return))
+             (define newline-count
+               (for/sum ([raw-ch (in-string (if (string? raw-text) raw-text ""))]
+                         #:when (char=? raw-ch #\newline))
+                 1))
+             (consume-newlines start-index
+                               (max 1 newline-count))]
+            [else
+             (consume-horizontal-whitespace start-index)])])]
+      [(and (string? raw-text)
+            (source-prefix=? start-index raw-text))
        raw-text]
       [else
-       (format "~a" raw-text)]))
+        (define ch
+         (source-char start-index))
+       (cond
+         [ch  (string ch)]
+         [else
+          (format "~a" raw-text)])]))
 
   ;; initialize-source! : input-port? -> void?
   ;;   Stream the original input into a pipe and a small exact-text buffer.
@@ -306,7 +466,6 @@
           (cond
             [(exact-positive-integer? raw-offset) raw-offset]
             [else                                 1]))
-        (set! base-offset initial-offset)
         (define-values (pipe-in pipe-out)
           (make-pipe))
         (port-count-lines! pipe-in)
@@ -347,8 +506,6 @@
     (initialize-source! in)
     (define start-pos
       (current-stream-position lexer-port))
-    (define start-index
-      (file-position lexer-port))
     (define-values (text cls paren raw-start raw-end next-offset next-mode status)
       (racket-lexer*/status lexer-port offset mode))
     (set! offset next-offset)
@@ -357,16 +514,16 @@
       [(eof-object? text)
        'eof]
       [else
-       (define end-index
-         (file-position lexer-port))
-       (derived-token-from-result (source-text text
-                                               raw-start
-                                               raw-end
-                                               start-index
-                                               end-index)
+       (define normalized-class
+         (normalized-token-class cls))
+       (define end-pos
+         (current-stream-position lexer-port))
+       (define exact-text
+         (source-text text normalized-class start-pos end-pos))
+       (derived-token-from-result exact-text
                                   cls
                                   start-pos
-                                  (current-stream-position lexer-port)
+                                  end-pos
                                   paren
                                   status)])))
 

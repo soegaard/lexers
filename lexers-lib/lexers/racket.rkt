@@ -248,6 +248,29 @@
                            #:source-positions #f))
   (define ordinary-comment-derived-tokens
     (racket-string->derived-tokens ordinary-comment-source))
+  (define crlf-synthetic-source
+    (string-append
+     "(define x 1)\r\n"
+     "(js-add-event-listener! element \"load\" callback)\r\n"))
+  (define crlf-synthetic-tokens
+    (racket-string->tokens crlf-synthetic-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define crlf-synthetic-derived-tokens
+    (racket-string->derived-tokens crlf-synthetic-source))
+  (define register-script-events-source
+    (string-append
+     "(define (register-script-events! element)\r\n"
+     "  (define callback (procedure->external script-ready))\r\n"
+     "  (define error    (procedure->external script-error))\r\n"
+     "  (js-add-event-listener! element \"load\"  callback)\r\n"
+     "  (js-add-event-listener! element \"error\" error))\r\n"))
+  (define register-script-events-tokens
+    (racket-string->tokens register-script-events-source
+                           #:profile 'coloring
+                           #:source-positions #f))
+  (define register-script-events-derived-tokens
+    (racket-string->derived-tokens register-script-events-source))
   (define regex-heavy-source
     (string-append
      "      'char_alphabetic': ((cp) =>\n"
@@ -378,6 +401,12 @@
                        (drop-right (map stream-token-value ordinary-comment-tokens) 1))
                 ordinary-comment-source)
   (check-equal? (apply string-append
+                       (drop-right (map stream-token-value crlf-synthetic-tokens) 1))
+                crlf-synthetic-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value register-script-events-tokens) 1))
+                register-script-events-source)
+  (check-equal? (apply string-append
                        (drop-right (map stream-token-value regex-heavy-tokens) 1))
                 regex-heavy-source)
   (check-equal? (apply string-append
@@ -392,6 +421,12 @@
   (check-equal? (apply string-append
                        (map racket-derived-token-text ordinary-comment-derived-tokens))
                 ordinary-comment-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text crlf-synthetic-derived-tokens))
+                crlf-synthetic-source)
+  (check-equal? (apply string-append
+                       (map racket-derived-token-text register-script-events-derived-tokens))
+                register-script-events-source)
   (check-equal? (apply string-append
                        (map racket-derived-token-text regex-heavy-derived-tokens))
                 regex-heavy-source)
