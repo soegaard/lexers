@@ -140,6 +140,25 @@
            racket/list
            lexers/token)
 
+  ;; first-derived-token-before-rest? : (-> (input-port? -> any)) string? string? -> any
+  ;;   Read the first derived token before the second chunk is written.
+  (define (first-derived-token-before-rest? make-lexer first-chunk rest-chunk)
+    (define lexer
+      (make-lexer))
+    (define-values (in out)
+      (make-pipe))
+    (write-string first-chunk out)
+    (flush-output out)
+    (define result-channel
+      (make-channel))
+    (thread (lambda ()
+              (channel-put result-channel (lexer in))))
+    (define token
+      (sync/timeout 1 result-channel))
+    (write-string rest-chunk out)
+    (close-output-port out)
+    token)
+
   ;; token-source-slice : string? (or/c symbol? token? position-token?) -> string?
   ;;   Extract the exact source slice covered by one projected token.
   (define (token-source-slice source token)
@@ -249,6 +268,10 @@
              (and (scribble-derived-token-has-tag? token 'scribble-racket-escape)
                   (string=? (scribble-derived-token-text token) "define")))
            derived-tokens))
+  (define streaming-first-token
+    (first-derived-token-before-rest? make-scribble-derived-lexer
+                                      "@title{Hi}"
+                                      "\n\nText\n"))
 
   (check-equal? (map stream-token-name simple-tokens)
                 '(delimiter identifier delimiter literal delimiter whitespace literal eof))
@@ -292,7 +315,10 @@
   (check-not-false derived-title)
   (check-not-false derived-item)
   (check-not-false derived-racket-command)
+  (check-not-false streaming-first-token)
   (check-not-false derived-text)
   (check-not-false derived-body-delimiter)
   (check-not-false derived-optional-delimiter)
-  (check-not-false derived-racket-escape-token))
+  (check-not-false derived-racket-escape-token)
+  (check-equal? (scribble-derived-token-text streaming-first-token)
+                "@"))

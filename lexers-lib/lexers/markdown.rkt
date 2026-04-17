@@ -139,6 +139,25 @@
   (require rackunit
            racket/list)
 
+  ;; first-token-before-rest? : (-> (input-port? -> any)) string? string? -> any
+  ;;   Read the first token before the second chunk is written.
+  (define (first-token-before-rest? make-lexer first-chunk rest-chunk)
+    (define lexer
+      (make-lexer))
+    (define-values (in out)
+      (make-pipe))
+    (write-string first-chunk out)
+    (flush-output out)
+    (define result-channel
+      (make-channel))
+    (thread (lambda ()
+              (channel-put result-channel (lexer in))))
+    (define token
+      (sync/timeout 1 result-channel))
+    (write-string rest-chunk out)
+    (close-output-port out)
+    token)
+
   ;; derive-with-timeout : string? real? -> (or/c (listof markdown-derived-token?) #f)
   ;;   Tokenize source in a worker thread and fail fast on accidental hangs.
   (define (derive-with-timeout source seconds)
@@ -307,6 +326,10 @@
     "Trailing slash \\\n")
   (define prose-backslash-derived-tokens
     (derive-with-timeout prose-backslash-source 2))
+  (define streaming-first-token
+    (first-token-before-rest? make-markdown-derived-lexer
+                              "# Title\n\n"
+                              "More text.\n"))
   (define nested-fence-source
     "### Minimal example\n\n```racket\n(define x 1)\n```\n\n- item\n  ```racket\n  (define y 2)\n  ```\n")
   (define nested-fence-derived-tokens
@@ -383,8 +406,11 @@
   (check-not-false prose-exclamation-derived-tokens)
   (check-not-false prose-tilde-derived-tokens)
   (check-not-false prose-backslash-derived-tokens)
+  (check-not-false streaming-first-token)
   (check-not-false indented-opening-fence-whitespace)
   (check-not-false indented-closing-fence)
+  (check-not-false (markdown-derived-token-has-tag? streaming-first-token
+                                                    'markdown-heading-marker))
   (check-equal? (markdown-derived-token-text hard-break-token)
                 "  ")
   (check-equal? (apply string-append

@@ -211,16 +211,88 @@
 ;; make-racket-derived-reader : -> (input-port? -> (or/c racket-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Racket tokens.
 (define (make-racket-derived-reader)
-  (define source      #f)
-  (define source-port #f)
+  (define lexer-port  #f)
   (define offset      0)
   (define mode        #f)
+  (define base-offset 1)
+  (define chunks      '())
+  (define chunk-lock  (make-semaphore 1))
+
+  ;; append-chunk! : exact-nonnegative-integer? string? -> void?
+  ;;   Record one streamed source chunk for later exact-slice recovery.
+  (define (append-chunk! start chunk)
+    (call-with-semaphore
+     chunk-lock
+     (lambda ()
+       (set! chunks
+             (append chunks
+                     (list (cons start chunk)))))))
+
+  ;; slice-text : exact-nonnegative-integer? exact-nonnegative-integer? -> (or/c string? #f)
+  ;;   Recover a source slice from the incrementally buffered chunks.
+  (define (slice-text start end)
+    (call-with-semaphore
+     chunk-lock
+     (lambda ()
+       (define pieces '())
+       (for ([chunk (in-list chunks)])
+         (define chunk-start
+           (car chunk))
+         (define chunk-text
+           (cdr chunk))
+         (define chunk-end
+           (+ chunk-start (string-length chunk-text)))
+         (when (and (< start chunk-end)
+                    (< chunk-start end))
+           (define piece-start
+             (max start chunk-start))
+           (define piece-end
+             (min end chunk-end))
+           (set! pieces
+                 (cons (substring chunk-text
+                                  (- piece-start chunk-start)
+                                  (- piece-end chunk-start))
+                       pieces))))
+       (define slice
+         (apply string-append (reverse pieces)))
+       (cond
+         [(= (string-length slice) (- end start))
+          slice]
+         [else
+          #f]))))
+
+  ;; source-text : any/c any/c any/c exact-nonnegative-integer? exact-nonnegative-integer? -> string?
+  ;;   Recover exact token text from the incremental buffer when possible.
+  (define (source-text raw-text raw-start raw-end start-index end-index)
+    (define (valid-local-range? start end)
+      (and (exact-integer? start)
+           (exact-integer? end)
+           (<= 0 start end)))
+    (define local-start
+      (cond
+        [(exact-integer? raw-start)
+         (- raw-start base-offset)]
+        [else
+         start-index]))
+    (define local-end
+      (cond
+        [(exact-integer? raw-end)
+         (- raw-end base-offset)]
+        [else
+         end-index]))
+    (cond
+      [(and (valid-local-range? local-start local-end)
+            (slice-text local-start local-end))
+       => values]
+      [(string? raw-text)
+       raw-text]
+      [else
+       (format "~a" raw-text)]))
 
   ;; initialize-source! : input-port? -> void?
-  ;;   Buffer the remaining input into an internal string port so the adapter
-  ;;   can recover exact token text spans.
+  ;;   Stream the original input into a pipe and a small exact-text buffer.
   (define (initialize-source! in)
-    (when (not source-port)
+    (when (not lexer-port)
       (let-values ([(line col raw-offset) (port-next-location in)])
         (define base-line
           (cond
@@ -230,28 +302,55 @@
           (cond
             [(exact-nonnegative-integer? col) col]
             [else                             0]))
-        (define base-offset
+        (define initial-offset
           (cond
             [(exact-positive-integer? raw-offset) raw-offset]
             [else                                 1]))
-        (set! source (port->string in))
-        (set! source-port (open-input-string source))
-        (port-count-lines! source-port)
-        (set-port-next-location! source-port
+        (set! base-offset initial-offset)
+        (define-values (pipe-in pipe-out)
+          (make-pipe))
+        (port-count-lines! pipe-in)
+        (set-port-next-location! pipe-in
                                  base-line
                                  base-col
-                                 base-offset))))
+                                 initial-offset)
+        (thread
+         (lambda ()
+           (let loop ([local-start 0])
+             (define first-char
+               (read-char in))
+             (cond
+               [(eof-object? first-char)
+                (close-output-port pipe-out)]
+               [else
+                (define out
+                  (open-output-string))
+                (write-char first-char out)
+                (let fill ()
+                  (when (char-ready? in)
+                    (define next-char
+                      (read-char in))
+                    (unless (eof-object? next-char)
+                      (write-char next-char out)
+                      (fill))))
+                (define chunk
+                  (get-output-string out))
+                (append-chunk! local-start chunk)
+                (write-string chunk pipe-out)
+                (flush-output pipe-out)
+                (loop (+ local-start (string-length chunk)))]))))
+        (set! lexer-port pipe-in))))
 
   (lambda (in)
     (unless (input-port? in)
       (raise-argument-error 'make-racket-derived-reader "input-port?" in))
     (initialize-source! in)
     (define start-pos
-      (current-stream-position source-port))
+      (current-stream-position lexer-port))
     (define start-index
-      (file-position source-port))
+      (file-position lexer-port))
     (define-values (text cls paren raw-start raw-end next-offset next-mode status)
-      (racket-lexer*/status source-port offset mode))
+      (racket-lexer*/status lexer-port offset mode))
     (set! offset next-offset)
     (set! mode   next-mode)
     (cond
@@ -259,16 +358,15 @@
        'eof]
       [else
        (define end-index
-         (file-position source-port))
-       (derived-token-from-result (token-text source
-                                              text
-                                              raw-start
-                                              raw-end
-                                              start-index
-                                              end-index)
+         (file-position lexer-port))
+       (derived-token-from-result (source-text text
+                                               raw-start
+                                               raw-end
+                                               start-index
+                                               end-index)
                                   cls
                                   start-pos
-                                  (current-stream-position source-port)
+                                  (current-stream-position lexer-port)
                                   paren
                                   status)])))
 

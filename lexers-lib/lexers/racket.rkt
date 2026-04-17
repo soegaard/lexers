@@ -139,6 +139,25 @@
   (require rackunit
            racket/list)
 
+  ;; first-derived-token-before-rest? : (-> (input-port? -> any)) string? string? -> any
+  ;;   Read the first derived token before the second chunk is written.
+  (define (first-derived-token-before-rest? make-lexer first-chunk rest-chunk)
+    (define lexer
+      (make-lexer))
+    (define-values (in out)
+      (make-pipe))
+    (write-string first-chunk out)
+    (flush-output out)
+    (define result-channel
+      (make-channel))
+    (thread (lambda ()
+              (channel-put result-channel (lexer in))))
+    (define token
+      (sync/timeout 1 result-channel))
+    (write-string rest-chunk out)
+    (close-output-port out)
+    token)
+
   (define coloring-tokens
     (racket-string->tokens "; hi\n#;(+ 1 2) #:x \"hi\""
                            #:profile 'coloring
@@ -285,6 +304,10 @@
     (findf (lambda (token)
              (racket-derived-token-has-tag? token 'racket-continue))
            derived-tokens))
+  (define streaming-first-token
+    (first-derived-token-before-rest? make-racket-derived-lexer
+                                      "("
+                                      "define x 1)\ny\n"))
 
   (check-equal? (map stream-token-name coloring-tokens)
                 '(comment whitespace comment comment comment comment comment
@@ -310,8 +333,11 @@
   (check-not-false derived-open)
   (check-not-false derived-close)
   (check-not-false derived-continue)
+  (check-not-false streaming-first-token)
   (check-equal? (racket-derived-token-text derived-hash-colon)
                 "#:x")
+  (check-equal? (racket-derived-token-text streaming-first-token)
+                "(")
   (check-not-false (racket-derived-token-has-tag? derived-define
                                                   'racket-usual-special-form))
   (check-not-false (racket-derived-token-has-tag? derived-define

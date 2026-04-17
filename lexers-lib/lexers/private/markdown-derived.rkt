@@ -959,17 +959,255 @@
                (emit line-end full-line-end 'whitespace nl '(whitespace)))
              (loop full-line-end)])])])))
 
+;; current-stream-position : input-port? -> position?
+;;   Read the current parser-tools-compatible source position from a port.
+(define (current-stream-position in)
+  (let-values ([(line col offset) (port-next-location in)])
+    (define safe-line
+      (cond
+        [(exact-positive-integer? line)   line]
+        [else                             1]))
+    (define safe-col
+      (cond
+        [(exact-nonnegative-integer? col) col]
+        [else                             0]))
+    (define safe-offset
+      (cond
+        [(exact-positive-integer? offset) offset]
+        [else                             1]))
+    (make-stream-position safe-offset safe-line safe-col)))
+
+;; split-line-ending : string? -> (values string? string?)
+;;   Split one preserved line into content and its trailing line ending.
+(define (split-line-ending line*)
+  (define len
+    (string-length line*))
+  (cond
+    [(and (>= len 2)
+          (char=? (string-ref line* (- len 2)) #\return)
+          (char=? (string-ref line* (sub1 len)) #\newline))
+     (values (substring line* 0 (- len 2))
+             "\r\n")]
+    [(and (positive? len)
+          (char=? (string-ref line* (sub1 len)) #\newline))
+     (values (substring line* 0 (sub1 len))
+             "\n")]
+    [(and (positive? len)
+          (char=? (string-ref line* (sub1 len)) #\return))
+     (values (substring line* 0 (sub1 len))
+             "\r")]
+    [else
+     (values line* "")]))
+
+;; read-line/preserve : input-port? -> (or/c string? eof-object?)
+;;   Read one line while preserving its trailing newline sequence.
+(define (read-line/preserve in)
+  (define out
+    (open-output-string))
+  (let loop ()
+    (define ch
+      (read-char in))
+    (cond
+      [(eof-object? ch)
+       (define line*
+         (get-output-string out))
+       (cond
+         [(string=? line* "")
+          eof]
+         [else
+          line*])]
+      [else
+       (write-char ch out)
+       (cond
+         [(char=? ch #\newline)
+          (get-output-string out)]
+         [(char=? ch #\return)
+          (define next
+            (peek-char in))
+          (when (char=? next #\newline)
+            (write-char (read-char in) out))
+          (get-output-string out)]
+         [else
+          (loop)])])))
+
+;; shift-position : position? exact-positive-integer? exact-positive-integer? exact-nonnegative-integer? -> position?
+;;   Shift one local token position into the original streamed source.
+(define (shift-position pos base-offset base-line base-col)
+  (define local-line
+    (position-line pos))
+  (define local-col
+    (position-col pos))
+  (make-stream-position (+ base-offset (sub1 (position-offset pos)))
+                        (+ base-line (sub1 local-line))
+                        (cond
+                          [(= local-line 1)
+                           (+ base-col local-col)]
+                          [else
+                           local-col])))
+
+;; shift-token : markdown-derived-token? exact-positive-integer? exact-positive-integer? exact-nonnegative-integer? -> markdown-derived-token?
+;;   Shift one local Markdown token into the original streamed source.
+(define (shift-token token base-offset base-line base-col)
+  (markdown-derived-token (markdown-derived-token-kind token)
+                          (markdown-derived-token-text token)
+                          (shift-position (markdown-derived-token-start token)
+                                          base-offset
+                                          base-line
+                                          base-col)
+                          (shift-position (markdown-derived-token-end token)
+                                          base-offset
+                                          base-line
+                                          base-col)
+                          (markdown-derived-token-tags token)))
+
+;; shifted-block-tokens : string? exact-positive-integer? exact-positive-integer? exact-nonnegative-integer? -> (listof markdown-derived-token?)
+;;   Tokenize one local Markdown block and shift its positions into the original source.
+(define (shifted-block-tokens block-source base-offset base-line base-col)
+  (for/list ([token (in-list (tokenize-markdown-source block-source))])
+    (shift-token token base-offset base-line base-col)))
+
 ;; make-markdown-derived-reader : -> (input-port? -> (or/c markdown-derived-token? 'eof))
 ;;   Construct a stateful port-based reader for derived Markdown tokens.
 (define (make-markdown-derived-reader)
   (define tokens #f)
+  (define pending-line #f)
+
+  ;; next-line-record : input-port? -> (or/c (list/c string? position?) #f)
+  ;;   Read the next preserved line, with one-line pushback support.
+  (define (next-line-record in)
+    (cond
+      [pending-line
+       (define record pending-line)
+       (set! pending-line #f)
+       record]
+      [else
+       (define start-pos
+         (current-stream-position in))
+       (define line*
+         (read-line/preserve in))
+       (cond
+         [(eof-object? line*)
+          #f]
+         [else
+          (list line* start-pos)])]))
+
+  ;; unread-line-record! : (list/c string? position?) -> void?
+  ;;   Push one preserved line back for the next block read.
+  (define (unread-line-record! record)
+    (set! pending-line record))
+
+  ;; read-next-block : input-port? -> (or/c (list/c string? position?) #f)
+  ;;   Read one Markdown block with enough lookahead to keep multiline blocks intact.
+  (define (read-next-block in)
+    (define first-record
+      (next-line-record in))
+    (cond
+      [(not first-record)
+       #f]
+      [else
+       (define first-line*
+         (car first-record))
+       (define first-pos
+         (cadr first-record))
+       (define out
+         (open-output-string))
+       (define (write-record! record)
+         (write-string (car record) out))
+       (define-values (first-line first-nl)
+         (split-line-ending first-line*))
+       (write-record! first-record)
+       (cond
+         [(blank-line? first-line)
+          (list (get-output-string out) first-pos)]
+         [(regexp-match #px"^[ \t]{0,3}([`~]{3,})(.*)$" first-line)
+          => (lambda (m)
+               (define fence
+                 (capture->string (cadr m)))
+               (define fence-char
+                 (substring fence 0 1))
+               (define fence-len
+                 (string-length fence))
+               (let loop ()
+                 (define record
+                   (next-line-record in))
+                 (cond
+                   [(not record)
+                    (list (get-output-string out) first-pos)]
+                   [else
+                    (define line*
+                      (car record))
+                    (define-values (line _nl)
+                      (split-line-ending line*))
+                    (write-record! record)
+                    (cond
+                      [(regexp-match? (pregexp (format "^[ \t]{0,3}~a{~a,}[ \t]*$"
+                                                       (regexp-quote fence-char)
+                                                       fence-len))
+                                      line)
+                       (list (get-output-string out) first-pos)]
+                      [else
+                       (loop)])])))]
+         [(and (regexp-match? #px"^(?: {4}|\t)" first-line)
+               (not (regexp-match? #px"^[ \t]{0,3}([`~]{3,})" first-line)))
+          (let loop ()
+            (define record
+              (next-line-record in))
+            (cond
+              [(not record)
+               (list (get-output-string out) first-pos)]
+              [else
+               (define line*
+                 (car record))
+               (define-values (line _nl)
+                 (split-line-ending line*))
+               (cond
+                 [(or (blank-line? line)
+                      (regexp-match? #px"^(?: {4}|\t)" line))
+                  (write-record! record)
+                  (loop)]
+                 [else
+                  (unread-line-record! record)
+                  (list (get-output-string out) first-pos)])]))]
+         [else
+          (let loop ()
+            (define record
+              (next-line-record in))
+            (cond
+              [(not record)
+               (list (get-output-string out) first-pos)]
+              [else
+               (define line*
+                 (car record))
+               (define-values (line _nl)
+                 (split-line-ending line*))
+               (cond
+                 [(blank-line? line)
+                  (unread-line-record! record)
+                  (list (get-output-string out) first-pos)]
+                 [else
+                  (write-record! record)
+                  (loop)])]))])]))
+
   (lambda (in)
     (unless (input-port? in)
       (raise-argument-error 'make-markdown-derived-reader "input-port?" in))
-    (when (not tokens)
-      (port-count-lines! in)
+    (port-count-lines! in)
+    (when (or (not tokens) (null? tokens))
+      (define block
+        (read-next-block in))
       (set! tokens
-            (tokenize-markdown-source (port->string in))))
+            (cond
+              [block
+               (define block-source
+                 (car block))
+               (define block-pos
+                 (cadr block))
+               (shifted-block-tokens block-source
+                                     (position-offset block-pos)
+                                     (position-line block-pos)
+                                     (position-col block-pos))]
+              [else
+               '()])))
     (cond
       [(null? tokens)
        'eof]
