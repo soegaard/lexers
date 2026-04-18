@@ -287,9 +287,8 @@
                 '(delimiter identifier delimiter delimiter identifier delimiter
                   literal delimiter delimiter identifier delimiter
                   literal delimiter delimiter eof))
-  (check-equal? (map stream-token-name escape-tokens)
-                '(delimiter identifier delimiter delimiter identifier identifier
-                  literal delimiter delimiter eof))
+  (check-equal? (map stream-token-value escape-tokens)
+                '("@" "racket" "[" "(" "define" "x" "1" ")" "]" #f))
   (check-equal? (map stream-token-name no-position-tokens)
                 '(delimiter identifier delimiter literal delimiter eof))
   (check-equal? (map stream-token-name compiler-no-trivia-tokens)
