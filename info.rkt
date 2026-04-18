@@ -4,5 +4,13 @@
 (define pkg-authors '(soegaard))
 (define license 'MIT)
 
-(define deps '("base" "lexers-lib" "lexers-doc"))
-(define build-deps '())
+(define deps '("base"
+               "lexers-lib"
+               "lexers-doc"
+               "parser-tools-lib"
+               "syntax-color-lib"))
+(define build-deps '("parser-tools-doc"
+                     "racket-doc"
+                     "rackunit-lib"
+                     "scribble-lib"
+                     "syntax-color-doc"))
