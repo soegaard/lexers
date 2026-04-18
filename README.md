@@ -32,6 +32,10 @@ This repository contains three packages:
 
 The long-form public documentation lives in `lexers-doc`.
 
+Published documentation:
+
+- [docs.racket-lang.org/lexers](https://docs.racket-lang.org/lexers/index.html)
+
 To build the local manual:
 
 ```sh
