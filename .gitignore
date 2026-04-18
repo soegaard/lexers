@@ -1,6 +1,8 @@
 .DS_Store
 compiled/
 /doc/
+html/
+lexers-doc/doc/
 *~
 *.bak
 \#*
