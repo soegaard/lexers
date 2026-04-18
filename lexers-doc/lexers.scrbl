@@ -73,6 +73,7 @@
      the-eval))
 
 @title{Lexers}
+@author[(author+email "Jens Axel Søgaard" "jensaxel@soegaard.net")]
 
 This manual documents the public APIs in the @tt{lexers} packages.
 
