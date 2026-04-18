@@ -212,6 +212,14 @@
                              #:source-positions #t))
   (define contracts-excerpt-derived-tokens
     (scribble-string->derived-tokens contracts-excerpt-source))
+  (define crlf-source
+    "#lang scribble/manual\r\n\r\n@title{Hi}\r\n")
+  (define crlf-projected-tokens
+    (scribble-string->tokens crlf-source
+                             #:profile 'coloring
+                             #:source-positions #t))
+  (define crlf-derived-tokens
+    (scribble-string->derived-tokens crlf-source))
   (define projected-whitespace-token
     (findf (lambda (token)
              (and (eq? (lexer-token-name token) 'whitespace)
@@ -299,6 +307,14 @@
   (check-equal? (apply string-append
                        (map scribble-derived-token-text contracts-line-derived-tokens))
                 contracts-line-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list crlf-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (stream-token-value token)))
+                crlf-source)
+  (check-equal? (apply string-append
+                       (map scribble-derived-token-text crlf-derived-tokens))
+                crlf-source)
   (check-equal? (apply string-append
                        (for/list ([token (in-list contracts-excerpt-projected-tokens)]
                                   #:unless (eof-token? token))
