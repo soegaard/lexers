@@ -297,6 +297,26 @@
     (markdown-string->derived-tokens "```js\nconst x = 1;\n"))
   (define closed-fence-derived-tokens
     (markdown-string->derived-tokens "```js\nconst x = 1;\n```\n"))
+  (define crlf-fence-opener-source
+    "```sh\r\nracket hi\r\n```\r\n")
+  (define crlf-fence-opener-derived-tokens
+    (markdown-string->derived-tokens crlf-fence-opener-source))
+  (define crlf-fence-opener-projected-tokens
+    (markdown-string->tokens crlf-fence-opener-source
+                             #:profile 'coloring
+                             #:source-positions #f))
+  (define crlf-fence-all-lines-source
+    "```racket\r\n(+ 1 2)\r\n```\r\n")
+  (define crlf-fence-all-lines-derived-tokens
+    (markdown-string->derived-tokens crlf-fence-all-lines-source))
+  (define crlf-fence-all-lines-projected-tokens
+    (markdown-string->tokens crlf-fence-all-lines-source
+                             #:profile 'coloring
+                             #:source-positions #f))
+  (define lf-fence-control-source
+    "```racket\n(+ 1 2)\n```\n")
+  (define lf-fence-control-derived-tokens
+    (markdown-string->derived-tokens lf-fence-control-source))
   (define fenced-bash-newline
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'whitespace)
@@ -453,6 +473,25 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text closed-fence-derived-tokens))
                 "```js\nconst x = 1;\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text crlf-fence-opener-derived-tokens))
+                crlf-fence-opener-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list crlf-fence-opener-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (stream-token-value token)))
+                crlf-fence-opener-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text crlf-fence-all-lines-derived-tokens))
+                crlf-fence-all-lines-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list crlf-fence-all-lines-projected-tokens)]
+                                  #:unless (eof-token? token))
+                         (stream-token-value token)))
+                crlf-fence-all-lines-source)
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text lf-fence-control-derived-tokens))
+                lf-fence-control-source)
   (check-not-false
    (findf (lambda (token)
             (markdown-derived-token-has-tag? token 'markdown-code-fence))
@@ -473,4 +512,7 @@
   (check-true (contiguous-derived-stream? lone-fence-derived-tokens))
   (check-true (contiguous-derived-stream? lone-fence+newline-derived-tokens))
   (check-true (contiguous-derived-stream? unterminated-fence-with-content-derived-tokens))
-  (check-true (contiguous-derived-stream? closed-fence-derived-tokens)))
+  (check-true (contiguous-derived-stream? closed-fence-derived-tokens))
+  (check-true (contiguous-derived-stream? crlf-fence-opener-derived-tokens))
+  (check-true (contiguous-derived-stream? crlf-fence-all-lines-derived-tokens))
+  (check-true (contiguous-derived-stream? lf-fence-control-derived-tokens)))

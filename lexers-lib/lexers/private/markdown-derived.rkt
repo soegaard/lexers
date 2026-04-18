@@ -320,6 +320,19 @@
     (cond
       [(>= i len)
        (values (substring source index len) "" len len)]
+      [(char=? (string-ref source i) #\return)
+       (cond
+         [(and (< (add1 i) len)
+               (char=? (string-ref source (add1 i)) #\newline))
+          (values (substring source index i)
+                  "\r\n"
+                  i
+                  (+ i 2))]
+         [else
+          (values (substring source index i)
+                  "\r"
+                  i
+                  (add1 i))])]
       [(char=? (string-ref source i) #\newline)
        (values (substring source index i)
                "\n"
