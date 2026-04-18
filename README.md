@@ -1,8 +1,8 @@
 # lexers
 
-A collection of lexers for a few select languages.
+Reusable lexers for multiple consumers.
 
-Currently implemented language modules include:
+The library currently provides public lexer modules for:
 
 - `lexers/css`
 - `lexers/html`
@@ -12,56 +12,40 @@ Currently implemented language modules include:
 - `lexers/scribble`
 - `lexers/wat`
 
-The long-term public-facing documentation is intended to live in `lexers-doc`.
+These modules expose:
 
-## CSS
+- a projected token API for general consumers such as syntax coloring
+- a derived-token API for richer language-specific classification
 
-The first implemented lexer is available at the public module path
-`lexers/css`.
+## Packages
 
-The module currently exports:
+This repository contains three packages:
 
-- `make-css-lexer`
-- `css-string->tokens`
-- `make-css-derived-lexer`
-- `css-string->derived-tokens`
-- `css-profiles`
+- `lexers`
+  Meta-package that installs the library and documentation
+- `lexers-lib`
+  Lexer implementations
+- `lexers-doc`
+  Scribble manual
 
-### Projected Tokens
+## Documentation
 
-Use `css-string->tokens` for the consumer-facing token stream:
+The long-form public documentation lives in `lexers-doc`.
 
-```racket
-(require lexers/css)
+To build the local manual:
 
-(css-string->tokens "/* c */ color: #fff;" #:profile 'coloring)
+```sh
+raco scribble +m --htmls --dest html/ lexers-doc/lexers.scrbl
 ```
 
-The projected stream is intended for general consumers such as syntax coloring.
-The current common categories include values such as `comment`, `whitespace`,
-`identifier`, `keyword`, `literal`, `delimiter`, and `unknown`.
+## Status
 
-### Derived Tokens
+The current lexers are intended to be reusable across tools instead of being
+tied to a single renderer or editor integration.
 
-Use `css-string->derived-tokens` when you want richer CSS-specific
-classifications:
+Several lexers are handwritten, while the Racket and Scribble support is
+adapter-backed on top of `syntax-color`.
 
-```racket
-(require lexers/css)
+## License
 
-(css-string->derived-tokens "#fff rgb( --brand-color")
-```
-
-The derived layer can currently distinguish tags such as `color-literal`,
-`color-function`, and `custom-property-name`.
-
-### Profiles
-
-Two profiles are currently supported:
-
-- `'coloring`
-  Keeps trivia, emits `unknown` for malformed input, and includes source
-  positions by default.
-- `'compiler`
-  Skips trivia, raises on malformed input, and includes source positions by
-  default.
+MIT. See [LICENSE](LICENSE).
