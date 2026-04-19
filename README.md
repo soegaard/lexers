@@ -6,6 +6,7 @@ The library currently provides public lexer modules for:
 
 - `lexers/css`
 - `lexers/html`
+- `lexers/json`
 - `lexers/javascript`
 - `lexers/markdown`
 - `lexers/racket`

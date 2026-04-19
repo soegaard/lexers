@@ -9,6 +9,7 @@
                               make-scribble-inside-lexer)
                      lexers/css
                      lexers/html
+                     lexers/json
                      lexers/markdown
                      lexers/racket
                      lexers/rhombus
@@ -48,6 +49,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/markdown))
+     the-eval))
+
+@(define json-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/json))
      the-eval))
 
 @(define racket-eval
@@ -101,6 +110,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
+ @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/racket]}
@@ -192,7 +202,8 @@ The current defaults are:
 
 For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[css-string->tokens], @racket[make-html-lexer],
-@racket[html-string->tokens], @racket[make-javascript-lexer],
+@racket[html-string->tokens], @racket[make-json-lexer],
+@racket[json-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
 @racket[markdown-string->tokens], @racket[make-racket-lexer],
 @racket[racket-string->tokens], @racket[make-rhombus-lexer],
@@ -597,6 +608,117 @@ gain an additional language marker such as @racket['embedded-css] or
 @defthing[html-profiles immutable-hash?]{
 The profile defaults used by the HTML lexer.}
 
+@section{JSON}
+
+@defmodule[lexers/json]
+
+The projected JSON API has two entry points:
+
+@itemlist[
+ @item{@racket[make-json-lexer] for streaming tokenization from an input port.}
+ @item{@racket[json-string->tokens] for eager tokenization of an entire string.}]
+
+@defproc[(make-json-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming JSON lexer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next token from the port and returns one projected token value.
+
+Projected JSON categories include @racket['delimiter], @racket['operator],
+@racket['identifier], @racket['literal], @racket['whitespace], and
+@racket['unknown].
+
+Object keys project as @racket['identifier], while numbers, ordinary strings,
+and the JSON keywords @tt{true}, @tt{false}, and @tt{null} project as
+@racket['literal].
+
+@examples[#:eval json-eval
+(define lexer
+  (make-json-lexer #:profile 'coloring))
+(define in
+  (open-input-string "{\"x\": [1, true]}"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(json-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected JSON tokens.}
+
+The derived JSON API provides reusable language-specific structure:
+
+@defproc[(make-json-derived-lexer)
+         (input-port? . -> . (or/c json-derived-token? 'eof))]{
+Constructs a streaming JSON lexer that returns derived JSON tokens.}
+
+@defproc[(json-string->derived-tokens [source string?])
+         (listof json-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived JSON tokens.}
+
+@defproc[(json-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived JSON tokens.}
+
+@defproc[(json-derived-token-tags [token json-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(json-derived-token-has-tag? [token json-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(json-derived-token-text [token json-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(json-derived-token-start [token json-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(json-derived-token-end [token json-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable JSON-specific derived tags include:
+
+@itemlist[
+ @item{@racket['json-object-key]}
+ @item{@racket['json-string]}
+ @item{@racket['json-number]}
+ @item{@racket['json-true]}
+ @item{@racket['json-false]}
+ @item{@racket['json-null]}
+ @item{@racket['json-object-start]}
+ @item{@racket['json-object-end]}
+ @item{@racket['json-array-start]}
+ @item{@racket['json-array-end]}
+ @item{@racket['json-comma]}
+ @item{@racket['json-colon]}
+ @item{@racket['json-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed JSON input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{json} delegate to
+@racketmodname[lexers/json]. Wrapped delegated Markdown tokens preserve
+JSON-derived tags and gain @racket['embedded-json].}
+
 @section{Markdown}
 
 @defmodule[lexers/markdown]
@@ -611,8 +733,8 @@ The projected Markdown API has two entry points:
 
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
-and known fenced-code languages to the existing HTML, CSS, JavaScript, Racket,
-Scribble, and WAT lexers.
+and known fenced-code languages to the existing HTML, CSS, JavaScript, JSON,
+Racket, Scribble, shell, and WAT lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -770,6 +892,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-html]}
  @item{@racket['embedded-css]}
  @item{@racket['embedded-javascript]}
+ @item{@racket['embedded-json]}
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
@@ -779,7 +902,7 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-javascript],
-@racket['embedded-racket], @racket['embedded-shell], or
+@racket['embedded-json], @racket['embedded-racket], @racket['embedded-shell], or
 @racket['embedded-wat].
 
 @examples[#:eval markdown-eval

@@ -10,6 +10,8 @@
 ;;   Default settings for named CSS lexer profiles.
 ;; html-profile-defaults : immutable-hash?
 ;;   Default settings for named HTML lexer profiles.
+;; json-profile-defaults : immutable-hash?
+;;   Default settings for named JSON lexer profiles.
 ;; rhombus-profile-defaults : immutable-hash?
 ;;   Default settings for named Rhombus lexer profiles.
 ;; wat-profile-defaults : immutable-hash?
@@ -47,6 +49,18 @@
 ;; html-config-errors    : html-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-html-config      : keyword-arguments -> html-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; json-config?          : any/c -> boolean?
+;;   Recognize JSON lexer configuration values.
+;; json-config-profile   : json-config? -> symbol?
+;;   Extract the configured profile name.
+;; json-config-trivia    : json-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; json-config-source-positions : json-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; json-config-errors    : json-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-json-config      : keyword-arguments -> json-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; rhombus-config?       : any/c -> boolean?
 ;;   Recognize Rhombus lexer configuration values.
@@ -139,6 +153,7 @@
 
 (provide css-profile-defaults
          html-profile-defaults
+         json-profile-defaults
          rhombus-profile-defaults
          wat-profile-defaults
          shell-profile-defaults
@@ -158,6 +173,12 @@
          html-config-source-positions
          html-config-errors
          make-html-config
+         json-config?
+         json-config-profile
+         json-config-trivia
+         json-config-source-positions
+         json-config-errors
+         make-json-config
          rhombus-config?
          rhombus-config-profile
          rhombus-config-trivia
@@ -209,6 +230,9 @@
 ;; A resolved configuration for the public HTML lexer.
 (struct html-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public JSON lexer.
+(struct json-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public Rhombus lexer.
 (struct rhombus-config (profile trivia source-positions errors) #:transparent)
 
@@ -241,6 +265,15 @@
 
 ;; Profile defaults for the HTML lexer.
 (define html-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the JSON lexer.
+(define json-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -359,6 +392,33 @@
       [else              source-positions]))
   (define resolved-errors (hash-ref defaults 'errors))
   (html-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
+
+;; make-json-config : keyword-arguments -> json-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-json-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref json-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-json-config
+                                       "unknown JSON lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (json-config profile
                resolved-trivia
                resolved-source-positions
                resolved-errors))

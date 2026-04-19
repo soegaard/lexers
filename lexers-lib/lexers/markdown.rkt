@@ -290,12 +290,20 @@
            (markdown-string->derived-tokens "a  \nb")))
   (define fenced-bash-derived-tokens
     (markdown-string->derived-tokens "```bash\necho hi\n```\n"))
+  (define fenced-json-derived-tokens
+    (markdown-string->derived-tokens "```json\n{\"x\": 1, \"ok\": true}\n```\n"))
   (define derived-shell-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-shell)
                   (markdown-derived-token-has-tag? token 'shell-builtin)
                   (string=? (markdown-derived-token-text token) "echo")))
            fenced-bash-derived-tokens))
+  (define derived-json-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-json)
+                  (markdown-derived-token-has-tag? token 'json-object-key)
+                  (string=? (markdown-derived-token-text token) "\"x\"")))
+           fenced-json-derived-tokens))
   (define fenced-racket-derived-tokens
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
   (define fenced-webracket-derived-tokens
@@ -430,6 +438,7 @@
   (check-not-false derived-css-token)
   (check-not-false derived-wat-token)
   (check-not-false derived-shell-token)
+  (check-not-false derived-json-token)
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
@@ -514,10 +523,14 @@
             (markdown-derived-token-has-tag? token 'markdown-code-block))
           unterminated-fence-with-content-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-json-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
   (check-true (contiguous-derived-stream? hard-break-derived-tokens))
   (check-true (contiguous-derived-stream? prose-exclamation-derived-tokens))
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-json-derived-tokens))
+                "```json\n{\"x\": 1, \"ok\": true}\n```\n")
   (check-true (contiguous-derived-stream? prose-tilde-derived-tokens))
   (check-true (contiguous-derived-stream? prose-backslash-derived-tokens))
   (check-true (contiguous-derived-stream? nested-fence-derived-tokens))

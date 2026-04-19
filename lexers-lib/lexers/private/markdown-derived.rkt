@@ -37,6 +37,7 @@
          "../css.rkt"
          "../html.rkt"
          "../javascript.rkt"
+         "../json.rkt"
          "../racket.rkt"
          "../shell.rkt"
          "../scribble.rkt"
@@ -106,6 +107,7 @@
           (member 'object-key tags)
           (member 'method-name tags)
           (member 'private-name tags)
+          (member 'json-object-key tags)
           (member 'at-rule-name tags)
           (member 'function-name tags)
           (member 'custom-property-name tags)
@@ -138,6 +140,11 @@
           (member 'html-attribute-value tags)
           (member 'html-entity tags)
           (member 'html-doctype tags)
+          (member 'json-string tags)
+          (member 'json-number tags)
+          (member 'json-true tags)
+          (member 'json-false tags)
+          (member 'json-null tags)
           (member 'racket-string tags)
           (member 'racket-constant tags)
           (member 'racket-hash-colon-keyword tags)
@@ -215,6 +222,7 @@
     [(member primary '("css"))           'css]
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
+    [(member primary '("json"))          'json]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
     [(member primary '("bash" "sh" "shell")) 'bash]
@@ -265,6 +273,15 @@
                           html-derived-token-end
                           html-derived-token-tags
                           '(embedded-html markdown-code-block))]
+    [(json)
+     (wrap-derived-tokens (json-string->derived-tokens body)
+                          body-start
+                          starts
+                          json-derived-token-text
+                          json-derived-token-start
+                          json-derived-token-end
+                          json-derived-token-tags
+                          '(embedded-json markdown-code-block))]
     [(javascript)
      (wrap-derived-tokens (javascript-string->derived-tokens body #:jsx? #f)
                           body-start
