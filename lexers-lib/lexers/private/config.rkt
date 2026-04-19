@@ -12,6 +12,8 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; c-profile-defaults : immutable-hash?
 ;;   Default settings for named C lexer profiles.
+;; yaml-profile-defaults : immutable-hash?
+;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
 ;; python-profile-defaults : immutable-hash?
@@ -65,6 +67,18 @@
 ;; c-config-errors       : c-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-c-config         : keyword-arguments -> c-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; yaml-config?          : any/c -> boolean?
+;;   Recognize YAML lexer configuration values.
+;; yaml-config-profile   : yaml-config? -> symbol?
+;;   Extract the configured profile name.
+;; yaml-config-trivia    : yaml-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; yaml-config-source-positions : yaml-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; yaml-config-errors    : yaml-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-yaml-config      : keyword-arguments -> yaml-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; json-config?          : any/c -> boolean?
 ;;   Recognize JSON lexer configuration values.
@@ -182,6 +196,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          c-profile-defaults
+         yaml-profile-defaults
          json-profile-defaults
          python-profile-defaults
          rhombus-profile-defaults
@@ -209,6 +224,12 @@
          c-config-source-positions
          c-config-errors
          make-c-config
+         yaml-config?
+         yaml-config-profile
+         yaml-config-trivia
+         yaml-config-source-positions
+         yaml-config-errors
+         make-yaml-config
          json-config?
          json-config-profile
          json-config-trivia
@@ -275,6 +296,9 @@
 ;; A resolved configuration for the public C lexer.
 (struct c-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public YAML lexer.
+(struct yaml-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
 
@@ -322,6 +346,15 @@
 
 ;; Profile defaults for the C lexer.
 (define c-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the YAML lexer.
+(define yaml-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -488,6 +521,33 @@
             resolved-trivia
             resolved-source-positions
             resolved-errors))
+
+;; make-yaml-config : keyword-arguments -> yaml-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-yaml-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref yaml-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-yaml-config
+                                       "unknown YAML lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (yaml-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
 
 ;; make-json-config : keyword-arguments -> json-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

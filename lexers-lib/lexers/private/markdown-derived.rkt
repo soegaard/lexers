@@ -44,6 +44,7 @@
          "../shell.rkt"
          "../scribble.rkt"
          "../wat.rkt"
+         "../yaml.rkt"
          "parser-tools-compat.rkt"
          "string-compat.rkt")
 
@@ -127,8 +128,13 @@
           (member 'scribble-command tags)
           (member 'shell-word tags)
           (member 'c-identifier tags)
+          (member 'yaml-anchor tags)
+          (member 'yaml-alias tags)
+          (member 'yaml-tag tags)
           (member 'wat-identifier tags))
       '(identifier)]
+     [(member 'yaml-directive tags)
+      '(keyword)]
      [(or (member 'literal tags)
           (member 'string-literal tags)
           (member 'numeric-literal tags)
@@ -163,6 +169,12 @@
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
           (member 'c-header-name tags)
+          (member 'yaml-plain-scalar tags)
+          (member 'yaml-string-literal tags)
+          (member 'yaml-boolean tags)
+          (member 'yaml-null tags)
+          (member 'yaml-number tags)
+          (member 'yaml-block-scalar-content tags)
           (member 'wat-string-literal tags)
           (member 'wat-numeric-literal tags))
       '(literal)]
@@ -176,6 +188,12 @@
       '(keyword)]
     [(or (member 'delimiter tags)
           (member 'c-delimiter tags)
+          (member 'yaml-document-marker tags)
+          (member 'yaml-flow-delimiter tags)
+          (member 'yaml-value-indicator tags)
+          (member 'yaml-key-indicator tags)
+          (member 'yaml-sequence-indicator tags)
+          (member 'yaml-block-scalar-header tags)
           (member 'racket-parenthesis tags)
           (member 'scribble-parenthesis tags)
           (member 'scribble-command-char tags)
@@ -237,6 +255,7 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
     [(member primary '("python" "py"))   'python]
+    [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
     [(member primary '("bash" "sh" "shell")) 'bash]
@@ -314,6 +333,15 @@
                           python-derived-token-end
                           python-derived-token-tags
                           '(embedded-python markdown-code-block))]
+    [(yaml)
+     (wrap-derived-tokens (yaml-string->derived-tokens body)
+                          body-start
+                          starts
+                          yaml-derived-token-text
+                          yaml-derived-token-start
+                          yaml-derived-token-end
+                          yaml-derived-token-tags
+                          '(embedded-yaml markdown-code-block))]
     [(javascript)
      (wrap-derived-tokens (javascript-string->derived-tokens body #:jsx? #f)
                           body-start

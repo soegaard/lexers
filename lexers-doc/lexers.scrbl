@@ -19,7 +19,8 @@
                      lexers/scribble
                      lexers/token
                      lexers/javascript
-                     lexers/wat))
+                     lexers/wat
+                     lexers/yaml))
 
 @(define c-eval
    (let ([the-eval (make-base-eval)])
@@ -67,6 +68,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/json))
+     the-eval))
+
+@(define yaml-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/yaml))
      the-eval))
 
 @(define python-eval
@@ -137,7 +146,8 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
- @item{@racketmodname[lexers/wat]}]
+ @item{@racketmodname[lexers/wat]}
+ @item{@racketmodname[lexers/yaml]}]
 
 Each language module currently exposes two related kinds of API:
 
@@ -857,6 +867,131 @@ Markdown fenced code blocks labeled @tt{json} delegate to
 @racketmodname[lexers/json]. Wrapped delegated Markdown tokens preserve
 JSON-derived tags and gain @racket['embedded-json].}
 
+@section{YAML}
+
+@defmodule[lexers/yaml]
+
+The projected YAML API has two entry points:
+
+@itemlist[
+ @item{@racket[make-yaml-lexer] for streaming tokenization from an input port.}
+ @item{@racket[yaml-string->tokens] for eager tokenization of an entire string.}]
+
+The first YAML implementation is a handwritten streaming lexer grounded
+primarily in the YAML 1.2.2 lexical and structural rules. The first slice is
+deliberately parser-lite, but it covers practical block mappings, block
+sequences, flow delimiters, directives, document markers, quoted scalars, plain
+scalars, comments, and block scalar bodies.
+
+@defproc[(make-yaml-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming YAML lexer.
+
+Projected YAML categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['delimiter], and @racket['unknown].
+
+Directive lines such as @tt{%YAML 1.2} project as @racket['keyword]. Plain and
+quoted scalars project as @racket['literal]. Structural markers such as
+@tt{:}, @tt{-}, @tt{[}, @tt{]}, @tt{@(litchar "{")}, @tt{@(litchar "}")}, and document
+markers project as @racket['delimiter].
+
+@examples[#:eval yaml-eval
+(define lexer
+  (make-yaml-lexer #:profile 'coloring))
+(define in
+  (open-input-string "name: Deploy\non:\n  push:\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(yaml-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected YAML tokens.}
+
+The derived YAML API provides reusable language-specific structure:
+
+@defproc[(make-yaml-derived-lexer)
+         (input-port? . -> . (or/c yaml-derived-token? 'eof))]{
+Constructs a streaming YAML lexer that returns derived YAML tokens.}
+
+@defproc[(yaml-string->derived-tokens [source string?])
+         (listof yaml-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived YAML tokens.}
+
+@defproc[(yaml-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived YAML tokens.}
+
+@defproc[(yaml-derived-token-tags [token yaml-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(yaml-derived-token-has-tag? [token yaml-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(yaml-derived-token-text [token yaml-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(yaml-derived-token-start [token yaml-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(yaml-derived-token-end [token yaml-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable YAML-specific derived tags include:
+
+@itemlist[
+ @item{@racket['yaml-comment]}
+ @item{@racket['yaml-whitespace]}
+ @item{@racket['yaml-directive]}
+ @item{@racket['yaml-document-marker]}
+ @item{@racket['yaml-sequence-indicator]}
+ @item{@racket['yaml-key-indicator]}
+ @item{@racket['yaml-value-indicator]}
+ @item{@racket['yaml-flow-delimiter]}
+ @item{@racket['yaml-anchor]}
+ @item{@racket['yaml-alias]}
+ @item{@racket['yaml-tag]}
+ @item{@racket['yaml-string-literal]}
+ @item{@racket['yaml-plain-scalar]}
+ @item{@racket['yaml-key-scalar]}
+ @item{@racket['yaml-boolean]}
+ @item{@racket['yaml-null]}
+ @item{@racket['yaml-number]}
+ @item{@racket['yaml-block-scalar-header]}
+ @item{@racket['yaml-block-scalar-content]}
+ @item{@racket['yaml-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed YAML input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{yaml} or @tt{yml} delegate to
+@racketmodname[lexers/yaml]. Wrapped delegated Markdown tokens preserve
+YAML-derived tags and gain @racket['embedded-yaml].}
+
+@defthing[yaml-profiles immutable-hash?]{
+The profile defaults used by the YAML lexer.}
+
 @section{Markdown}
 
 @defmodule[lexers/markdown]
@@ -872,7 +1007,7 @@ The projected Markdown API has two entry points:
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
 and known fenced-code languages to the existing C, HTML, CSS, JavaScript,
-JSON, Python, Racket, Scribble, shell, and WAT lexers.
+JSON, Python, Racket, Scribble, shell, WAT, and YAML lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -1036,13 +1171,14 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
  @item{@racket['embedded-wat]}
+ @item{@racket['embedded-yaml]}
  @item{@racket['malformed-token]}]
 
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-javascript],
 @racket['embedded-json], @racket['embedded-python], @racket['embedded-racket],
-@racket['embedded-shell], or @racket['embedded-wat].
+@racket['embedded-shell], @racket['embedded-wat], or @racket['embedded-yaml].
 
 @examples[#:eval markdown-eval
 (define derived-tokens

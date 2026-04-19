@@ -16,6 +16,7 @@ The library currently provides public lexer modules for:
 - `lexers/shell`
 - `lexers/scribble`
 - `lexers/wat`
+- `lexers/yaml`
 
 These modules expose:
 
