@@ -55,6 +55,9 @@ Coding guidelines for Racket code in `lexers`:
     `any/c`.
 25. In hot paths, prefer shared non-allocating substring comparison helpers
     over patterns such as `(string=? (substring ...) ...)`.
+26. When adding a new public lexer module, update
+    `lexers-doc/lexers.scrbl` in the same turn so the manual matches the
+    shipped API.
 
 ## Packages
 
