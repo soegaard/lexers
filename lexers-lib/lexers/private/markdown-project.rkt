@@ -33,6 +33,8 @@
      stream-category-comment]
     [(markdown-derived-token-has-tag? derived-token 'whitespace)
      stream-category-whitespace]
+    [(markdown-derived-token-has-tag? derived-token 'keyword)
+     stream-category-keyword]
     [(markdown-derived-token-has-tag? derived-token 'delimiter)
      stream-category-delimiter]
     [(markdown-derived-token-has-tag? derived-token 'identifier)

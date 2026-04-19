@@ -12,6 +12,8 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; wat-profile-defaults : immutable-hash?
 ;;   Default settings for named WAT lexer profiles.
+;; shell-profile-defaults : immutable-hash?
+;;   Default settings for named shell lexer profiles.
 ;; racket-profile-defaults : immutable-hash?
 ;;   Default settings for named Racket lexer profiles.
 ;; markdown-profile-defaults : immutable-hash?
@@ -55,6 +57,20 @@
 ;; wat-config-errors     : wat-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-wat-config       : keyword-arguments -> wat-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; shell-config?         : any/c -> boolean?
+;;   Recognize shell lexer configuration values.
+;; shell-config-profile  : shell-config? -> symbol?
+;;   Extract the configured profile name.
+;; shell-config-trivia   : shell-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; shell-config-source-positions : shell-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; shell-config-shell    : shell-config? -> symbol?
+;;   Extract the configured shell dialect.
+;; shell-config-errors   : shell-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-shell-config     : keyword-arguments -> shell-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; racket-config?        : any/c -> boolean?
 ;;   Recognize Racket lexer configuration values.
@@ -110,6 +126,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          wat-profile-defaults
+         shell-profile-defaults
          racket-profile-defaults
          markdown-profile-defaults
          scribble-profile-defaults
@@ -132,6 +149,13 @@
          wat-config-source-positions
          wat-config-errors
          make-wat-config
+         shell-config?
+         shell-config-profile
+         shell-config-trivia
+         shell-config-source-positions
+         shell-config-shell
+         shell-config-errors
+         make-shell-config
          racket-config?
          racket-config-profile
          racket-config-trivia
@@ -167,6 +191,9 @@
 ;; A resolved configuration for the public WAT lexer.
 (struct wat-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public shell lexer.
+(struct shell-config (profile trivia source-positions shell errors) #:transparent)
+
 ;; A resolved configuration for the public Racket lexer.
 (struct racket-config (profile trivia source-positions errors) #:transparent)
 
@@ -199,6 +226,15 @@
 
 ;; Profile defaults for the WAT lexer.
 (define wat-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the shell lexer.
+(define shell-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -319,6 +355,48 @@
               resolved-trivia
               resolved-source-positions
               resolved-errors))
+
+;; normalize-shell-dialect : symbol? -> symbol?
+;;   Normalize accepted shell dialect names.
+(define (normalize-shell-dialect who shell)
+  (case shell
+    [(bash zsh powershell) shell]
+    [(pwsh)                'powershell]
+    [else
+     (raise-arguments-error who
+                            "unknown shell dialect"
+                            "shell" shell)]))
+
+;; make-shell-config : keyword-arguments -> shell-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-shell-config #:profile          [profile 'coloring]
+                           #:trivia           [trivia 'profile-default]
+                           #:source-positions [source-positions 'profile-default]
+                           #:shell            [shell 'bash])
+  (define defaults
+    (hash-ref shell-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-shell-config
+                                       "unknown shell lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-shell
+    (normalize-shell-dialect 'make-shell-config shell))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (shell-config profile
+                resolved-trivia
+                resolved-source-positions
+                resolved-shell
+                resolved-errors))
 
 ;; make-racket-config : keyword-arguments -> racket-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

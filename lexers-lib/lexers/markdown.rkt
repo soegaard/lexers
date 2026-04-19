@@ -217,6 +217,11 @@
      "```unknown\nx\n```\n"
      #:profile 'compiler
      #:source-positions #f))
+  (define fenced-shell-tokens
+    (markdown-string->tokens
+     "```bash\necho hi\n```\n"
+     #:profile 'compiler
+     #:source-positions #f))
   (define indented-code-tokens
     (markdown-string->tokens
      "    code\n    more\n"
@@ -285,6 +290,12 @@
            (markdown-string->derived-tokens "a  \nb")))
   (define fenced-bash-derived-tokens
     (markdown-string->derived-tokens "```bash\necho hi\n```\n"))
+  (define derived-shell-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-shell)
+                  (markdown-derived-token-has-tag? token 'shell-builtin)
+                  (string=? (markdown-derived-token-text token) "echo")))
+           fenced-bash-derived-tokens))
   (define fenced-racket-derived-tokens
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
   (define fenced-webracket-derived-tokens
@@ -394,6 +405,7 @@
   (check-not-false (member 'delimiter (map stream-token-name inline-tokens)))
   (check-not-false (member 'literal (map stream-token-name table-tokens)))
   (check-not-false (member 'identifier (map stream-token-name fenced-js-tokens)))
+  (check-not-false (member 'keyword (map stream-token-name fenced-shell-tokens)))
   (check-equal? (map stream-token-name fenced-unknown-tokens)
                 '(delimiter identifier literal delimiter eof))
   (check-equal? (map stream-token-name indented-code-tokens)
@@ -417,6 +429,7 @@
   (check-not-false derived-html-token)
   (check-not-false derived-css-token)
   (check-not-false derived-wat-token)
+  (check-not-false derived-shell-token)
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)

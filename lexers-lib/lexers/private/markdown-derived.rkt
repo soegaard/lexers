@@ -38,6 +38,7 @@
          "../html.rkt"
          "../javascript.rkt"
          "../racket.rkt"
+         "../shell.rkt"
          "../scribble.rkt"
          "../wat.rkt"
          "parser-tools-compat.rkt"
@@ -120,6 +121,7 @@
           (member 'racket-other tags)
           (member 'scribble-symbol tags)
           (member 'scribble-command tags)
+          (member 'shell-word tags)
           (member 'wat-identifier tags))
       '(identifier)]
      [(or (member 'literal tags)
@@ -142,19 +144,27 @@
           (member 'scribble-text tags)
           (member 'scribble-string tags)
           (member 'scribble-constant tags)
+          (member 'shell-string-literal tags)
+          (member 'shell-variable tags)
+          (member 'shell-command-substitution tags)
+          (member 'shell-option tags)
+          (member 'shell-numeric-literal tags)
           (member 'wat-string-literal tags)
           (member 'wat-numeric-literal tags))
       '(literal)]
-     [(or (member 'wat-form tags)
+    [(or (member 'wat-form tags)
           (member 'wat-type tags)
-          (member 'wat-instruction tags))
+          (member 'wat-instruction tags)
+          (member 'shell-keyword tags)
+          (member 'shell-builtin tags))
       '(keyword)]
-     [(or (member 'delimiter tags)
+    [(or (member 'delimiter tags)
           (member 'racket-parenthesis tags)
           (member 'scribble-parenthesis tags)
           (member 'scribble-command-char tags)
           (member 'scribble-body-delimiter tags)
           (member 'scribble-optional-delimiter tags)
+          (member 'shell-punctuation tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
       '(delimiter)]
      [(regexp-match? #px"^[=+\\-*/!&|%^~]+$" text)
@@ -207,6 +217,9 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
+    [(member primary '("bash" "sh" "shell")) 'bash]
+    [(member primary '("zsh"))           'zsh]
+    [(member primary '("powershell" "pwsh" "ps1")) 'powershell]
     [(member primary '("scribble" "scrbl")) 'scribble]
     [(member primary '("wat" "wasm"))    'wat]
     [else                                #f]))
@@ -279,6 +292,33 @@
                           racket-derived-token-end
                           racket-derived-token-tags
                           '(embedded-racket markdown-code-block))]
+    [(bash)
+     (wrap-derived-tokens (shell-string->derived-tokens body #:shell 'bash)
+                          body-start
+                          starts
+                          shell-derived-token-text
+                          shell-derived-token-start
+                          shell-derived-token-end
+                          shell-derived-token-tags
+                          '(embedded-shell markdown-code-block))]
+    [(zsh)
+     (wrap-derived-tokens (shell-string->derived-tokens body #:shell 'zsh)
+                          body-start
+                          starts
+                          shell-derived-token-text
+                          shell-derived-token-start
+                          shell-derived-token-end
+                          shell-derived-token-tags
+                          '(embedded-shell markdown-code-block))]
+    [(powershell)
+     (wrap-derived-tokens (shell-string->derived-tokens body #:shell 'powershell)
+                          body-start
+                          starts
+                          shell-derived-token-text
+                          shell-derived-token-start
+                          shell-derived-token-end
+                          shell-derived-token-tags
+                          '(embedded-shell markdown-code-block))]
     [(scribble)
      (wrap-derived-tokens (scribble-string->derived-tokens body)
                           body-start

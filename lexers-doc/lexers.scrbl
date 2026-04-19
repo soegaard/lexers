@@ -11,6 +11,7 @@
                      lexers/html
                      lexers/markdown
                      lexers/racket
+                     lexers/shell
                      lexers/scribble
                      lexers/token
                      lexers/javascript
@@ -56,6 +57,14 @@
                          lexers/racket))
      the-eval))
 
+@(define shell-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/shell))
+     the-eval))
+
 @(define wat-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -94,6 +103,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/racket]}
+ @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/wat]}]
 
@@ -183,7 +193,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[html-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
 @racket[markdown-string->tokens], @racket[make-racket-lexer],
-@racket[racket-string->tokens], @racket[make-scribble-lexer],
+@racket[racket-string->tokens], @racket[make-shell-lexer],
+@racket[shell-string->tokens], @racket[make-scribble-lexer],
 @racket[scribble-string->tokens], @racket[make-wat-lexer], and
 @racket[wat-string->tokens]:
 
@@ -757,6 +768,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-css]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-racket]}
+ @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
  @item{@racket['embedded-wat]}
  @item{@racket['malformed-token]}]
@@ -764,7 +776,8 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-javascript],
-@racket['embedded-racket], or @racket['embedded-wat].
+@racket['embedded-racket], @racket['embedded-shell], or
+@racket['embedded-wat].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -778,6 +791,148 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{Shell}
+
+@defmodule[lexers/shell]
+
+The projected shell API has two entry points:
+
+@itemlist[
+ @item{@racket[make-shell-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[shell-string->tokens] for eager tokenization of an entire
+       string.}]
+
+The first shell implementation is a handwritten lexer for reusable shell
+tokenization. It currently supports Bash, Zsh, and PowerShell. The public API
+defaults to Bash and accepts @racket[#:shell 'bash], @racket[#:shell 'zsh],
+and @racket[#:shell 'powershell] (with @racket['pwsh] accepted as an alias).
+
+@defproc[(make-shell-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                           [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                           [#:shell shell (or/c 'bash 'zsh 'powershell 'pwsh) 'bash])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming shell lexer.}
+
+@defproc[(shell-string->tokens [source string?]
+                               [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                               [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                               [#:shell shell (or/c 'bash 'zsh 'powershell 'pwsh) 'bash])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire shell source string using the projected token API.}
+
+@subsection{Shell Returned Tokens}
+
+Common projected shell categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['keyword]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current shell scaffold:
+
+@itemlist[
+ @item{keywords and builtins project as @racket['keyword]}
+ @item{remaining words project as @racket['identifier]}
+ @item{strings, variables, command substitutions, options, and numeric
+       literals project as @racket['literal]}
+ @item{operators and punctuation project as @racket['delimiter]}
+ @item{malformed string or substitution input projects as @racket['unknown] in
+       @racket['coloring] mode and raises in @racket['compiler] mode}]
+
+Projected and derived shell token text preserve the exact consumed source
+slice, including comments, whitespace, and CRLF line endings.
+
+@examples[#:eval shell-eval
+(define lexer
+  (make-shell-lexer #:profile 'coloring #:shell 'bash))
+(define in
+  (open-input-string "export PATH\necho $PATH\n"))
+(port-count-lines! in)
+(list (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(make-shell-derived-lexer [#:shell shell (or/c 'bash 'zsh 'powershell 'pwsh) 'bash])
+         (input-port? . -> . (or/c 'eof shell-derived-token?))]{
+Constructs a streaming shell lexer for the derived-token layer.}
+
+@defproc[(shell-string->derived-tokens [source string?]
+                                       [#:shell shell (or/c 'bash 'zsh 'powershell 'pwsh) 'bash])
+         (listof shell-derived-token?)]{
+Tokenizes an entire shell source string into derived shell token values.}
+
+@defproc[(shell-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived shell token values returned by
+@racket[make-shell-derived-lexer] and
+@racket[shell-string->derived-tokens].}
+
+@defproc[(shell-derived-token-tags [token shell-derived-token?])
+         (listof symbol?)]{
+Returns the shell-specific classification tags attached to a derived shell
+token.}
+
+@defproc[(shell-derived-token-has-tag? [token shell-derived-token?]
+                                       [tag symbol?])
+         boolean?]{
+Determines whether a derived shell token carries a given classification tag.}
+
+@defproc[(shell-derived-token-text [token shell-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived shell token.}
+
+@defproc[(shell-derived-token-start [token shell-derived-token?])
+         position?]{
+Returns the starting source position for a derived shell token.}
+
+@defproc[(shell-derived-token-end [token shell-derived-token?])
+         position?]{
+Returns the ending source position for a derived shell token.}
+
+@subsection{Shell Derived Tokens}
+
+The current shell scaffold may attach tags such as:
+
+@itemlist[
+ @item{@racket['shell-keyword]}
+ @item{@racket['shell-builtin]}
+ @item{@racket['shell-word]}
+ @item{@racket['shell-string-literal]}
+ @item{@racket['shell-variable]}
+ @item{@racket['shell-command-substitution]}
+ @item{@racket['shell-comment]}
+ @item{@racket['shell-option]}
+ @item{@racket['shell-numeric-literal]}
+ @item{@racket['shell-punctuation]}
+ @item{@racket['malformed-token]}]
+
+Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
+@tt{bash}, @tt{sh}, @tt{shell}, @tt{zsh}, @tt{powershell}, @tt{pwsh}, and
+@tt{ps1} info strings. Delegated Markdown tokens keep the shell tags and gain
+@racket['embedded-shell].
+
+@examples[#:eval shell-eval
+(define derived-tokens
+  (shell-string->derived-tokens "printf \"%s\\n\" $(pwd)\n# done\n"))
+(map (lambda (token)
+       (list (shell-derived-token-text token)
+             (shell-derived-token-tags token)))
+     derived-tokens)
+]}
+
+@defthing[shell-profiles immutable-hash?]{
+The profile defaults used by the shell lexer.}
 
 @section{WAT}
 

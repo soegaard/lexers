@@ -9,6 +9,7 @@ The library currently provides public lexer modules for:
 - `lexers/javascript`
 - `lexers/markdown`
 - `lexers/racket`
+- `lexers/shell`
 - `lexers/scribble`
 - `lexers/wat`
 
