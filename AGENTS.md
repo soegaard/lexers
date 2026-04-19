@@ -58,6 +58,8 @@ Coding guidelines for Racket code in `lexers`:
 26. When optional language integrations depend on packages or Racket versions
     that may be unavailable in supported environments, prefer lazy
     `dynamic-require` at runtime over hard module or package dependencies.
+27. When a new lexer has enough real local source available, add a corpus
+    checker script in `tools/` instead of relying only on unit tests.
 26. When adding a new public lexer module, update
     `lexers-doc/lexers.scrbl` in the same turn so the manual matches the
     shipped API.
