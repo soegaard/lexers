@@ -12,6 +12,8 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
+;; python-profile-defaults : immutable-hash?
+;;   Default settings for named Python lexer profiles.
 ;; rhombus-profile-defaults : immutable-hash?
 ;;   Default settings for named Rhombus lexer profiles.
 ;; wat-profile-defaults : immutable-hash?
@@ -61,6 +63,18 @@
 ;; json-config-errors    : json-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-json-config      : keyword-arguments -> json-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; python-config?        : any/c -> boolean?
+;;   Recognize Python lexer configuration values.
+;; python-config-profile : python-config? -> symbol?
+;;   Extract the configured profile name.
+;; python-config-trivia  : python-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; python-config-source-positions : python-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; python-config-errors  : python-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-python-config    : keyword-arguments -> python-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; rhombus-config?       : any/c -> boolean?
 ;;   Recognize Rhombus lexer configuration values.
@@ -154,6 +168,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          json-profile-defaults
+         python-profile-defaults
          rhombus-profile-defaults
          wat-profile-defaults
          shell-profile-defaults
@@ -179,6 +194,12 @@
          json-config-source-positions
          json-config-errors
          make-json-config
+         python-config?
+         python-config-profile
+         python-config-trivia
+         python-config-source-positions
+         python-config-errors
+         make-python-config
          rhombus-config?
          rhombus-config-profile
          rhombus-config-trivia
@@ -233,6 +254,9 @@
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public Python lexer.
+(struct python-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public Rhombus lexer.
 (struct rhombus-config (profile trivia source-positions errors) #:transparent)
 
@@ -274,6 +298,15 @@
 
 ;; Profile defaults for the JSON lexer.
 (define json-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Python lexer.
+(define python-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -422,6 +455,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-python-config : keyword-arguments -> python-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-python-config #:profile          [profile 'coloring]
+                            #:trivia           [trivia 'profile-default]
+                            #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref python-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-python-config
+                                       "unknown Python lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (python-config profile
+                 resolved-trivia
+                 resolved-source-positions
+                 resolved-errors))
 
 ;; make-rhombus-config : keyword-arguments -> rhombus-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

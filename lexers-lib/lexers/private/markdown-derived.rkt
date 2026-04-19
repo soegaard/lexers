@@ -38,6 +38,7 @@
          "../html.rkt"
          "../javascript.rkt"
          "../json.rkt"
+         "../python.rkt"
          "../racket.rkt"
          "../shell.rkt"
          "../scribble.rkt"
@@ -223,6 +224,7 @@
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
+    [(member primary '("python" "py"))   'python]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
     [(member primary '("bash" "sh" "shell")) 'bash]
@@ -282,6 +284,15 @@
                           json-derived-token-end
                           json-derived-token-tags
                           '(embedded-json markdown-code-block))]
+    [(python)
+     (wrap-derived-tokens (python-string->derived-tokens body)
+                          body-start
+                          starts
+                          python-derived-token-text
+                          python-derived-token-start
+                          python-derived-token-end
+                          python-derived-token-tags
+                          '(embedded-python markdown-code-block))]
     [(javascript)
      (wrap-derived-tokens (javascript-string->derived-tokens body #:jsx? #f)
                           body-start

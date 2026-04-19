@@ -60,6 +60,9 @@ Coding guidelines for Racket code in `lexers`:
     `dynamic-require` at runtime over hard module or package dependencies.
 27. When a new lexer has enough real local source available, add a corpus
     checker script in `tools/` instead of relying only on unit tests.
+28. For languages with an official lexical-analysis reference, treat that
+    lexical specification as the primary lexer source. Use parser grammars and
+    implementation files as secondary context.
 26. When adding a new public lexer module, update
     `lexers-doc/lexers.scrbl` in the same turn so the manual matches the
     shipped API.

@@ -11,6 +11,7 @@
                      lexers/html
                      lexers/json
                      lexers/markdown
+                     lexers/python
                      lexers/racket
                      lexers/rhombus
                      lexers/shell
@@ -57,6 +58,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/json))
+     the-eval))
+
+@(define python-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/python))
      the-eval))
 
 @(define racket-eval
@@ -113,6 +122,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
+ @item{@racketmodname[lexers/python]}
  @item{@racketmodname[lexers/racket]}
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/shell]}
@@ -205,7 +215,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[html-string->tokens], @racket[make-json-lexer],
 @racket[json-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
-@racket[markdown-string->tokens], @racket[make-racket-lexer],
+@racket[markdown-string->tokens], @racket[make-python-lexer],
+@racket[python-string->tokens], @racket[make-racket-lexer],
 @racket[racket-string->tokens], @racket[make-rhombus-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
@@ -734,7 +745,7 @@ The projected Markdown API has two entry points:
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
 and known fenced-code languages to the existing HTML, CSS, JavaScript, JSON,
-Racket, Scribble, shell, and WAT lexers.
+Python, Racket, Scribble, shell, and WAT lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -893,6 +904,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-css]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
+ @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
@@ -902,8 +914,8 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-javascript],
-@racket['embedded-json], @racket['embedded-racket], @racket['embedded-shell], or
-@racket['embedded-wat].
+@racket['embedded-json], @racket['embedded-python], @racket['embedded-racket],
+@racket['embedded-shell], or @racket['embedded-wat].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -917,6 +929,121 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{Python}
+
+@defmodule[lexers/python]
+
+The projected Python API has two entry points:
+
+@itemlist[
+ @item{@racket[make-python-lexer] for streaming tokenization from an input port.}
+ @item{@racket[python-string->tokens] for eager tokenization of an entire string.}]
+
+The first Python implementation is a handwritten streaming lexer grounded in
+Python's lexical-analysis rules. It tracks indentation-sensitive line starts,
+physical and logical newlines, names, comments, strings, numbers, operators,
+and delimiters.
+
+@defproc[(make-python-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                            [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Python lexer.
+
+Projected Python categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].
+
+Soft keywords currently project as @racket['keyword], while the derived layer
+keeps the more specific @racket['python-soft-keyword] tag.
+
+@examples[#:eval python-eval
+(define lexer
+  (make-python-lexer #:profile 'coloring))
+(define in
+  (open-input-string "def answer(x):\n    return x\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(python-string->tokens [source string?]
+                                [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Python tokens.}
+
+The derived Python API provides reusable language-specific structure:
+
+@defproc[(make-python-derived-lexer)
+         (input-port? . -> . (or/c python-derived-token? 'eof))]{
+Constructs a streaming Python lexer that returns derived Python tokens.}
+
+@defproc[(python-string->derived-tokens [source string?])
+         (listof python-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Python tokens.}
+
+@defproc[(python-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Python tokens.}
+
+@defproc[(python-derived-token-tags [token python-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(python-derived-token-has-tag? [token python-derived-token?]
+                                        [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(python-derived-token-text [token python-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(python-derived-token-start [token python-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(python-derived-token-end [token python-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Python-specific derived tags include:
+
+@itemlist[
+ @item{@racket['python-comment]}
+ @item{@racket['python-whitespace]}
+ @item{@racket['python-newline]}
+ @item{@racket['python-nl]}
+ @item{@racket['python-line-join]}
+ @item{@racket['python-keyword]}
+ @item{@racket['python-soft-keyword]}
+ @item{@racket['python-identifier]}
+ @item{@racket['python-string-literal]}
+ @item{@racket['python-bytes-literal]}
+ @item{@racket['python-numeric-literal]}
+ @item{@racket['python-operator]}
+ @item{@racket['python-delimiter]}
+ @item{@racket['python-indent]}
+ @item{@racket['python-dedent]}
+ @item{@racket['python-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed Python input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{python} and @tt{py} delegate to
+@racketmodname[lexers/python]. Wrapped delegated Markdown tokens preserve
+Python-derived tags and gain @racket['embedded-python].}
 
 @section{Shell}
 
