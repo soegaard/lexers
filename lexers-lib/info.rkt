@@ -2,7 +2,7 @@
 
 (define collection 'multi)
 (define pkg-desc
-  "Reusable lexers for CSS, HTML, JavaScript, JSON, Markdown, Python, Racket, Rhombus, Scribble, shell scripts, and WebAssembly text.")
+  "Reusable lexers for C, CSS, HTML, JavaScript, JSON, Markdown, Python, Racket, Rhombus, Scribble, shell scripts, and WebAssembly text.")
 (define pkg-authors '(soegaard))
 (define license 'MIT)
 (define deps '("base" "parser-tools-lib" "syntax-color-lib"))

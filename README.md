@@ -5,6 +5,7 @@ Reusable lexers for multiple consumers.
 The library currently provides public lexer modules for:
 
 - `lexers/css`
+- `lexers/c`
 - `lexers/html`
 - `lexers/json`
 - `lexers/javascript`

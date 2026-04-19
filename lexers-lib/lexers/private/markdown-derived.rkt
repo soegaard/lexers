@@ -34,6 +34,7 @@
          racket/list
          racket/port
          racket/string
+         "../c.rkt"
          "../css.rkt"
          "../html.rkt"
          "../javascript.rkt"
@@ -125,6 +126,7 @@
           (member 'scribble-symbol tags)
           (member 'scribble-command tags)
           (member 'shell-word tags)
+          (member 'c-identifier tags)
           (member 'wat-identifier tags))
       '(identifier)]
      [(or (member 'literal tags)
@@ -157,16 +159,23 @@
           (member 'shell-command-substitution tags)
           (member 'shell-option tags)
           (member 'shell-numeric-literal tags)
+          (member 'c-string-literal tags)
+          (member 'c-char-literal tags)
+          (member 'c-numeric-literal tags)
+          (member 'c-header-name tags)
           (member 'wat-string-literal tags)
           (member 'wat-numeric-literal tags))
       '(literal)]
     [(or (member 'wat-form tags)
           (member 'wat-type tags)
           (member 'wat-instruction tags)
+          (member 'c-keyword tags)
+          (member 'c-preprocessor-directive tags)
           (member 'shell-keyword tags)
           (member 'shell-builtin tags))
       '(keyword)]
     [(or (member 'delimiter tags)
+          (member 'c-delimiter tags)
           (member 'racket-parenthesis tags)
           (member 'scribble-parenthesis tags)
           (member 'scribble-command-char tags)
@@ -175,6 +184,8 @@
           (member 'shell-punctuation tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
       '(delimiter)]
+     [(member 'c-operator tags)
+      '(operator)]
      [(regexp-match? #px"^[=+\\-*/!&|%^~]+$" text)
       '(operator)]
      [(member 'malformed-token tags)
@@ -220,6 +231,7 @@
        ""]))
   (cond
     [(equal? primary "")                 #f]
+    [(member primary '("c" "h"))         'c]
     [(member primary '("css"))           'css]
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
@@ -257,6 +269,15 @@
 ;;   Tokenize a fenced code body using a delegated lexer when available.
 (define (delegated-fence-tokens lang body body-start starts)
   (case lang
+    [(c)
+     (wrap-derived-tokens (c-string->derived-tokens body)
+                          body-start
+                          starts
+                          c-derived-token-text
+                          c-derived-token-start
+                          c-derived-token-end
+                          c-derived-token-tags
+                          '(embedded-c markdown-code-block))]
     [(css)
      (wrap-derived-tokens (css-string->derived-tokens body)
                           body-start

@@ -7,6 +7,7 @@
                      syntax-color/racket-lexer
                      (only-in syntax-color/scribble-lexer
                               make-scribble-inside-lexer)
+                     lexers/c
                      lexers/css
                      lexers/html
                      lexers/json
@@ -19,6 +20,14 @@
                      lexers/token
                      lexers/javascript
                      lexers/wat))
+
+@(define c-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/c))
+     the-eval))
 
 @(define css-eval
    (let ([the-eval (make-base-eval)])
@@ -117,6 +126,7 @@ The public language modules currently available are:
 
 @itemlist[
  @item{@racketmodname[lexers/token]}
+ @item{@racketmodname[lexers/c]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/json]}
@@ -619,6 +629,123 @@ gain an additional language marker such as @racket['embedded-css] or
 @defthing[html-profiles immutable-hash?]{
 The profile defaults used by the HTML lexer.}
 
+@section{C}
+
+@defmodule[lexers/c]
+
+The projected C API has two entry points:
+
+@itemlist[
+ @item{@racket[make-c-lexer] for streaming tokenization from an input port.}
+ @item{@racket[c-string->tokens] for eager tokenization of an entire string.}]
+
+The first C implementation is a handwritten streaming lexer grounded primarily
+in C lexical and preprocessing-token rules. It is preprocessor-aware from the
+first slice, so directive lines like @tt{#include} and @tt{#define} are
+tokenized directly instead of being flattened into ordinary punctuation and
+identifiers.
+
+@defproc[(make-c-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                       [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                       [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming C lexer.
+
+Projected C categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].
+
+Keywords and preprocessor directive names project as @racket['keyword].
+Header names such as @tt{<stdio.h>} and @tt{"local.h"} project as
+@racket['literal].
+
+@examples[#:eval c-eval
+(define lexer
+  (make-c-lexer #:profile 'coloring))
+(define in
+  (open-input-string "#include <stdio.h>\nint main(void) { return 0; }\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(c-string->tokens [source string?]
+                           [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                           [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected C tokens.}
+
+The derived C API provides reusable language-specific structure:
+
+@defproc[(make-c-derived-lexer)
+         (input-port? . -> . (or/c c-derived-token? 'eof))]{
+Constructs a streaming C lexer that returns derived C tokens.}
+
+@defproc[(c-string->derived-tokens [source string?])
+         (listof c-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived C tokens.}
+
+@defproc[(c-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived C tokens.}
+
+@defproc[(c-derived-token-tags [token c-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(c-derived-token-has-tag? [token c-derived-token?]
+                                   [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(c-derived-token-text [token c-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(c-derived-token-start [token c-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(c-derived-token-end [token c-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable C-specific derived tags include:
+
+@itemlist[
+ @item{@racket['c-comment]}
+ @item{@racket['c-whitespace]}
+ @item{@racket['c-keyword]}
+ @item{@racket['c-identifier]}
+ @item{@racket['c-string-literal]}
+ @item{@racket['c-char-literal]}
+ @item{@racket['c-numeric-literal]}
+ @item{@racket['c-operator]}
+ @item{@racket['c-delimiter]}
+ @item{@racket['c-preprocessor-directive]}
+ @item{@racket['c-header-name]}
+ @item{@racket['c-line-splice]}
+ @item{@racket['c-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed C input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{c} or @tt{h} delegate to
+@racketmodname[lexers/c]. Wrapped delegated Markdown tokens preserve C-derived
+tags and gain @racket['embedded-c].}
+
+@defthing[c-profiles immutable-hash?]{
+The profile defaults used by the C lexer.}
+
 @section{JSON}
 
 @defmodule[lexers/json]
@@ -744,8 +871,8 @@ The projected Markdown API has two entry points:
 
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
-and known fenced-code languages to the existing HTML, CSS, JavaScript, JSON,
-Python, Racket, Scribble, shell, and WAT lexers.
+and known fenced-code languages to the existing C, HTML, CSS, JavaScript,
+JSON, Python, Racket, Scribble, shell, and WAT lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

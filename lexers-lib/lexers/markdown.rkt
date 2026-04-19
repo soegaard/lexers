@@ -294,6 +294,8 @@
     (markdown-string->derived-tokens "```json\n{\"x\": 1, \"ok\": true}\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
+  (define fenced-c-derived-tokens
+    (markdown-string->derived-tokens "```c\n#include <stdio.h>\nint x = 1;\n```\n"))
   (define derived-shell-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-shell)
@@ -312,6 +314,12 @@
                   (markdown-derived-token-has-tag? token 'python-keyword)
                   (string=? (markdown-derived-token-text token) "def")))
            fenced-python-derived-tokens))
+  (define derived-c-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-c)
+                  (markdown-derived-token-has-tag? token 'c-preprocessor-directive)
+                  (string=? (markdown-derived-token-text token) "include")))
+           fenced-c-derived-tokens))
   (define fenced-racket-derived-tokens
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
   (define fenced-webracket-derived-tokens
@@ -448,6 +456,7 @@
   (check-not-false derived-shell-token)
   (check-not-false derived-json-token)
   (check-not-false derived-python-token)
+  (check-not-false derived-c-token)
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
@@ -534,6 +543,7 @@
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-json-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-python-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-c-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
   (check-true (contiguous-derived-stream? hard-break-derived-tokens))
@@ -544,6 +554,9 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-python-derived-tokens))
                 "```python\ndef answer(x):\n    return x\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-c-derived-tokens))
+                "```c\n#include <stdio.h>\nint x = 1;\n```\n")
   (check-true (contiguous-derived-stream? prose-tilde-derived-tokens))
   (check-true (contiguous-derived-stream? prose-backslash-derived-tokens))
   (check-true (contiguous-derived-stream? nested-fence-derived-tokens))

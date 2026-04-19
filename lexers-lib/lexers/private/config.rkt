@@ -10,6 +10,8 @@
 ;;   Default settings for named CSS lexer profiles.
 ;; html-profile-defaults : immutable-hash?
 ;;   Default settings for named HTML lexer profiles.
+;; c-profile-defaults : immutable-hash?
+;;   Default settings for named C lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
 ;; python-profile-defaults : immutable-hash?
@@ -51,6 +53,18 @@
 ;; html-config-errors    : html-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-html-config      : keyword-arguments -> html-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; c-config?             : any/c -> boolean?
+;;   Recognize C lexer configuration values.
+;; c-config-profile      : c-config? -> symbol?
+;;   Extract the configured profile name.
+;; c-config-trivia       : c-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; c-config-source-positions : c-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; c-config-errors       : c-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-c-config         : keyword-arguments -> c-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; json-config?          : any/c -> boolean?
 ;;   Recognize JSON lexer configuration values.
@@ -167,6 +181,7 @@
 
 (provide css-profile-defaults
          html-profile-defaults
+         c-profile-defaults
          json-profile-defaults
          python-profile-defaults
          rhombus-profile-defaults
@@ -188,6 +203,12 @@
          html-config-source-positions
          html-config-errors
          make-html-config
+         c-config?
+         c-config-profile
+         c-config-trivia
+         c-config-source-positions
+         c-config-errors
+         make-c-config
          json-config?
          json-config-profile
          json-config-trivia
@@ -251,6 +272,9 @@
 ;; A resolved configuration for the public HTML lexer.
 (struct html-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public C lexer.
+(struct c-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
 
@@ -289,6 +313,15 @@
 
 ;; Profile defaults for the HTML lexer.
 (define html-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the C lexer.
+(define c-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -428,6 +461,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-c-config : keyword-arguments -> c-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-c-config #:profile          [profile 'coloring]
+                       #:trivia           [trivia 'profile-default]
+                       #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref c-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-c-config
+                                       "unknown C lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (c-config profile
+            resolved-trivia
+            resolved-source-positions
+            resolved-errors))
 
 ;; make-json-config : keyword-arguments -> json-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
