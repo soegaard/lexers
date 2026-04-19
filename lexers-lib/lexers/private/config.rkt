@@ -10,6 +10,8 @@
 ;;   Default settings for named CSS lexer profiles.
 ;; html-profile-defaults : immutable-hash?
 ;;   Default settings for named HTML lexer profiles.
+;; rhombus-profile-defaults : immutable-hash?
+;;   Default settings for named Rhombus lexer profiles.
 ;; wat-profile-defaults : immutable-hash?
 ;;   Default settings for named WAT lexer profiles.
 ;; shell-profile-defaults : immutable-hash?
@@ -45,6 +47,18 @@
 ;; html-config-errors    : html-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-html-config      : keyword-arguments -> html-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; rhombus-config?       : any/c -> boolean?
+;;   Recognize Rhombus lexer configuration values.
+;; rhombus-config-profile : rhombus-config? -> symbol?
+;;   Extract the configured profile name.
+;; rhombus-config-trivia : rhombus-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; rhombus-config-source-positions : rhombus-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; rhombus-config-errors : rhombus-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-rhombus-config   : keyword-arguments -> rhombus-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; wat-config?           : any/c -> boolean?
 ;;   Recognize WAT lexer configuration values.
@@ -125,6 +139,7 @@
 
 (provide css-profile-defaults
          html-profile-defaults
+         rhombus-profile-defaults
          wat-profile-defaults
          shell-profile-defaults
          racket-profile-defaults
@@ -143,6 +158,12 @@
          html-config-source-positions
          html-config-errors
          make-html-config
+         rhombus-config?
+         rhombus-config-profile
+         rhombus-config-trivia
+         rhombus-config-source-positions
+         rhombus-config-errors
+         make-rhombus-config
          wat-config?
          wat-config-profile
          wat-config-trivia
@@ -188,6 +209,9 @@
 ;; A resolved configuration for the public HTML lexer.
 (struct html-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public Rhombus lexer.
+(struct rhombus-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public WAT lexer.
 (struct wat-config (profile trivia source-positions errors) #:transparent)
 
@@ -217,6 +241,15 @@
 
 ;; Profile defaults for the HTML lexer.
 (define html-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Rhombus lexer.
+(define rhombus-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -329,6 +362,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-rhombus-config : keyword-arguments -> rhombus-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-rhombus-config #:profile          [profile 'coloring]
+                             #:trivia           [trivia 'profile-default]
+                             #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref rhombus-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-rhombus-config
+                                       "unknown Rhombus lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (rhombus-config profile
+                  resolved-trivia
+                  resolved-source-positions
+                  resolved-errors))
 
 ;; make-wat-config : keyword-arguments -> wat-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

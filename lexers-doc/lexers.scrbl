@@ -11,6 +11,7 @@
                      lexers/html
                      lexers/markdown
                      lexers/racket
+                     lexers/rhombus
                      lexers/shell
                      lexers/scribble
                      lexers/token
@@ -103,6 +104,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/racket]}
+ @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/wat]}]
@@ -193,7 +195,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[html-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
 @racket[markdown-string->tokens], @racket[make-racket-lexer],
-@racket[racket-string->tokens], @racket[make-shell-lexer],
+@racket[racket-string->tokens], @racket[make-rhombus-lexer],
+@racket[rhombus-string->tokens], @racket[make-shell-lexer],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
 @racket[scribble-string->tokens], @racket[make-wat-lexer], and
 @racket[wat-string->tokens]:
@@ -1287,6 +1290,142 @@ perform expansion or binding resolution.
 
 @defthing[racket-profiles immutable-hash?]{
 The profile defaults used by the Racket lexer.}
+
+@section{Rhombus}
+
+@defmodule[lexers/rhombus]
+
+The projected Rhombus API has two entry points:
+
+@itemlist[
+ @item{@racket[make-rhombus-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[rhombus-string->tokens] for eager tokenization of an entire
+       string.}]
+
+This lexer is adapter-backed. It uses the lexer from @tt{rhombus/private/syntax-color}
+as its raw engine and adapts that
+output into the public @tt{lexers} projected and derived APIs.
+
+Rhombus support is optional. When @tt{rhombus/private/syntax-color} is not
+available, the module still loads, but calling the Rhombus lexer raises an
+error explaining that Rhombus support requires @tt{rhombus-lib} on
+@tt{base >= 8.14}.
+
+@defproc[(make-rhombus-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Rhombus lexer.}
+
+@defproc[(rhombus-string->tokens [source string?]
+                                 [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                 [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                 [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire Rhombus string using the projected token API.}
+
+@subsection{Rhombus Returned Tokens}
+
+Common projected Rhombus categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['identifier]}
+ @item{@racket['keyword]}
+ @item{@racket['literal]}
+ @item{@racket['operator]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For the current adapter:
+
+@itemlist[
+ @item{ordinary whitespace projects as @racket['whitespace]}
+ @item{line comments project as @racket['comment]}
+ @item{Rhombus keywords and builtins project as @racket['keyword]}
+ @item{remaining identifiers project as @racket['identifier]}
+ @item{literals project as @racket['literal]}
+ @item{openers, closers, and separators project as @racket['delimiter]}
+ @item{operators such as @tt{+}, @tt{:}, and @tt{,} project as
+       @racket['operator]}
+ @item{recoverable malformed input projects as @racket['unknown] in
+       @racket['coloring] mode and raises in @racket['compiler] mode}]
+
+Projected and derived Rhombus token text preserve the exact consumed source
+slice, including CRLF line endings when Rhombus support is available.
+
+@defproc[(make-rhombus-derived-lexer)
+         (input-port? . -> . (or/c 'eof rhombus-derived-token?))]{
+Constructs a streaming Rhombus lexer for the derived-token layer.}
+
+@defproc[(rhombus-string->derived-tokens [source string?])
+         (listof rhombus-derived-token?)]{
+Tokenizes an entire Rhombus string into derived Rhombus token values.}
+
+@defproc[(rhombus-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Rhombus token values returned by
+@racket[make-rhombus-derived-lexer] and
+@racket[rhombus-string->derived-tokens].}
+
+@defproc[(rhombus-derived-token-tags [token rhombus-derived-token?])
+         (listof symbol?)]{
+Returns the Rhombus-specific classification tags attached to a derived Rhombus
+token.}
+
+@defproc[(rhombus-derived-token-has-tag? [token rhombus-derived-token?]
+                                         [tag symbol?])
+         boolean?]{
+Determines whether a derived Rhombus token carries a given classification tag.}
+
+@defproc[(rhombus-derived-token-text [token rhombus-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived Rhombus token.}
+
+@defproc[(rhombus-derived-token-start [token rhombus-derived-token?])
+         position?]{
+Returns the starting source position for a derived Rhombus token.}
+
+@defproc[(rhombus-derived-token-end [token rhombus-derived-token?])
+         position?]{
+Returns the ending source position for a derived Rhombus token.}
+
+@subsection{Rhombus Derived Tokens}
+
+The current Rhombus adapter may attach tags such as:
+
+@itemlist[
+ @item{@racket['rhombus-comment]}
+ @item{@racket['rhombus-whitespace]}
+ @item{@racket['rhombus-string]}
+ @item{@racket['rhombus-constant]}
+ @item{@racket['rhombus-literal]}
+ @item{@racket['rhombus-identifier]}
+ @item{@racket['rhombus-keyword]}
+ @item{@racket['rhombus-builtin]}
+ @item{@racket['rhombus-operator]}
+ @item{@racket['rhombus-block-operator]}
+ @item{@racket['rhombus-comma-operator]}
+ @item{@racket['rhombus-opener]}
+ @item{@racket['rhombus-closer]}
+ @item{@racket['rhombus-parenthesis]}
+ @item{@racket['rhombus-separator]}
+ @item{@racket['rhombus-at]}
+ @item{@racket['rhombus-fail]}
+ @item{@racket['rhombus-error]}
+ @item{@racket['malformed-token]}]
+
+The adapter preserves Rhombus-specific keyword and builtin guesses from
+@tt{rhombus/private/syntax-color}. Since the shared projected stream
+does not have a separate builtin category, builtins currently project as
+@racket['keyword], while the derived-token layer keeps the more specific
+@racket['rhombus-builtin] tag.
+
+@defthing[rhombus-profiles immutable-hash?]{
+The profile defaults used by the Rhombus lexer.}
 
 @section{Scribble}
 

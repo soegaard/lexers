@@ -9,6 +9,7 @@ The library currently provides public lexer modules for:
 - `lexers/javascript`
 - `lexers/markdown`
 - `lexers/racket`
+- `lexers/rhombus`
 - `lexers/shell`
 - `lexers/scribble`
 - `lexers/wat`
@@ -49,7 +50,12 @@ The current lexers are intended to be reusable across tools instead of being
 tied to a single renderer or editor integration.
 
 Several lexers are handwritten, while the Racket and Scribble support is
-adapter-backed on top of `syntax-color`.
+adapter-backed on top of `syntax-color`, and Rhombus support is adapter-backed
+on top of `rhombus/private/syntax-color`.
+
+Rhombus support is optional at runtime. The package remains installable on
+older Racket versions, and `lexers/rhombus` becomes usable when
+`rhombus-lib` is available on `base >= 8.14`.
 
 ## License
 
