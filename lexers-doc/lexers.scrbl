@@ -8,6 +8,7 @@
                      (only-in syntax-color/scribble-lexer
                               make-scribble-inside-lexer)
                      lexers/c
+                     lexers/csv
                      lexers/css
                      lexers/html
                      lexers/json
@@ -18,6 +19,7 @@
                      lexers/shell
                      lexers/scribble
                      lexers/token
+                     lexers/tsv
                      lexers/javascript
                      lexers/wat
                      lexers/yaml))
@@ -36,6 +38,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/css))
+     the-eval))
+
+@(define csv-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/csv))
      the-eval))
 
 @(define javascript-eval
@@ -102,6 +112,14 @@
                          lexers/shell))
      the-eval))
 
+@(define tsv-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/tsv))
+     the-eval))
+
 @(define wat-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -136,6 +154,7 @@ The public language modules currently available are:
 @itemlist[
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/c]}
+ @item{@racketmodname[lexers/csv]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/json]}
@@ -146,6 +165,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
+ @item{@racketmodname[lexers/tsv]}
  @item{@racketmodname[lexers/wat]}
  @item{@racketmodname[lexers/yaml]}]
 
@@ -756,6 +776,116 @@ tags and gain @racket['embedded-c].}
 @defthing[c-profiles immutable-hash?]{
 The profile defaults used by the C lexer.}
 
+@section{CSV}
+
+@defmodule[lexers/csv]
+
+The projected CSV API has two entry points:
+
+@itemlist[
+ @item{@racket[make-csv-lexer] for streaming tokenization from an input port.}
+ @item{@racket[csv-string->tokens] for eager tokenization of an entire string.}]
+
+The first CSV implementation is a handwritten streaming lexer for
+comma-separated text. It preserves exact source text, including empty fields
+and CRLF row separators.
+
+@defproc[(make-csv-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming CSV lexer.
+
+Projected CSV categories include @racket['literal], @racket['delimiter], and
+@racket['unknown].
+
+Field contents project as @racket['literal]. Field separators and row
+separators project as @racket['delimiter].
+
+@examples[#:eval csv-eval
+(define lexer
+  (make-csv-lexer #:profile 'coloring))
+(define in
+  (open-input-string "name,age\nAda,37\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(csv-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected CSV tokens.}
+
+The derived CSV API provides reusable structure for delimited text:
+
+@defproc[(make-csv-derived-lexer)
+         (input-port? . -> . (or/c csv-derived-token? 'eof))]{
+Constructs a streaming CSV lexer that returns derived CSV tokens.}
+
+@defproc[(csv-string->derived-tokens [source string?])
+         (listof csv-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived CSV tokens.}
+
+@defproc[(csv-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived CSV tokens.}
+
+@defproc[(csv-derived-token-tags [token csv-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(csv-derived-token-has-tag? [token csv-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(csv-derived-token-text [token csv-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(csv-derived-token-start [token csv-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(csv-derived-token-end [token csv-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable CSV-specific derived tags include:
+
+@itemlist[
+ @item{@racket['delimited-field]}
+ @item{@racket['delimited-quoted-field]}
+ @item{@racket['delimited-unquoted-field]}
+ @item{@racket['delimited-empty-field]}
+ @item{@racket['delimited-separator]}
+ @item{@racket['delimited-row-separator]}
+ @item{@racket['delimited-error]}
+ @item{@racket['csv-field]}
+ @item{@racket['csv-separator]}
+ @item{@racket['csv-row-separator]}
+ @item{@racket['malformed-token]}]
+
+Malformed CSV input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{csv} delegate to
+@racketmodname[lexers/csv]. Wrapped delegated Markdown tokens preserve
+CSV-derived tags and gain @racket['embedded-csv].}
+
+@defthing[csv-profiles immutable-hash?]{
+The profile defaults used by the CSV lexer.}
+
 @section{JSON}
 
 @defmodule[lexers/json]
@@ -1006,8 +1136,9 @@ The projected Markdown API has two entry points:
 
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
-and known fenced-code languages to the existing C, HTML, CSS, JavaScript,
-JSON, Python, Racket, Scribble, shell, WAT, and YAML lexers.
+and known fenced-code languages to the existing C, CSV, HTML, CSS,
+JavaScript, JSON, Python, Racket, Scribble, shell, TSV, WAT, and YAML
+lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -1164,21 +1295,24 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['markdown-hard-line-break]}
  @item{@racket['embedded-html]}
  @item{@racket['embedded-css]}
+ @item{@racket['embedded-csv]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
+ @item{@racket['embedded-tsv]}
  @item{@racket['embedded-wat]}
  @item{@racket['embedded-yaml]}
  @item{@racket['malformed-token]}]
 
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
-@racket['embedded-html], @racket['embedded-javascript],
-@racket['embedded-json], @racket['embedded-python], @racket['embedded-racket],
-@racket['embedded-shell], @racket['embedded-wat], or @racket['embedded-yaml].
+@racket['embedded-html], @racket['embedded-csv],
+@racket['embedded-javascript], @racket['embedded-json],
+@racket['embedded-python], @racket['embedded-racket], @racket['embedded-shell],
+@racket['embedded-tsv], @racket['embedded-wat], or @racket['embedded-yaml].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -1449,6 +1583,116 @@ Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
 
 @defthing[shell-profiles immutable-hash?]{
 The profile defaults used by the shell lexer.}
+
+@section{TSV}
+
+@defmodule[lexers/tsv]
+
+The projected TSV API has two entry points:
+
+@itemlist[
+ @item{@racket[make-tsv-lexer] for streaming tokenization from an input port.}
+ @item{@racket[tsv-string->tokens] for eager tokenization of an entire string.}]
+
+The first TSV implementation is a handwritten streaming lexer for
+tab-separated text. It preserves exact source text, including literal tab
+separators, empty fields, and CRLF row separators.
+
+@defproc[(make-tsv-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming TSV lexer.
+
+Projected TSV categories include @racket['literal], @racket['delimiter], and
+@racket['unknown].
+
+Field contents project as @racket['literal]. Field separators and row
+separators project as @racket['delimiter].
+
+@examples[#:eval tsv-eval
+(define lexer
+  (make-tsv-lexer #:profile 'coloring))
+(define in
+  (open-input-string "name\tage\nAda\t37\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(tsv-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected TSV tokens.}
+
+The derived TSV API provides reusable structure for delimited text:
+
+@defproc[(make-tsv-derived-lexer)
+         (input-port? . -> . (or/c tsv-derived-token? 'eof))]{
+Constructs a streaming TSV lexer that returns derived TSV tokens.}
+
+@defproc[(tsv-string->derived-tokens [source string?])
+         (listof tsv-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived TSV tokens.}
+
+@defproc[(tsv-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived TSV tokens.}
+
+@defproc[(tsv-derived-token-tags [token tsv-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(tsv-derived-token-has-tag? [token tsv-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(tsv-derived-token-text [token tsv-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(tsv-derived-token-start [token tsv-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(tsv-derived-token-end [token tsv-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable TSV-specific derived tags include:
+
+@itemlist[
+ @item{@racket['delimited-field]}
+ @item{@racket['delimited-quoted-field]}
+ @item{@racket['delimited-unquoted-field]}
+ @item{@racket['delimited-empty-field]}
+ @item{@racket['delimited-separator]}
+ @item{@racket['delimited-row-separator]}
+ @item{@racket['delimited-error]}
+ @item{@racket['tsv-field]}
+ @item{@racket['tsv-separator]}
+ @item{@racket['tsv-row-separator]}
+ @item{@racket['malformed-token]}]
+
+Malformed TSV input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{tsv} delegate to
+@racketmodname[lexers/tsv]. Wrapped delegated Markdown tokens preserve
+TSV-derived tags and gain @racket['embedded-tsv].}
+
+@defthing[tsv-profiles immutable-hash?]{
+The profile defaults used by the TSV lexer.}
 
 @section{WAT}
 

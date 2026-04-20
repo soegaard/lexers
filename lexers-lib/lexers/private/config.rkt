@@ -12,6 +12,10 @@
 ;;   Default settings for named HTML lexer profiles.
 ;; c-profile-defaults : immutable-hash?
 ;;   Default settings for named C lexer profiles.
+;; csv-profile-defaults : immutable-hash?
+;;   Default settings for named CSV lexer profiles.
+;; tsv-profile-defaults : immutable-hash?
+;;   Default settings for named TSV lexer profiles.
 ;; yaml-profile-defaults : immutable-hash?
 ;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
@@ -67,6 +71,30 @@
 ;; c-config-errors       : c-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-c-config         : keyword-arguments -> c-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; csv-config?           : any/c -> boolean?
+;;   Recognize CSV lexer configuration values.
+;; csv-config-profile    : csv-config? -> symbol?
+;;   Extract the configured profile name.
+;; csv-config-trivia     : csv-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; csv-config-source-positions : csv-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; csv-config-errors     : csv-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-csv-config       : keyword-arguments -> csv-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; tsv-config?           : any/c -> boolean?
+;;   Recognize TSV lexer configuration values.
+;; tsv-config-profile    : tsv-config? -> symbol?
+;;   Extract the configured profile name.
+;; tsv-config-trivia     : tsv-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; tsv-config-source-positions : tsv-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; tsv-config-errors     : tsv-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-tsv-config       : keyword-arguments -> tsv-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; yaml-config?          : any/c -> boolean?
 ;;   Recognize YAML lexer configuration values.
@@ -196,6 +224,8 @@
 (provide css-profile-defaults
          html-profile-defaults
          c-profile-defaults
+         csv-profile-defaults
+         tsv-profile-defaults
          yaml-profile-defaults
          json-profile-defaults
          python-profile-defaults
@@ -224,6 +254,18 @@
          c-config-source-positions
          c-config-errors
          make-c-config
+         csv-config?
+         csv-config-profile
+         csv-config-trivia
+         csv-config-source-positions
+         csv-config-errors
+         make-csv-config
+         tsv-config?
+         tsv-config-profile
+         tsv-config-trivia
+         tsv-config-source-positions
+         tsv-config-errors
+         make-tsv-config
          yaml-config?
          yaml-config-profile
          yaml-config-trivia
@@ -296,6 +338,12 @@
 ;; A resolved configuration for the public C lexer.
 (struct c-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public CSV lexer.
+(struct csv-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public TSV lexer.
+(struct tsv-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public YAML lexer.
 (struct yaml-config (profile trivia source-positions errors) #:transparent)
 
@@ -346,6 +394,24 @@
 
 ;; Profile defaults for the C lexer.
 (define c-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the CSV lexer.
+(define csv-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the TSV lexer.
+(define tsv-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -521,6 +587,60 @@
             resolved-trivia
             resolved-source-positions
             resolved-errors))
+
+;; make-csv-config : keyword-arguments -> csv-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-csv-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref csv-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-csv-config
+                                       "unknown CSV lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (csv-config profile
+              resolved-trivia
+              resolved-source-positions
+              resolved-errors))
+
+;; make-tsv-config : keyword-arguments -> tsv-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-tsv-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref tsv-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-tsv-config
+                                       "unknown TSV lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (tsv-config profile
+              resolved-trivia
+              resolved-source-positions
+              resolved-errors))
 
 ;; make-yaml-config : keyword-arguments -> yaml-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

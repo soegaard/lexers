@@ -6,6 +6,7 @@ The library currently provides public lexer modules for:
 
 - `lexers/css`
 - `lexers/c`
+- `lexers/csv`
 - `lexers/html`
 - `lexers/json`
 - `lexers/javascript`
@@ -15,6 +16,7 @@ The library currently provides public lexer modules for:
 - `lexers/rhombus`
 - `lexers/shell`
 - `lexers/scribble`
+- `lexers/tsv`
 - `lexers/wat`
 - `lexers/yaml`
 

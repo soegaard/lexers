@@ -292,8 +292,12 @@
     (markdown-string->derived-tokens "```bash\necho hi\n```\n"))
   (define fenced-json-derived-tokens
     (markdown-string->derived-tokens "```json\n{\"x\": 1, \"ok\": true}\n```\n"))
+  (define fenced-csv-derived-tokens
+    (markdown-string->derived-tokens "```csv\nname,age\nAda,37\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
+  (define fenced-tsv-derived-tokens
+    (markdown-string->derived-tokens "```tsv\nname\tage\nAda\t37\n```\n"))
   (define fenced-yaml-derived-tokens
     (markdown-string->derived-tokens "```yaml\nname: Deploy\non:\n  push:\n```\n"))
   (define fenced-c-derived-tokens
@@ -310,12 +314,24 @@
                   (markdown-derived-token-has-tag? token 'json-object-key)
                   (string=? (markdown-derived-token-text token) "\"x\"")))
            fenced-json-derived-tokens))
+  (define derived-csv-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-csv)
+                  (markdown-derived-token-has-tag? token 'csv-field)
+                  (string=? (markdown-derived-token-text token) "name")))
+           fenced-csv-derived-tokens))
   (define derived-python-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-python)
                   (markdown-derived-token-has-tag? token 'python-keyword)
                   (string=? (markdown-derived-token-text token) "def")))
            fenced-python-derived-tokens))
+  (define derived-tsv-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-tsv)
+                  (markdown-derived-token-has-tag? token 'tsv-field)
+                  (string=? (markdown-derived-token-text token) "name")))
+           fenced-tsv-derived-tokens))
   (define derived-yaml-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-yaml)
@@ -463,7 +479,9 @@
   (check-not-false derived-wat-token)
   (check-not-false derived-shell-token)
   (check-not-false derived-json-token)
+  (check-not-false derived-csv-token)
   (check-not-false derived-python-token)
+  (check-not-false derived-tsv-token)
   (check-not-false derived-yaml-token)
   (check-not-false derived-c-token)
   (check-not-false derived-hard-break)
@@ -551,7 +569,9 @@
           unterminated-fence-with-content-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-json-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-csv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-python-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-tsv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-yaml-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-c-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
@@ -562,8 +582,14 @@
                        (map markdown-derived-token-text fenced-json-derived-tokens))
                 "```json\n{\"x\": 1, \"ok\": true}\n```\n")
   (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-csv-derived-tokens))
+                "```csv\nname,age\nAda,37\n```\n")
+  (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-python-derived-tokens))
                 "```python\ndef answer(x):\n    return x\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-tsv-derived-tokens))
+                "```tsv\nname\tage\nAda\t37\n```\n")
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-yaml-derived-tokens))
                 "```yaml\nname: Deploy\non:\n  push:\n```\n")

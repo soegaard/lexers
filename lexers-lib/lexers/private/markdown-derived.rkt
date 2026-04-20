@@ -34,6 +34,7 @@
          racket/list
          racket/port
          racket/string
+         "../csv.rkt"
          "../c.rkt"
          "../css.rkt"
          "../html.rkt"
@@ -43,6 +44,7 @@
          "../racket.rkt"
          "../shell.rkt"
          "../scribble.rkt"
+         "../tsv.rkt"
          "../wat.rkt"
          "../yaml.rkt"
          "parser-tools-compat.rkt"
@@ -127,7 +129,9 @@
           (member 'scribble-symbol tags)
           (member 'scribble-command tags)
           (member 'shell-word tags)
+          (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'tsv-field tags)
           (member 'yaml-anchor tags)
           (member 'yaml-alias tags)
           (member 'yaml-tag tags)
@@ -165,9 +169,11 @@
           (member 'shell-command-substitution tags)
           (member 'shell-option tags)
           (member 'shell-numeric-literal tags)
+          (member 'csv-field tags)
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'tsv-field tags)
           (member 'c-header-name tags)
           (member 'yaml-plain-scalar tags)
           (member 'yaml-string-literal tags)
@@ -188,6 +194,8 @@
       '(keyword)]
     [(or (member 'delimiter tags)
           (member 'c-delimiter tags)
+          (member 'csv-separator tags)
+          (member 'csv-row-separator tags)
           (member 'yaml-document-marker tags)
           (member 'yaml-flow-delimiter tags)
           (member 'yaml-value-indicator tags)
@@ -200,6 +208,8 @@
           (member 'scribble-body-delimiter tags)
           (member 'scribble-optional-delimiter tags)
           (member 'shell-punctuation tags)
+          (member 'tsv-separator tags)
+          (member 'tsv-row-separator tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
       '(delimiter)]
      [(member 'c-operator tags)
@@ -250,11 +260,13 @@
   (cond
     [(equal? primary "")                 #f]
     [(member primary '("c" "h"))         'c]
+    [(member primary '("csv"))           'csv]
     [(member primary '("css"))           'css]
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
     [(member primary '("python" "py"))   'python]
+    [(member primary '("tsv"))           'tsv]
     [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
@@ -297,6 +309,15 @@
                           c-derived-token-end
                           c-derived-token-tags
                           '(embedded-c markdown-code-block))]
+    [(csv)
+     (wrap-derived-tokens (csv-string->derived-tokens body)
+                          body-start
+                          starts
+                          csv-derived-token-text
+                          csv-derived-token-start
+                          csv-derived-token-end
+                          csv-derived-token-tags
+                          '(embedded-csv markdown-code-block))]
     [(css)
      (wrap-derived-tokens (css-string->derived-tokens body)
                           body-start
@@ -405,6 +426,15 @@
                           scribble-derived-token-end
                           scribble-derived-token-tags
                           '(embedded-scribble markdown-code-block))]
+    [(tsv)
+     (wrap-derived-tokens (tsv-string->derived-tokens body)
+                          body-start
+                          starts
+                          tsv-derived-token-text
+                          tsv-derived-token-start
+                          tsv-derived-token-end
+                          tsv-derived-token-tags
+                          '(embedded-tsv markdown-code-block))]
     [(wat)
      (wrap-derived-tokens (wat-string->derived-tokens body)
                           body-start
