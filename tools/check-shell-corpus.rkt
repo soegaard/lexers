@@ -157,32 +157,37 @@
 ;; main : -> void?
 ;;   Run the shell lexer across the copied corpus.
 (define (main)
-  (define files
-    (corpus-files))
-  (define results
-    (for/list ([p (in-list files)])
-      (define shell
-        (detect-shell p))
-      (match (lex-file p shell)
-        [(list 'ok stats)
-         (hash 'path (relative-corpus-path p)
-               'shell shell
-               'status 'ok
-               'projected-count (hash-ref stats 'projected-count)
-               'derived-count (hash-ref stats 'derived-count)
-               'derived-roundtrip? (hash-ref stats 'derived-roundtrip?)
-               'projected-roundtrip? (hash-ref stats 'projected-roundtrip?))]
-        [(list 'error msg)
-         (hash 'path (relative-corpus-path p)
-               'shell shell
-               'status 'error
-               'message msg)]
-        [(list 'timeout seconds)
-         (hash 'path (relative-corpus-path p)
-               'shell shell
-               'status 'timeout
-               'seconds seconds)])))
-  (write-summary! results)
-  (printf "Wrote summary to ~a\n" summary-path))
+  (cond
+    [(directory-exists? corpus-root)
+     (define files
+       (corpus-files))
+     (define results
+       (for/list ([p (in-list files)])
+         (define shell
+           (detect-shell p))
+         (match (lex-file p shell)
+           [(list 'ok stats)
+            (hash 'path (relative-corpus-path p)
+                  'shell shell
+                  'status 'ok
+                  'projected-count (hash-ref stats 'projected-count)
+                  'derived-count (hash-ref stats 'derived-count)
+                  'derived-roundtrip? (hash-ref stats 'derived-roundtrip?)
+                  'projected-roundtrip? (hash-ref stats 'projected-roundtrip?))]
+           [(list 'error msg)
+            (hash 'path (relative-corpus-path p)
+                  'shell shell
+                  'status 'error
+                  'message msg)]
+           [(list 'timeout seconds)
+            (hash 'path (relative-corpus-path p)
+                  'shell shell
+                  'status 'timeout
+                  'seconds seconds)])))
+     (write-summary! results)
+     (printf "Wrote summary to ~a\n" summary-path)]
+    [else
+     (printf "Skipping shell corpus check; missing corpus directory ~a\n"
+             corpus-root)]))
 
 (main)

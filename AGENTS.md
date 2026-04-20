@@ -60,6 +60,9 @@ Coding guidelines for Racket code in `lexers`:
     `dynamic-require` at runtime over hard module or package dependencies.
 27. When a new lexer has enough real local source available, add a corpus
     checker script in `tools/` instead of relying only on unit tests.
+28. Corpus checker scripts in `tools/` must skip cleanly when their local
+    `/tmp` corpus directory is unavailable, so package-server tests do not
+    fail when the corpus is absent.
 28. For languages with an official lexical-analysis reference, treat that
     lexical specification as the primary lexer source. Use parser grammars and
     implementation files as secondary context.
