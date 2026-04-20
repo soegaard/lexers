@@ -16,6 +16,7 @@ The library currently provides public lexer modules for:
 - `lexers/rhombus`
 - `lexers/shell`
 - `lexers/scribble`
+- `lexers/swift`
 - `lexers/tsv`
 - `lexers/wat`
 - `lexers/yaml`

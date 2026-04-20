@@ -44,6 +44,7 @@
          "../racket.rkt"
          "../shell.rkt"
          "../scribble.rkt"
+         "../swift.rkt"
          "../tsv.rkt"
          "../wat.rkt"
          "../yaml.rkt"
@@ -131,6 +132,7 @@
           (member 'shell-word tags)
           (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'swift-identifier tags)
           (member 'tsv-field tags)
           (member 'yaml-anchor tags)
           (member 'yaml-alias tags)
@@ -173,6 +175,8 @@
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'swift-string-literal tags)
+          (member 'swift-numeric-literal tags)
           (member 'tsv-field tags)
           (member 'c-header-name tags)
           (member 'yaml-plain-scalar tags)
@@ -211,8 +215,9 @@
           (member 'tsv-separator tags)
           (member 'tsv-row-separator tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
-      '(delimiter)]
-     [(member 'c-operator tags)
+     '(delimiter)]
+     [(or (member 'c-operator tags)
+          (member 'swift-operator tags))
       '(operator)]
      [(regexp-match? #px"^[=+\\-*/!&|%^~]+$" text)
       '(operator)]
@@ -266,6 +271,7 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
     [(member primary '("python" "py"))   'python]
+    [(member primary '("swift"))         'swift]
     [(member primary '("tsv"))           'tsv]
     [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
@@ -426,6 +432,15 @@
                           scribble-derived-token-end
                           scribble-derived-token-tags
                           '(embedded-scribble markdown-code-block))]
+    [(swift)
+     (wrap-derived-tokens (swift-string->derived-tokens body)
+                          body-start
+                          starts
+                          swift-derived-token-text
+                          swift-derived-token-start
+                          swift-derived-token-end
+                          swift-derived-token-tags
+                          '(embedded-swift markdown-code-block))]
     [(tsv)
      (wrap-derived-tokens (tsv-string->derived-tokens body)
                           body-start

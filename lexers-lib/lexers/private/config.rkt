@@ -20,6 +20,8 @@
 ;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
+;; swift-profile-defaults : immutable-hash?
+;;   Default settings for named Swift lexer profiles.
 ;; python-profile-defaults : immutable-hash?
 ;;   Default settings for named Python lexer profiles.
 ;; rhombus-profile-defaults : immutable-hash?
@@ -119,6 +121,18 @@
 ;; json-config-errors    : json-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-json-config      : keyword-arguments -> json-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; swift-config?         : any/c -> boolean?
+;;   Recognize Swift lexer configuration values.
+;; swift-config-profile  : swift-config? -> symbol?
+;;   Extract the configured profile name.
+;; swift-config-trivia   : swift-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; swift-config-source-positions : swift-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; swift-config-errors   : swift-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-swift-config     : keyword-arguments -> swift-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; python-config?        : any/c -> boolean?
 ;;   Recognize Python lexer configuration values.
@@ -228,6 +242,7 @@
          tsv-profile-defaults
          yaml-profile-defaults
          json-profile-defaults
+         swift-profile-defaults
          python-profile-defaults
          rhombus-profile-defaults
          wat-profile-defaults
@@ -278,6 +293,12 @@
          json-config-source-positions
          json-config-errors
          make-json-config
+         swift-config?
+         swift-config-profile
+         swift-config-trivia
+         swift-config-source-positions
+         swift-config-errors
+         make-swift-config
          python-config?
          python-config-profile
          python-config-trivia
@@ -349,6 +370,9 @@
 
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Swift lexer.
+(struct swift-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Python lexer.
 (struct python-config (profile trivia source-positions errors) #:transparent)
@@ -430,6 +454,15 @@
 
 ;; Profile defaults for the JSON lexer.
 (define json-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Swift lexer.
+(define swift-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -695,6 +728,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-swift-config : keyword-arguments -> swift-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-swift-config #:profile          [profile 'coloring]
+                           #:trivia           [trivia 'profile-default]
+                           #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref swift-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-swift-config
+                                       "unknown Swift lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (swift-config profile
+                resolved-trivia
+                resolved-source-positions
+                resolved-errors))
 
 ;; make-python-config : keyword-arguments -> python-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

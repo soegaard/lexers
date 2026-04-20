@@ -18,6 +18,7 @@
                      lexers/rhombus
                      lexers/shell
                      lexers/scribble
+                     lexers/swift
                      lexers/token
                      lexers/tsv
                      lexers/javascript
@@ -112,6 +113,14 @@
                          lexers/shell))
      the-eval))
 
+@(define swift-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/swift))
+     the-eval))
+
 @(define tsv-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -165,6 +174,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
+ @item{@racketmodname[lexers/swift]}
  @item{@racketmodname[lexers/tsv]}
  @item{@racketmodname[lexers/wat]}
  @item{@racketmodname[lexers/yaml]}]
@@ -260,7 +270,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[racket-string->tokens], @racket[make-rhombus-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
-@racket[scribble-string->tokens], @racket[make-wat-lexer], and
+@racket[scribble-string->tokens], @racket[make-swift-lexer],
+@racket[swift-string->tokens], @racket[make-wat-lexer], and
 @racket[wat-string->tokens]:
 
 @itemlist[
@@ -1302,6 +1313,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
+ @item{@racket['embedded-swift]}
  @item{@racket['embedded-tsv]}
  @item{@racket['embedded-wat]}
  @item{@racket['embedded-yaml]}
@@ -1312,7 +1324,8 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-csv],
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-python], @racket['embedded-racket], @racket['embedded-shell],
-@racket['embedded-tsv], @racket['embedded-wat], or @racket['embedded-yaml].
+@racket['embedded-swift], @racket['embedded-tsv], @racket['embedded-wat], or
+@racket['embedded-yaml].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -1583,6 +1596,113 @@ Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
 
 @defthing[shell-profiles immutable-hash?]{
 The profile defaults used by the shell lexer.}
+
+@section{Swift}
+
+@defmodule[lexers/swift]
+
+The projected Swift API has two entry points:
+
+@itemlist[
+ @item{@racket[make-swift-lexer] for streaming tokenization from an input port.}
+ @item{@racket[swift-string->tokens] for eager tokenization of an entire string.}]
+
+The first Swift implementation is a handwritten streaming lexer grounded in
+Swift lexical structure. It covers whitespace, line comments, nested block
+comments, identifiers, keywords, attributes, pound directives, strings,
+numbers, operators, and delimiters.
+
+@defproc[(make-swift-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                           [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Swift lexer.
+
+Projected Swift categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].
+
+@examples[#:eval swift-eval
+(define lexer
+  (make-swift-lexer #:profile 'coloring))
+(define in
+  (open-input-string "import UIKit\n@IBOutlet weak var label: UILabel!\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(swift-string->tokens [source string?]
+                               [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                               [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Swift tokens.}
+
+The derived Swift API provides reusable language-specific structure:
+
+@defproc[(make-swift-derived-lexer)
+         (input-port? . -> . (or/c swift-derived-token? 'eof))]{
+Constructs a streaming Swift lexer that returns derived Swift tokens.}
+
+@defproc[(swift-string->derived-tokens [source string?])
+         (listof swift-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Swift tokens.}
+
+@defproc[(swift-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Swift tokens.}
+
+@defproc[(swift-derived-token-tags [token swift-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(swift-derived-token-has-tag? [token swift-derived-token?]
+                                       [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(swift-derived-token-text [token swift-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(swift-derived-token-start [token swift-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(swift-derived-token-end [token swift-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Swift-specific derived tags include:
+
+@itemlist[
+ @item{@racket['swift-comment]}
+ @item{@racket['swift-whitespace]}
+ @item{@racket['swift-keyword]}
+ @item{@racket['swift-identifier]}
+ @item{@racket['swift-string-literal]}
+ @item{@racket['swift-numeric-literal]}
+ @item{@racket['swift-attribute]}
+ @item{@racket['swift-pound-directive]}
+ @item{@racket['swift-operator]}
+ @item{@racket['swift-delimiter]}
+ @item{@racket['swift-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed Swift input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{swift} delegate to
+@racketmodname[lexers/swift]. Wrapped delegated Markdown tokens preserve
+Swift-derived tags and gain @racket['embedded-swift].}
 
 @section{TSV}
 

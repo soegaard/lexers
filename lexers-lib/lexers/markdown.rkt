@@ -296,6 +296,8 @@
     (markdown-string->derived-tokens "```csv\nname,age\nAda,37\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
+  (define fenced-swift-derived-tokens
+    (markdown-string->derived-tokens "```swift\nimport UIKit\nlet value = 42\n```\n"))
   (define fenced-tsv-derived-tokens
     (markdown-string->derived-tokens "```tsv\nname\tage\nAda\t37\n```\n"))
   (define fenced-yaml-derived-tokens
@@ -326,6 +328,12 @@
                   (markdown-derived-token-has-tag? token 'python-keyword)
                   (string=? (markdown-derived-token-text token) "def")))
            fenced-python-derived-tokens))
+  (define derived-swift-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-swift)
+                  (markdown-derived-token-has-tag? token 'swift-keyword)
+                  (string=? (markdown-derived-token-text token) "import")))
+           fenced-swift-derived-tokens))
   (define derived-tsv-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-tsv)
@@ -481,6 +489,7 @@
   (check-not-false derived-json-token)
   (check-not-false derived-csv-token)
   (check-not-false derived-python-token)
+  (check-not-false derived-swift-token)
   (check-not-false derived-tsv-token)
   (check-not-false derived-yaml-token)
   (check-not-false derived-c-token)
@@ -571,6 +580,7 @@
   (check-true (contiguous-derived-stream? fenced-json-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-csv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-python-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-swift-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-tsv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-yaml-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-c-derived-tokens))
@@ -587,6 +597,9 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-python-derived-tokens))
                 "```python\ndef answer(x):\n    return x\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-swift-derived-tokens))
+                "```swift\nimport UIKit\nlet value = 42\n```\n")
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-tsv-derived-tokens))
                 "```tsv\nname\tage\nAda\t37\n```\n")
