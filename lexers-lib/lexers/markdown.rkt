@@ -292,6 +292,8 @@
     (markdown-string->derived-tokens "```bash\necho hi\n```\n"))
   (define fenced-json-derived-tokens
     (markdown-string->derived-tokens "```json\n{\"x\": 1, \"ok\": true}\n```\n"))
+  (define fenced-makefile-derived-tokens
+    (markdown-string->derived-tokens "```makefile\nall:\n\t$(CC) main.c\n```\n"))
   (define fenced-objc-derived-tokens
     (markdown-string->derived-tokens "```objc\n@interface Foo : NSObject\n@end\n```\n"))
   (define fenced-csv-derived-tokens
@@ -326,6 +328,12 @@
                   (markdown-derived-token-has-tag? token 'objc-at-keyword)
                   (string=? (markdown-derived-token-text token) "@interface")))
            fenced-objc-derived-tokens))
+  (define derived-makefile-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-makefile)
+                  (markdown-derived-token-has-tag? token 'makefile-rule-target)
+                  (string=? (markdown-derived-token-text token) "all")))
+           fenced-makefile-derived-tokens))
   (define derived-csv-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-csv)
@@ -503,6 +511,7 @@
   (check-not-false derived-wat-token)
   (check-not-false derived-shell-token)
   (check-not-false derived-json-token)
+  (check-not-false derived-makefile-token)
   (check-not-false derived-objc-token)
   (check-not-false derived-csv-token)
   (check-not-false derived-python-token)

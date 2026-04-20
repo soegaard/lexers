@@ -11,6 +11,7 @@ The library currently provides public lexer modules for:
 - `lexers/html`
 - `lexers/json`
 - `lexers/javascript`
+- `lexers/makefile`
 - `lexers/markdown`
 - `lexers/objc`
 - `lexers/python`

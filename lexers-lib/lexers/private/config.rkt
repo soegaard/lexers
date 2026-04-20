@@ -20,6 +20,8 @@
 ;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
+;; makefile-profile-defaults : immutable-hash?
+;;   Default settings for named Makefile lexer profiles.
 ;; swift-profile-defaults : immutable-hash?
 ;;   Default settings for named Swift lexer profiles.
 ;; python-profile-defaults : immutable-hash?
@@ -132,6 +134,8 @@
 ;;   Extract the configured source-position setting.
 ;; swift-config-errors   : swift-config? -> symbol?
 ;;   Extract the configured error policy.
+;; make-makefile-config  : keyword-arguments -> makefile-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; make-swift-config     : keyword-arguments -> swift-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; python-config?        : any/c -> boolean?
@@ -244,6 +248,7 @@
          tsv-profile-defaults
          yaml-profile-defaults
          json-profile-defaults
+         makefile-profile-defaults
          swift-profile-defaults
          python-profile-defaults
          rhombus-profile-defaults
@@ -307,6 +312,12 @@
          json-config-source-positions
          json-config-errors
          make-json-config
+         makefile-config?
+         makefile-config-profile
+         makefile-config-trivia
+         makefile-config-source-positions
+         makefile-config-errors
+         make-makefile-config
          swift-config?
          swift-config-profile
          swift-config-trivia
@@ -390,6 +401,9 @@
 
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Makefile lexer.
+(struct makefile-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Swift lexer.
 (struct swift-config (profile trivia source-positions errors) #:transparent)
@@ -492,6 +506,15 @@
 
 ;; Profile defaults for the JSON lexer.
 (define json-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Makefile lexer.
+(define makefile-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -820,6 +843,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-makefile-config : keyword-arguments -> makefile-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-makefile-config #:profile          [profile 'coloring]
+                              #:trivia           [trivia 'profile-default]
+                              #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref makefile-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-makefile-config
+                                       "unknown Makefile lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (makefile-config profile
+                   resolved-trivia
+                   resolved-source-positions
+                   resolved-errors))
 
 ;; make-swift-config : keyword-arguments -> swift-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

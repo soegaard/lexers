@@ -13,6 +13,7 @@
                      lexers/css
                      lexers/html
                      lexers/json
+                     lexers/makefile
                      lexers/markdown
                      lexers/objc
                      lexers/python
@@ -89,6 +90,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/json))
+     the-eval))
+
+@(define makefile-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/makefile))
      the-eval))
 
 @(define objc-eval
@@ -186,6 +195,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/json]}
+ @item{@racketmodname[lexers/makefile]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/objc]}
@@ -1143,6 +1153,93 @@ Markdown fenced code blocks labeled @tt{json} delegate to
 @racketmodname[lexers/json]. Wrapped delegated Markdown tokens preserve
 JSON-derived tags and gain @racket['embedded-json].}
 
+@section{Makefile}
+
+@defmodule[lexers/makefile]
+
+The projected Makefile API has two entry points:
+
+@itemlist[
+ @item{@racket[make-makefile-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[makefile-string->tokens] for eager tokenization of an entire
+       string.}]
+
+The first Makefile implementation is a handwritten streaming lexer aimed at
+ordinary @tt{Makefile}, @tt{GNUmakefile}, and @tt{.mk} inputs. It covers
+comments, directive lines, variable assignments, rule targets, recipe lines,
+variable references, delimiters, and CRLF-preserving source fidelity.
+
+@defproc[(make-makefile-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Makefile lexer.
+
+Projected Makefile categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].
+
+Directive words such as @tt{include} project as @racket['keyword]. Assignment
+operators such as @tt{:=} and @tt{+=} project as @racket['operator]. Rule
+separators such as @tt{:} project as @racket['delimiter].}
+
+@defproc[(makefile-string->tokens [source string?]
+                                  [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                  [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                  [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Makefile tokens.}
+
+The derived Makefile API provides reusable language-specific structure:
+
+@defproc[(make-makefile-derived-lexer)
+         (input-port? . -> . (or/c makefile-derived-token? 'eof))]{
+Constructs a streaming Makefile lexer that returns derived Makefile tokens.}
+
+@defproc[(makefile-string->derived-tokens [source string?])
+         (listof makefile-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Makefile tokens.}
+
+@defproc[(makefile-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Makefile tokens.}
+
+@defproc[(makefile-derived-token-tags [token makefile-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(makefile-derived-token-has-tag? [token makefile-derived-token?]
+                                          [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(makefile-derived-token-text [token makefile-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(makefile-derived-token-start [token makefile-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(makefile-derived-token-end [token makefile-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Makefile-specific derived tags include:
+
+@itemlist[
+ @item{@racket['makefile-directive]}
+ @item{@racket['makefile-variable]}
+ @item{@racket['makefile-assignment-operator]}
+ @item{@racket['makefile-rule-target]}
+ @item{@racket['makefile-variable-reference]}
+ @item{@racket['malformed-token]}]
+
+Markdown fenced code blocks labeled @tt{make}, @tt{makefile}, or @tt{mk}
+delegate to @racketmodname[lexers/makefile]. Wrapped delegated Markdown tokens
+preserve Makefile-derived tags and gain @racket['embedded-makefile].}
+
 @section{YAML}
 
 @defmodule[lexers/yaml]
@@ -1282,9 +1379,9 @@ The projected Markdown API has two entry points:
 
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
-and known fenced-code languages to the existing C, CSV, HTML, CSS,
-JavaScript, JSON, Python, Racket, Scribble, shell, TSV, WAT, and YAML
-lexers.
+and known fenced-code languages to the existing C, C++, CSV, HTML, CSS,
+JavaScript, JSON, Makefile, Objective-C, Python, Racket, Scribble, shell,
+Swift, TSV, WAT, and YAML lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -1445,6 +1542,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-csv]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
+ @item{@racket['embedded-makefile]}
  @item{@racket['embedded-objc]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
@@ -1459,7 +1557,8 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
-@racket['embedded-javascript], @racket['embedded-json], @racket['embedded-objc],
+@racket['embedded-javascript], @racket['embedded-json],
+@racket['embedded-makefile], @racket['embedded-objc],
 @racket['embedded-python], @racket['embedded-racket], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tsv], @racket['embedded-wat], or
 @racket['embedded-yaml].
