@@ -36,6 +36,7 @@
          racket/string
          "../csv.rkt"
          "../c.rkt"
+         "../cpp.rkt"
          "../css.rkt"
          "../html.rkt"
          "../javascript.rkt"
@@ -114,6 +115,7 @@
           (member 'method-name tags)
           (member 'private-name tags)
           (member 'json-object-key tags)
+          (member 'cpp-identifier tags)
           (member 'at-rule-name tags)
           (member 'function-name tags)
           (member 'custom-property-name tags)
@@ -265,6 +267,7 @@
   (cond
     [(equal? primary "")                 #f]
     [(member primary '("c" "h"))         'c]
+    [(member primary '("cpp" "c++" "cc" "cxx" "hpp" "hh" "hxx")) 'cpp]
     [(member primary '("csv"))           'csv]
     [(member primary '("css"))           'css]
     [(member primary '("html"))          'html]
@@ -315,6 +318,15 @@
                           c-derived-token-end
                           c-derived-token-tags
                           '(embedded-c markdown-code-block))]
+    [(cpp)
+     (wrap-derived-tokens (cpp-string->derived-tokens body)
+                          body-start
+                          starts
+                          cpp-derived-token-text
+                          cpp-derived-token-start
+                          cpp-derived-token-end
+                          cpp-derived-token-tags
+                          '(embedded-cpp markdown-code-block))]
     [(csv)
      (wrap-derived-tokens (csv-string->derived-tokens body)
                           body-start

@@ -8,6 +8,7 @@
                      (only-in syntax-color/scribble-lexer
                               make-scribble-inside-lexer)
                      lexers/c
+                     lexers/cpp
                      lexers/csv
                      lexers/css
                      lexers/html
@@ -31,6 +32,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/c))
+     the-eval))
+
+@(define cpp-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/cpp))
      the-eval))
 
 @(define css-eval
@@ -163,6 +172,7 @@ The public language modules currently available are:
 @itemlist[
  @item{@racketmodname[lexers/token]}
  @item{@racketmodname[lexers/c]}
+ @item{@racketmodname[lexers/cpp]}
  @item{@racketmodname[lexers/csv]}
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
@@ -269,6 +279,7 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[python-string->tokens], @racket[make-racket-lexer],
 @racket[racket-string->tokens], @racket[make-rhombus-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
+@racket[make-cpp-lexer], @racket[cpp-string->tokens],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
 @racket[scribble-string->tokens], @racket[make-swift-lexer],
 @racket[swift-string->tokens], @racket[make-wat-lexer], and
@@ -786,6 +797,119 @@ tags and gain @racket['embedded-c].}
 
 @defthing[c-profiles immutable-hash?]{
 The profile defaults used by the C lexer.}
+
+@section{C++}
+
+@defmodule[lexers/cpp]
+
+The projected C++ API has two entry points:
+
+@itemlist[
+ @item{@racket[make-cpp-lexer] for streaming tokenization from an input port.}
+ @item{@racket[cpp-string->tokens] for eager tokenization of an entire string.}]
+
+The first C++ implementation is a handwritten streaming lexer grounded in C++
+lexical structure. It is preprocessor-aware and covers comments, identifiers,
+keywords, operator words, character and string literals, raw string literals,
+numeric literals, and punctuators such as @tt{::} and @tt{->}.
+
+@defproc[(make-cpp-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming C++ lexer.
+
+Projected C++ categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].
+
+@examples[#:eval cpp-eval
+(define lexer
+  (make-cpp-lexer #:profile 'coloring))
+(define in
+  (open-input-string "#include <vector>\nstd::string s;\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(cpp-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected C++ tokens.}
+
+The derived C++ API provides reusable language-specific structure:
+
+@defproc[(make-cpp-derived-lexer)
+         (input-port? . -> . (or/c cpp-derived-token? 'eof))]{
+Constructs a streaming C++ lexer that returns derived C++ tokens.}
+
+@defproc[(cpp-string->derived-tokens [source string?])
+         (listof cpp-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived C++ tokens.}
+
+@defproc[(cpp-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived C++ tokens.}
+
+@defproc[(cpp-derived-token-tags [token cpp-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(cpp-derived-token-has-tag? [token cpp-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(cpp-derived-token-text [token cpp-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(cpp-derived-token-start [token cpp-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(cpp-derived-token-end [token cpp-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable C++-specific derived tags include:
+
+@itemlist[
+ @item{@racket['cpp-comment]}
+ @item{@racket['cpp-whitespace]}
+ @item{@racket['cpp-keyword]}
+ @item{@racket['cpp-identifier]}
+ @item{@racket['cpp-string-literal]}
+ @item{@racket['cpp-char-literal]}
+ @item{@racket['cpp-numeric-literal]}
+ @item{@racket['cpp-operator]}
+ @item{@racket['cpp-delimiter]}
+ @item{@racket['cpp-preprocessor-directive]}
+ @item{@racket['cpp-header-name]}
+ @item{@racket['cpp-line-splice]}
+ @item{@racket['cpp-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed C++ input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{cpp}, @tt{c++}, @tt{cc}, @tt{cxx},
+@tt{hpp}, @tt{hh}, or @tt{hxx} delegate to @racketmodname[lexers/cpp].
+Wrapped delegated Markdown tokens preserve C++-derived tags and gain
+@racket['embedded-cpp].}
+
+@defthing[cpp-profiles immutable-hash?]{
+The profile defaults used by the C++ lexer.}
 
 @section{CSV}
 
@@ -1306,6 +1430,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['markdown-hard-line-break]}
  @item{@racket['embedded-html]}
  @item{@racket['embedded-css]}
+ @item{@racket['embedded-cpp]}
  @item{@racket['embedded-csv]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
@@ -1321,7 +1446,7 @@ The current Markdown scaffold may attach tags such as:
 
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
-@racket['embedded-html], @racket['embedded-csv],
+@racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-python], @racket['embedded-racket], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tsv], @racket['embedded-wat], or

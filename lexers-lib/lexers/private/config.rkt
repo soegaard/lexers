@@ -238,6 +238,7 @@
 (provide css-profile-defaults
          html-profile-defaults
          c-profile-defaults
+         cpp-profile-defaults
          csv-profile-defaults
          tsv-profile-defaults
          yaml-profile-defaults
@@ -269,6 +270,12 @@
          c-config-source-positions
          c-config-errors
          make-c-config
+         cpp-config?
+         cpp-config-profile
+         cpp-config-trivia
+         cpp-config-source-positions
+         cpp-config-errors
+         make-cpp-config
          csv-config?
          csv-config-profile
          csv-config-trivia
@@ -359,6 +366,9 @@
 ;; A resolved configuration for the public C lexer.
 (struct c-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public C++ lexer.
+(struct cpp-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public CSV lexer.
 (struct csv-config (profile trivia source-positions errors) #:transparent)
 
@@ -418,6 +428,15 @@
 
 ;; Profile defaults for the C lexer.
 (define c-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the C++ lexer.
+(define cpp-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -620,6 +639,33 @@
             resolved-trivia
             resolved-source-positions
             resolved-errors))
+
+;; make-cpp-config : keyword-arguments -> cpp-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-cpp-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref cpp-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-cpp-config
+                                       "unknown C++ lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (cpp-config profile
+              resolved-trivia
+              resolved-source-positions
+              resolved-errors))
 
 ;; make-csv-config : keyword-arguments -> csv-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

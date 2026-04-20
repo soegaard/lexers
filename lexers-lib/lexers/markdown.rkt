@@ -304,6 +304,8 @@
     (markdown-string->derived-tokens "```yaml\nname: Deploy\non:\n  push:\n```\n"))
   (define fenced-c-derived-tokens
     (markdown-string->derived-tokens "```c\n#include <stdio.h>\nint x = 1;\n```\n"))
+  (define fenced-cpp-derived-tokens
+    (markdown-string->derived-tokens "```cpp\n#include <vector>\nstd::string s;\n```\n"))
   (define derived-shell-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-shell)
@@ -352,6 +354,12 @@
                   (markdown-derived-token-has-tag? token 'c-preprocessor-directive)
                   (string=? (markdown-derived-token-text token) "include")))
            fenced-c-derived-tokens))
+  (define derived-cpp-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-cpp)
+                  (markdown-derived-token-has-tag? token 'cpp-preprocessor-directive)
+                  (string=? (markdown-derived-token-text token) "include")))
+           fenced-cpp-derived-tokens))
   (define fenced-racket-derived-tokens
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
   (define fenced-webracket-derived-tokens
@@ -493,6 +501,7 @@
   (check-not-false derived-tsv-token)
   (check-not-false derived-yaml-token)
   (check-not-false derived-c-token)
+  (check-not-false derived-cpp-token)
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
