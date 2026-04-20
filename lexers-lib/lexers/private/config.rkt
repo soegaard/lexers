@@ -239,6 +239,7 @@
          html-profile-defaults
          c-profile-defaults
          cpp-profile-defaults
+         objc-profile-defaults
          csv-profile-defaults
          tsv-profile-defaults
          yaml-profile-defaults
@@ -276,6 +277,12 @@
          cpp-config-source-positions
          cpp-config-errors
          make-cpp-config
+         objc-config?
+         objc-config-profile
+         objc-config-trivia
+         objc-config-source-positions
+         objc-config-errors
+         make-objc-config
          csv-config?
          csv-config-profile
          csv-config-trivia
@@ -369,6 +376,9 @@
 ;; A resolved configuration for the public C++ lexer.
 (struct cpp-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public Objective-C lexer.
+(struct objc-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public CSV lexer.
 (struct csv-config (profile trivia source-positions errors) #:transparent)
 
@@ -437,6 +447,15 @@
 
 ;; Profile defaults for the C++ lexer.
 (define cpp-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Objective-C lexer.
+(define objc-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -666,6 +685,33 @@
               resolved-trivia
               resolved-source-positions
               resolved-errors))
+
+;; make-objc-config : keyword-arguments -> objc-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-objc-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref objc-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-objc-config
+                                       "unknown Objective-C lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (objc-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
 
 ;; make-csv-config : keyword-arguments -> csv-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

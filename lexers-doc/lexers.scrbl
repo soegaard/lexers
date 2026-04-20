@@ -14,6 +14,7 @@
                      lexers/html
                      lexers/json
                      lexers/markdown
+                     lexers/objc
                      lexers/python
                      lexers/racket
                      lexers/rhombus
@@ -88,6 +89,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/json))
+     the-eval))
+
+@(define objc-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/objc))
      the-eval))
 
 @(define yaml-eval
@@ -179,6 +188,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
+ @item{@racketmodname[lexers/objc]}
  @item{@racketmodname[lexers/python]}
  @item{@racketmodname[lexers/racket]}
  @item{@racketmodname[lexers/rhombus]}
@@ -275,7 +285,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[html-string->tokens], @racket[make-json-lexer],
 @racket[json-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
-@racket[markdown-string->tokens], @racket[make-python-lexer],
+@racket[markdown-string->tokens], @racket[make-objc-lexer],
+@racket[objc-string->tokens], @racket[make-python-lexer],
 @racket[python-string->tokens], @racket[make-racket-lexer],
 @racket[racket-string->tokens], @racket[make-rhombus-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
@@ -1434,6 +1445,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-csv]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
+ @item{@racket['embedded-objc]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
  @item{@racket['embedded-shell]}
@@ -1447,7 +1459,7 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
-@racket['embedded-javascript], @racket['embedded-json],
+@racket['embedded-javascript], @racket['embedded-json], @racket['embedded-objc],
 @racket['embedded-python], @racket['embedded-racket], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tsv], @racket['embedded-wat], or
 @racket['embedded-yaml].
@@ -1464,6 +1476,126 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{Objective-C}
+
+@defmodule[lexers/objc]
+
+The projected Objective-C API has two entry points:
+
+@itemlist[
+ @item{@racket[make-objc-lexer] for streaming tokenization from an input port.}
+ @item{@racket[objc-string->tokens] for eager tokenization of an entire string.}]
+
+The first Objective-C implementation is a handwritten streaming lexer grounded
+in the language's lexical surface and existing Objective-C lexer prior art. It
+is preprocessor-aware and covers comments, identifiers, C / Objective-C
+keywords, at-sign Objective-C keywords, Objective-C strings, object-literal
+introducers, numbers, operators, and delimiters.
+
+@defproc[(make-objc-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Objective-C lexer.
+
+Projected Objective-C categories include @racket['comment],
+@racket['whitespace], @racket['keyword], @racket['identifier],
+@racket['literal], @racket['operator], @racket['delimiter], and
+@racket['unknown].
+
+@examples[#:eval objc-eval
+(define lexer
+  (make-objc-lexer #:profile 'coloring))
+(define in
+  (open-input-string "@interface Foo : NSObject\n@property NSString *name;\n@end\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(objc-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Objective-C
+tokens.}
+
+The derived Objective-C API provides reusable language-specific structure:
+
+@defproc[(make-objc-derived-lexer)
+         (input-port? . -> . (or/c objc-derived-token? 'eof))]{
+Constructs a streaming Objective-C lexer that returns derived Objective-C
+tokens.}
+
+@defproc[(objc-string->derived-tokens [source string?])
+         (listof objc-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Objective-C
+tokens.}
+
+@defproc[(objc-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Objective-C tokens.}
+
+@defproc[(objc-derived-token-tags [token objc-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(objc-derived-token-has-tag? [token objc-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(objc-derived-token-text [token objc-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(objc-derived-token-start [token objc-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(objc-derived-token-end [token objc-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Objective-C-specific derived tags include:
+
+@itemlist[
+ @item{@racket['objc-comment]}
+ @item{@racket['objc-whitespace]}
+ @item{@racket['objc-keyword]}
+ @item{@racket['objc-at-keyword]}
+ @item{@racket['objc-identifier]}
+ @item{@racket['objc-string-literal]}
+ @item{@racket['objc-char-literal]}
+ @item{@racket['objc-numeric-literal]}
+ @item{@racket['objc-operator]}
+ @item{@racket['objc-delimiter]}
+ @item{@racket['objc-preprocessor-directive]}
+ @item{@racket['objc-header-name]}
+ @item{@racket['objc-literal-introducer]}
+ @item{@racket['objc-line-splice]}
+ @item{@racket['objc-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed Objective-C input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{objc}, @tt{objective-c},
+@tt{objectivec}, or @tt{obj-c} delegate to @racketmodname[lexers/objc].
+Wrapped delegated Markdown tokens preserve Objective-C-derived tags and gain
+@racket['embedded-objc].}
+
+@defthing[objc-profiles immutable-hash?]{
+The profile defaults used by the Objective-C lexer.}
 
 @section{Python}
 

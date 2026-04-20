@@ -12,6 +12,7 @@ The library currently provides public lexer modules for:
 - `lexers/json`
 - `lexers/javascript`
 - `lexers/markdown`
+- `lexers/objc`
 - `lexers/python`
 - `lexers/racket`
 - `lexers/rhombus`

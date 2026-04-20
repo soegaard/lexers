@@ -41,6 +41,7 @@
          "../html.rkt"
          "../javascript.rkt"
          "../json.rkt"
+         "../objc.rkt"
          "../python.rkt"
          "../racket.rkt"
          "../shell.rkt"
@@ -112,6 +113,7 @@
           (member 'parameter-name tags)
           (member 'property-name tags)
           (member 'object-key tags)
+          (member 'objc-identifier tags)
           (member 'method-name tags)
           (member 'private-name tags)
           (member 'json-object-key tags)
@@ -273,6 +275,7 @@
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
+    [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
     [(member primary '("python" "py"))   'python]
     [(member primary '("swift"))         'swift]
     [(member primary '("tsv"))           'tsv]
@@ -363,6 +366,15 @@
                           json-derived-token-end
                           json-derived-token-tags
                           '(embedded-json markdown-code-block))]
+    [(objc)
+     (wrap-derived-tokens (objc-string->derived-tokens body)
+                          body-start
+                          starts
+                          objc-derived-token-text
+                          objc-derived-token-start
+                          objc-derived-token-end
+                          objc-derived-token-tags
+                          '(embedded-objc markdown-code-block))]
     [(python)
      (wrap-derived-tokens (python-string->derived-tokens body)
                           body-start
