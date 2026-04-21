@@ -15,6 +15,7 @@ The library currently provides public lexer modules for:
 - `lexers/latex`
 - `lexers/markdown`
 - `lexers/objc`
+- `lexers/pascal`
 - `lexers/plist`
 - `lexers/python`
 - `lexers/racket`

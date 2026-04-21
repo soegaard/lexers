@@ -17,6 +17,7 @@
                      lexers/makefile
                      lexers/markdown
                      lexers/objc
+                     lexers/pascal
                      lexers/plist
                      lexers/python
                      lexers/racket
@@ -128,6 +129,14 @@
                          lexers/objc))
      the-eval))
 
+@(define pascal-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/pascal))
+     the-eval))
+
 @(define yaml-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -236,6 +245,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/objc]}
+ @item{@racketmodname[lexers/pascal]}
  @item{@racketmodname[lexers/plist]}
  @item{@racketmodname[lexers/python]}
  @item{@racketmodname[lexers/racket]}
@@ -1681,6 +1691,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-makefile]}
  @item{@racket['embedded-latex]}
  @item{@racket['embedded-objc]}
+ @item{@racket['embedded-pascal]}
  @item{@racket['embedded-plist]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
@@ -1699,7 +1710,7 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
-@racket['embedded-plist], @racket['embedded-python],
+@racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
 @racket['embedded-racket], @racket['embedded-rust], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
 @racket['embedded-wat], or @racket['embedded-yaml].
@@ -1836,6 +1847,116 @@ Wrapped delegated Markdown tokens preserve Objective-C-derived tags and gain
 
 @defthing[objc-profiles immutable-hash?]{
 The profile defaults used by the Objective-C lexer.}
+
+@section{Pascal}
+
+@defmodule[lexers/pascal]
+
+The projected Pascal API has two entry points:
+
+@itemlist[
+ @item{@racket[make-pascal-lexer] for streaming tokenization from an input port.}
+ @item{@racket[pascal-string->tokens] for eager tokenization of an entire string.}]
+
+The first Pascal implementation is a handwritten streaming lexer grounded in
+the Free Pascal token reference. It covers whitespace, three comment forms,
+identifiers, escaped reserved-word identifiers, reserved words, numeric
+literals, strings, control-string fragments, operators, and delimiters.
+
+@defproc[(make-pascal-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                            [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Pascal lexer.
+
+Projected Pascal categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval pascal-eval
+(define lexer
+  (make-pascal-lexer #:profile 'coloring))
+(define in
+  (open-input-string "program Test;\nvar &do: Integer;\nbegin\nend.\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(pascal-string->tokens [source string?]
+                                [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Pascal tokens.}
+
+The derived Pascal API provides reusable language-specific structure:
+
+@defproc[(make-pascal-derived-lexer)
+         (input-port? . -> . (or/c pascal-derived-token? 'eof))]{
+Constructs a streaming Pascal lexer that returns derived Pascal tokens.}
+
+@defproc[(pascal-string->derived-tokens [source string?])
+         (listof pascal-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Pascal tokens.}
+
+@defproc[(pascal-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Pascal tokens.}
+
+@defproc[(pascal-derived-token-tags [token pascal-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(pascal-derived-token-has-tag? [token pascal-derived-token?]
+                                        [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(pascal-derived-token-text [token pascal-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(pascal-derived-token-start [token pascal-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(pascal-derived-token-end [token pascal-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Pascal-specific derived tags include:
+
+@itemlist[
+ @item{@racket['pascal-comment]}
+ @item{@racket['pascal-whitespace]}
+ @item{@racket['pascal-keyword]}
+ @item{@racket['pascal-identifier]}
+ @item{@racket['pascal-escaped-identifier]}
+ @item{@racket['pascal-string-literal]}
+ @item{@racket['pascal-control-string]}
+ @item{@racket['pascal-numeric-literal]}
+ @item{@racket['pascal-operator]}
+ @item{@racket['pascal-delimiter]}
+ @item{@racket['malformed-token]}]
+
+Malformed Pascal input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{pascal}, @tt{pas}, @tt{delphi}, and
+@tt{objectpascal} delegate to @racketmodname[lexers/pascal]. Wrapped
+delegated Markdown tokens preserve Pascal-derived tags and gain
+@racket['embedded-pascal].}
+
+@defthing[pascal-profiles immutable-hash?]{
+The profile defaults used by the Pascal lexer.}
 
 @section{Python}
 

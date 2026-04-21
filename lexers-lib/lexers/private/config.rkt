@@ -22,6 +22,8 @@
 ;;   Default settings for named JSON lexer profiles.
 ;; plist-profile-defaults : immutable-hash?
 ;;   Default settings for named plist lexer profiles.
+;; pascal-profile-defaults : immutable-hash?
+;;   Default settings for named Pascal lexer profiles.
 ;; tex-profile-defaults : immutable-hash?
 ;;   Default settings for named TeX lexer profiles.
 ;; makefile-profile-defaults : immutable-hash?
@@ -141,6 +143,18 @@
 ;; plist-config-errors   : plist-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-plist-config     : keyword-arguments -> plist-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; pascal-config?        : any/c -> boolean?
+;;   Recognize Pascal lexer configuration values.
+;; pascal-config-profile : pascal-config? -> symbol?
+;;   Extract the configured profile name.
+;; pascal-config-trivia  : pascal-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; pascal-config-source-positions : pascal-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; pascal-config-errors  : pascal-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-pascal-config    : keyword-arguments -> pascal-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; tex-config?           : any/c -> boolean?
 ;;   Recognize TeX lexer configuration values.
@@ -291,6 +305,7 @@
          yaml-profile-defaults
          json-profile-defaults
          plist-profile-defaults
+         pascal-profile-defaults
          tex-profile-defaults
          makefile-profile-defaults
          rust-profile-defaults
@@ -363,6 +378,12 @@
          plist-config-source-positions
          plist-config-errors
          make-plist-config
+         pascal-config?
+         pascal-config-profile
+         pascal-config-trivia
+         pascal-config-source-positions
+         pascal-config-errors
+         make-pascal-config
          tex-config?
          tex-config-profile
          tex-config-trivia
@@ -467,6 +488,9 @@
 
 ;; A resolved configuration for the public plist lexer.
 (struct plist-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Pascal lexer.
+(struct pascal-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public TeX lexer.
 (struct tex-config (profile trivia source-positions errors) #:transparent)
@@ -587,6 +611,15 @@
 
 ;; Profile defaults for the plist lexer.
 (define plist-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Pascal lexer.
+(define pascal-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -969,6 +1002,33 @@
                 resolved-trivia
                 resolved-source-positions
                 resolved-errors))
+
+;; make-pascal-config : keyword-arguments -> pascal-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-pascal-config #:profile          [profile 'coloring]
+                            #:trivia           [trivia 'profile-default]
+                            #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref pascal-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-pascal-config
+                                       "unknown Pascal lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (pascal-config profile
+                 resolved-trivia
+                 resolved-source-positions
+                 resolved-errors))
 
 ;; make-tex-config : keyword-arguments -> tex-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

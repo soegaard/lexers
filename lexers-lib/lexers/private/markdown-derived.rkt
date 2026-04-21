@@ -43,6 +43,7 @@
          "../json.rkt"
          "../makefile.rkt"
          "../latex.rkt"
+         "../pascal.rkt"
          "../plist.rkt"
          "../objc.rkt"
          "../python.rkt"
@@ -122,6 +123,8 @@
           (member 'method-name tags)
           (member 'private-name tags)
           (member 'json-object-key tags)
+          (member 'pascal-identifier tags)
+          (member 'pascal-escaped-identifier tags)
           (member 'cpp-identifier tags)
           (member 'at-rule-name tags)
           (member 'function-name tags)
@@ -174,6 +177,9 @@
           (member 'json-true tags)
           (member 'json-false tags)
           (member 'json-null tags)
+          (member 'pascal-string-literal tags)
+          (member 'pascal-control-string tags)
+          (member 'pascal-numeric-literal tags)
           (member 'racket-string tags)
           (member 'racket-constant tags)
           (member 'racket-hash-colon-keyword tags)
@@ -216,12 +222,14 @@
           (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
+          (member 'pascal-keyword tags)
           (member 'rust-keyword tags)
           (member 'shell-keyword tags)
           (member 'shell-builtin tags))
       '(keyword)]
     [(or (member 'delimiter tags)
           (member 'c-delimiter tags)
+          (member 'pascal-delimiter tags)
           (member 'rust-delimiter tags)
           (member 'csv-separator tags)
           (member 'csv-row-separator tags)
@@ -246,6 +254,7 @@
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
      '(delimiter)]
      [(or (member 'c-operator tags)
+          (member 'pascal-operator tags)
           (member 'rust-punctuation tags)
           (member 'swift-operator tags))
       '(operator)]
@@ -302,6 +311,7 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
     [(member primary '("make" "makefile" "mk")) 'makefile]
+    [(member primary '("pascal" "pas" "delphi" "objectpascal")) 'pascal]
     [(member primary '("plist"))         'plist]
     [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
     [(member primary '("python" "py"))   'python]
@@ -406,6 +416,15 @@
                           makefile-derived-token-end
                           makefile-derived-token-tags
                           '(embedded-makefile markdown-code-block))]
+    [(pascal)
+     (wrap-derived-tokens (pascal-string->derived-tokens body)
+                          body-start
+                          starts
+                          pascal-derived-token-text
+                          pascal-derived-token-start
+                          pascal-derived-token-end
+                          pascal-derived-token-tags
+                          '(embedded-pascal markdown-code-block))]
     [(plist)
      (wrap-derived-tokens (plist-string->derived-tokens body)
                           body-start
