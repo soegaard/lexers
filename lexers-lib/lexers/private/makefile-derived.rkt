@@ -34,6 +34,7 @@
          racket/list
          racket/set
          racket/string
+         "../shell.rkt"
          "parser-tools-compat.rkt")
 
 ;; A Makefile token plus reusable tags.
@@ -410,6 +411,41 @@
   (define (emit-range! start end tags)
     (emit! (substring line start end) tags))
 
+  ;; shell-tags->makefile-tags : (listof symbol?) -> (listof symbol?)
+  ;;   Add Makefile recipe tags to delegated shell tags.
+  (define (shell-tags->makefile-tags tags)
+    (append tags '(makefile-recipe embedded-shell)))
+
+  ;; emit-shell-chunk! : string? -> void?
+  ;;   Delegate one non-Make expansion chunk to the shell lexer.
+  (define (emit-shell-chunk! text)
+    (for ([token (in-list (shell-string->derived-tokens text #:shell 'bash))])
+      (emit! (shell-derived-token-text token)
+             (shell-tags->makefile-tags
+              (shell-derived-token-tags token)))))
+
+  ;; emit-recipe-body! : exact-nonnegative-integer? exact-nonnegative-integer? -> void?
+  ;;   Tokenize one recipe-body slice using shell delegation plus Make expansions.
+  (define (emit-recipe-body! start end)
+    (let loop ([cursor start] [chunk-start start])
+      (cond
+        [(>= cursor end)
+         (when (< chunk-start end)
+           (emit-shell-chunk! (substring line chunk-start end)))]
+        [(char=? (string-ref line cursor) #\$)
+         (when (< chunk-start cursor)
+           (emit-shell-chunk! (substring line chunk-start cursor)))
+         (define ref-length
+           (variable-reference-length line cursor))
+         (define ref-end
+           (min end (+ cursor ref-length)))
+         (emit-range! cursor
+                      ref-end
+                      '(identifier makefile-variable-reference makefile-recipe))
+         (loop ref-end ref-end)]
+        [else
+         (loop (add1 cursor) chunk-start)])))
+
   ;; next-special-index : exact-nonnegative-integer? -> exact-nonnegative-integer?
   ;;   Find the next structural character worth splitting on.
   (define (next-special-index start)
@@ -457,9 +493,8 @@
       [(and rule-colon-index
             (< start rule-colon-index))
        (emit! text '(identifier makefile-rule-target))]
-      [(or recipe-line?
-           (and (> end start)
-                (word-char? (string-ref text 0))))
+      [(and (> end start)
+            (word-char? (string-ref text 0)))
        (emit! text '(identifier))]
       [else
        (emit! text '(literal))]))
@@ -472,6 +507,14 @@
        (define ch
          (string-ref line index))
        (cond
+         [recipe-line?
+          (cond
+            [(= index 0)
+             (emit! "\t" '(whitespace makefile-recipe-prefix makefile-recipe))
+             (loop)]
+            [else
+             (emit-recipe-body! index length)
+             (reverse tokens)])]
          [(or (inline-whitespace-char? ch)
               (newline-char? ch))
           (define end

@@ -47,6 +47,7 @@
          "../objc.rkt"
          "../python.rkt"
          "../racket.rkt"
+         "../rust.rkt"
          "../shell.rkt"
          "../scribble.rkt"
          "../swift.rkt"
@@ -140,6 +141,9 @@
           (member 'shell-word tags)
           (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'rust-identifier tags)
+          (member 'rust-raw-identifier tags)
+          (member 'rust-lifetime tags)
           (member 'tex-control-word tags)
           (member 'tex-control-symbol tags)
           (member 'swift-identifier tags)
@@ -185,6 +189,13 @@
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'rust-string-literal tags)
+          (member 'rust-raw-string-literal tags)
+          (member 'rust-char-literal tags)
+          (member 'rust-byte-literal tags)
+          (member 'rust-byte-string-literal tags)
+          (member 'rust-c-string-literal tags)
+          (member 'rust-numeric-literal tags)
           (member 'tex-text tags)
           (member 'swift-string-literal tags)
           (member 'swift-numeric-literal tags)
@@ -205,11 +216,13 @@
           (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
+          (member 'rust-keyword tags)
           (member 'shell-keyword tags)
           (member 'shell-builtin tags))
       '(keyword)]
     [(or (member 'delimiter tags)
           (member 'c-delimiter tags)
+          (member 'rust-delimiter tags)
           (member 'csv-separator tags)
           (member 'csv-row-separator tags)
           (member 'yaml-document-marker tags)
@@ -233,6 +246,7 @@
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
      '(delimiter)]
      [(or (member 'c-operator tags)
+          (member 'rust-punctuation tags)
           (member 'swift-operator tags))
       '(operator)]
      [(regexp-match? #px"^[=+\\-*/!&|%^~]+$" text)
@@ -291,6 +305,7 @@
     [(member primary '("plist"))         'plist]
     [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
     [(member primary '("python" "py"))   'python]
+    [(member primary '("rust" "rs"))     'rust]
     [(member primary '("swift"))         'swift]
     [(member primary '("tex"))           'tex]
     [(member primary '("latex"))         'latex]
@@ -418,6 +433,15 @@
                           python-derived-token-end
                           python-derived-token-tags
                           '(embedded-python markdown-code-block))]
+    [(rust)
+     (wrap-derived-tokens (rust-string->derived-tokens body)
+                          body-start
+                          starts
+                          rust-derived-token-text
+                          rust-derived-token-start
+                          rust-derived-token-end
+                          rust-derived-token-tags
+                          '(embedded-rust markdown-code-block))]
     [(yaml)
      (wrap-derived-tokens (yaml-string->derived-tokens body)
                           body-start

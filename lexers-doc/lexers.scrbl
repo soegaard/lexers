@@ -21,6 +21,7 @@
                      lexers/python
                      lexers/racket
                      lexers/rhombus
+                     lexers/rust
                      lexers/shell
                      lexers/scribble
                      lexers/swift
@@ -151,6 +152,14 @@
                          lexers/racket))
      the-eval))
 
+@(define rust-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/rust))
+     the-eval))
+
 @(define shell-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -231,6 +240,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/python]}
  @item{@racketmodname[lexers/racket]}
  @item{@racketmodname[lexers/rhombus]}
+ @item{@racketmodname[lexers/rust]}
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/swift]}
@@ -1674,6 +1684,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-plist]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
+ @item{@racket['embedded-rust]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
  @item{@racket['embedded-swift]}
@@ -1689,7 +1700,7 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
 @racket['embedded-plist], @racket['embedded-python],
-@racket['embedded-racket], @racket['embedded-shell],
+@racket['embedded-racket], @racket['embedded-rust], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
 @racket['embedded-wat], or @racket['embedded-yaml].
 
@@ -2082,6 +2093,122 @@ Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
 
 @defthing[shell-profiles immutable-hash?]{
 The profile defaults used by the shell lexer.}
+
+@section{Rust}
+
+@defmodule[lexers/rust]
+
+The projected Rust API has two entry points:
+
+@itemlist[
+ @item{@racket[make-rust-lexer] for streaming tokenization from an input port.}
+ @item{@racket[rust-string->tokens] for eager tokenization of an entire string.}]
+
+The first Rust implementation is a handwritten streaming lexer grounded in the
+Rust lexical structure reference. It covers whitespace, line and nested block
+comments, identifiers, raw identifiers, keywords, lifetimes, strings, raw
+strings, character and byte literals, numeric literals, punctuation, and
+delimiters.
+
+@defproc[(make-rust-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Rust lexer.
+
+Projected Rust categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval rust-eval
+(define lexer
+  (make-rust-lexer #:profile 'coloring))
+(define in
+  (open-input-string "fn main() {\n    let r#type = 42u32;\n}\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(rust-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Rust tokens.}
+
+The derived Rust API provides reusable language-specific structure:
+
+@defproc[(make-rust-derived-lexer)
+         (input-port? . -> . (or/c rust-derived-token? 'eof))]{
+Constructs a streaming Rust lexer that returns derived Rust tokens.}
+
+@defproc[(rust-string->derived-tokens [source string?])
+         (listof rust-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Rust tokens.}
+
+@defproc[(rust-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Rust tokens.}
+
+@defproc[(rust-derived-token-tags [token rust-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(rust-derived-token-has-tag? [token rust-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(rust-derived-token-text [token rust-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(rust-derived-token-start [token rust-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(rust-derived-token-end [token rust-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Rust-specific derived tags include:
+
+@itemlist[
+ @item{@racket['rust-comment]}
+ @item{@racket['rust-doc-comment]}
+ @item{@racket['rust-whitespace]}
+ @item{@racket['rust-keyword]}
+ @item{@racket['rust-identifier]}
+ @item{@racket['rust-raw-identifier]}
+ @item{@racket['rust-lifetime]}
+ @item{@racket['rust-string-literal]}
+ @item{@racket['rust-raw-string-literal]}
+ @item{@racket['rust-char-literal]}
+ @item{@racket['rust-byte-literal]}
+ @item{@racket['rust-byte-string-literal]}
+ @item{@racket['rust-c-string-literal]}
+ @item{@racket['rust-numeric-literal]}
+ @item{@racket['rust-punctuation]}
+ @item{@racket['rust-delimiter]}
+ @item{@racket['malformed-token]}]
+
+Malformed Rust input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{rust} or @tt{rs} delegate to
+@racketmodname[lexers/rust]. Wrapped delegated Markdown tokens preserve
+Rust-derived tags and gain @racket['embedded-rust].}
+
+@defthing[rust-profiles immutable-hash?]{
+The profile defaults used by the Rust lexer.}
 
 @section{Swift}
 

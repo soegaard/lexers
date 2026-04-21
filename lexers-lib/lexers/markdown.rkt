@@ -302,6 +302,8 @@
     (markdown-string->derived-tokens "```csv\nname,age\nAda,37\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
+  (define fenced-rust-derived-tokens
+    (markdown-string->derived-tokens "```rust\nfn main() { let r#type = 42; }\n```\n"))
   (define fenced-swift-derived-tokens
     (markdown-string->derived-tokens "```swift\nimport UIKit\nlet value = 42\n```\n"))
   (define fenced-tex-derived-tokens
@@ -358,6 +360,12 @@
                   (markdown-derived-token-has-tag? token 'python-keyword)
                   (string=? (markdown-derived-token-text token) "def")))
            fenced-python-derived-tokens))
+  (define derived-rust-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-rust)
+                  (markdown-derived-token-has-tag? token 'rust-keyword)
+                  (string=? (markdown-derived-token-text token) "fn")))
+           fenced-rust-derived-tokens))
   (define derived-swift-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-swift)
@@ -540,6 +548,7 @@
   (check-not-false derived-objc-token)
   (check-not-false derived-csv-token)
   (check-not-false derived-python-token)
+  (check-not-false derived-rust-token)
   (check-not-false derived-swift-token)
   (check-not-false derived-tex-token)
   (check-not-false derived-latex-token)

@@ -26,6 +26,8 @@
 ;;   Default settings for named TeX lexer profiles.
 ;; makefile-profile-defaults : immutable-hash?
 ;;   Default settings for named Makefile lexer profiles.
+;; rust-profile-defaults : immutable-hash?
+;;   Default settings for named Rust lexer profiles.
 ;; swift-profile-defaults : immutable-hash?
 ;;   Default settings for named Swift lexer profiles.
 ;; python-profile-defaults : immutable-hash?
@@ -164,6 +166,18 @@
 ;;   Extract the configured error policy.
 ;; make-makefile-config  : keyword-arguments -> makefile-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; rust-config?          : any/c -> boolean?
+;;   Recognize Rust lexer configuration values.
+;; rust-config-profile   : rust-config? -> symbol?
+;;   Extract the configured profile name.
+;; rust-config-trivia    : rust-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; rust-config-source-positions : rust-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; rust-config-errors    : rust-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-rust-config      : keyword-arguments -> rust-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; make-swift-config     : keyword-arguments -> swift-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; python-config?        : any/c -> boolean?
@@ -279,6 +293,7 @@
          plist-profile-defaults
          tex-profile-defaults
          makefile-profile-defaults
+         rust-profile-defaults
          swift-profile-defaults
          python-profile-defaults
          rhombus-profile-defaults
@@ -360,6 +375,12 @@
          makefile-config-source-positions
          makefile-config-errors
          make-makefile-config
+         rust-config?
+         rust-config-profile
+         rust-config-trivia
+         rust-config-source-positions
+         rust-config-errors
+         make-rust-config
          swift-config?
          swift-config-profile
          swift-config-trivia
@@ -452,6 +473,9 @@
 
 ;; A resolved configuration for the public Makefile lexer.
 (struct makefile-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Rust lexer.
+(struct rust-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Swift lexer.
 (struct swift-config (profile trivia source-positions errors) #:transparent)
@@ -581,6 +605,15 @@
 
 ;; Profile defaults for the Makefile lexer.
 (define makefile-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Rust lexer.
+(define rust-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -990,6 +1023,33 @@
                    resolved-trivia
                    resolved-source-positions
                    resolved-errors))
+
+;; make-rust-config : keyword-arguments -> rust-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-rust-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref rust-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-rust-config
+                                       "unknown Rust lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (rust-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
 
 ;; make-swift-config : keyword-arguments -> swift-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

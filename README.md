@@ -19,6 +19,7 @@ The library currently provides public lexer modules for:
 - `lexers/python`
 - `lexers/racket`
 - `lexers/rhombus`
+- `lexers/rust`
 - `lexers/shell`
 - `lexers/scribble`
 - `lexers/swift`

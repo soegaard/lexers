@@ -186,6 +186,28 @@
     (findf (lambda (token)
              (makefile-derived-token-has-tag? token 'makefile-variable-reference))
            sample-derived))
+  (define recipe-shell-token
+    (findf (lambda (token)
+             (and (makefile-derived-token-has-tag? token 'makefile-recipe)
+                  (makefile-derived-token-has-tag? token 'shell-option)
+                  (string=? (makefile-derived-token-text token) "-o")))
+           sample-derived))
+  (define shell-recipe-source
+    "APP = scribble-tools\n.PHONY: docs test\ndocs:\n\traco scribble +m --html --dest html scribblings/scribble-tools.scrbl\n\ntest:\n\traco test private/lang-code.rkt\n")
+  (define shell-recipe-derived
+    (makefile-string->derived-tokens shell-recipe-source))
+  (define shell-recipe-raco-token
+    (findf (lambda (token)
+             (and (makefile-derived-token-has-tag? token 'makefile-recipe)
+                  (makefile-derived-token-has-tag? token 'identifier)
+                  (string=? (makefile-derived-token-text token) "raco")))
+           shell-recipe-derived))
+  (define shell-recipe-command-token
+    (findf (lambda (token)
+             (and (makefile-derived-token-has-tag? token 'makefile-recipe)
+                  (makefile-derived-token-has-tag? token 'shell-builtin)
+                  (string=? (makefile-derived-token-text token) "test")))
+           shell-recipe-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(identifier whitespace operator whitespace identifier whitespace identifier delimiter))
@@ -195,6 +217,9 @@
   (check-not-false assignment-token)
   (check-not-false target-token)
   (check-not-false recipe-ref-token)
+  (check-not-false recipe-shell-token)
+  (check-not-false shell-recipe-raco-token)
+  (check-not-false shell-recipe-command-token)
   (check-equal? (makefile-derived-token-text directive-token)
                 "include")
   (check-equal? (makefile-derived-token-text assignment-token)
