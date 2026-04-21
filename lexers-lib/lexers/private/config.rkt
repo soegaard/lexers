@@ -20,6 +20,8 @@
 ;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
+;; plist-profile-defaults : immutable-hash?
+;;   Default settings for named plist lexer profiles.
 ;; makefile-profile-defaults : immutable-hash?
 ;;   Default settings for named Makefile lexer profiles.
 ;; swift-profile-defaults : immutable-hash?
@@ -123,6 +125,18 @@
 ;; json-config-errors    : json-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-json-config      : keyword-arguments -> json-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; plist-config?         : any/c -> boolean?
+;;   Recognize plist lexer configuration values.
+;; plist-config-profile  : plist-config? -> symbol?
+;;   Extract the configured profile name.
+;; plist-config-trivia   : plist-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; plist-config-source-positions : plist-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; plist-config-errors   : plist-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-plist-config     : keyword-arguments -> plist-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; swift-config?         : any/c -> boolean?
 ;;   Recognize Swift lexer configuration values.
@@ -248,6 +262,7 @@
          tsv-profile-defaults
          yaml-profile-defaults
          json-profile-defaults
+         plist-profile-defaults
          makefile-profile-defaults
          swift-profile-defaults
          python-profile-defaults
@@ -312,6 +327,12 @@
          json-config-source-positions
          json-config-errors
          make-json-config
+         plist-config?
+         plist-config-profile
+         plist-config-trivia
+         plist-config-source-positions
+         plist-config-errors
+         make-plist-config
          makefile-config?
          makefile-config-profile
          makefile-config-trivia
@@ -401,6 +422,9 @@
 
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public plist lexer.
+(struct plist-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Makefile lexer.
 (struct makefile-config (profile trivia source-positions errors) #:transparent)
@@ -506,6 +530,15 @@
 
 ;; Profile defaults for the JSON lexer.
 (define json-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the plist lexer.
+(define plist-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -843,6 +876,33 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-plist-config : keyword-arguments -> plist-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-plist-config #:profile          [profile 'coloring]
+                           #:trivia           [trivia 'profile-default]
+                           #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref plist-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-plist-config
+                                       "unknown plist lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (plist-config profile
+                resolved-trivia
+                resolved-source-positions
+                resolved-errors))
 
 ;; make-makefile-config : keyword-arguments -> makefile-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

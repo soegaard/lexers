@@ -42,6 +42,7 @@
          "../javascript.rkt"
          "../json.rkt"
          "../makefile.rkt"
+         "../plist.rkt"
          "../objc.rkt"
          "../python.rkt"
          "../racket.rkt"
@@ -277,6 +278,7 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
     [(member primary '("make" "makefile" "mk")) 'makefile]
+    [(member primary '("plist"))         'plist]
     [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
     [(member primary '("python" "py"))   'python]
     [(member primary '("swift"))         'swift]
@@ -377,6 +379,15 @@
                           makefile-derived-token-end
                           makefile-derived-token-tags
                           '(embedded-makefile markdown-code-block))]
+    [(plist)
+     (wrap-derived-tokens (plist-string->derived-tokens body)
+                          body-start
+                          starts
+                          plist-derived-token-text
+                          plist-derived-token-start
+                          plist-derived-token-end
+                          plist-derived-token-tags
+                          '(embedded-plist markdown-code-block))]
     [(objc)
      (wrap-derived-tokens (objc-string->derived-tokens body)
                           body-start

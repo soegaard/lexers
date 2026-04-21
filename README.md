@@ -14,6 +14,7 @@ The library currently provides public lexer modules for:
 - `lexers/makefile`
 - `lexers/markdown`
 - `lexers/objc`
+- `lexers/plist`
 - `lexers/python`
 - `lexers/racket`
 - `lexers/rhombus`
