@@ -304,6 +304,10 @@
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
   (define fenced-swift-derived-tokens
     (markdown-string->derived-tokens "```swift\nimport UIKit\nlet value = 42\n```\n"))
+  (define fenced-tex-derived-tokens
+    (markdown-string->derived-tokens "```tex\n\\textbf{Hi} $x$\n```\n"))
+  (define fenced-latex-derived-tokens
+    (markdown-string->derived-tokens "```latex\n\\section{Hi}\n\\begin{itemize}\n\\item One\n\\end{itemize}\n```\n"))
   (define fenced-tsv-derived-tokens
     (markdown-string->derived-tokens "```tsv\nname\tage\nAda\t37\n```\n"))
   (define fenced-yaml-derived-tokens
@@ -360,6 +364,18 @@
                   (markdown-derived-token-has-tag? token 'swift-keyword)
                   (string=? (markdown-derived-token-text token) "import")))
            fenced-swift-derived-tokens))
+  (define derived-tex-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-tex)
+                  (markdown-derived-token-has-tag? token 'tex-control-word)
+                  (string=? (markdown-derived-token-text token) "\\textbf")))
+           fenced-tex-derived-tokens))
+  (define derived-latex-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-latex)
+                  (markdown-derived-token-has-tag? token 'latex-command)
+                  (string=? (markdown-derived-token-text token) "\\section")))
+           fenced-latex-derived-tokens))
   (define derived-tsv-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-tsv)
@@ -525,6 +541,8 @@
   (check-not-false derived-csv-token)
   (check-not-false derived-python-token)
   (check-not-false derived-swift-token)
+  (check-not-false derived-tex-token)
+  (check-not-false derived-latex-token)
   (check-not-false derived-tsv-token)
   (check-not-false derived-yaml-token)
   (check-not-false derived-c-token)

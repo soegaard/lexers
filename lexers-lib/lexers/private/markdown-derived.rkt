@@ -42,6 +42,7 @@
          "../javascript.rkt"
          "../json.rkt"
          "../makefile.rkt"
+         "../latex.rkt"
          "../plist.rkt"
          "../objc.rkt"
          "../python.rkt"
@@ -49,6 +50,7 @@
          "../shell.rkt"
          "../scribble.rkt"
          "../swift.rkt"
+         "../tex.rkt"
          "../tsv.rkt"
          "../wat.rkt"
          "../yaml.rkt"
@@ -138,6 +140,8 @@
           (member 'shell-word tags)
           (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'tex-control-word tags)
+          (member 'tex-control-symbol tags)
           (member 'swift-identifier tags)
           (member 'tsv-field tags)
           (member 'yaml-anchor tags)
@@ -181,6 +185,7 @@
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'tex-text tags)
           (member 'swift-string-literal tags)
           (member 'swift-numeric-literal tags)
           (member 'tsv-field tags)
@@ -197,6 +202,7 @@
     [(or (member 'wat-form tags)
           (member 'wat-type tags)
           (member 'wat-instruction tags)
+          (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
           (member 'shell-keyword tags)
@@ -218,6 +224,10 @@
           (member 'scribble-body-delimiter tags)
           (member 'scribble-optional-delimiter tags)
           (member 'shell-punctuation tags)
+          (member 'tex-math-shift tags)
+          (member 'tex-group-delimiter tags)
+          (member 'tex-optional-delimiter tags)
+          (member 'tex-special-character tags)
           (member 'tsv-separator tags)
           (member 'tsv-row-separator tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
@@ -282,6 +292,8 @@
     [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
     [(member primary '("python" "py"))   'python]
     [(member primary '("swift"))         'swift]
+    [(member primary '("tex"))           'tex]
+    [(member primary '("latex"))         'latex]
     [(member primary '("tsv"))           'tsv]
     [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
@@ -487,6 +499,24 @@
                           swift-derived-token-end
                           swift-derived-token-tags
                           '(embedded-swift markdown-code-block))]
+    [(tex)
+     (wrap-derived-tokens (tex-string->derived-tokens body)
+                          body-start
+                          starts
+                          tex-derived-token-text
+                          tex-derived-token-start
+                          tex-derived-token-end
+                          tex-derived-token-tags
+                          '(embedded-tex markdown-code-block))]
+    [(latex)
+     (wrap-derived-tokens (latex-string->derived-tokens body)
+                          body-start
+                          starts
+                          latex-derived-token-text
+                          latex-derived-token-start
+                          latex-derived-token-end
+                          latex-derived-token-tags
+                          '(embedded-latex markdown-code-block))]
     [(tsv)
      (wrap-derived-tokens (tsv-string->derived-tokens body)
                           body-start

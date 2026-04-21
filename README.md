@@ -12,6 +12,7 @@ The library currently provides public lexer modules for:
 - `lexers/json`
 - `lexers/javascript`
 - `lexers/makefile`
+- `lexers/latex`
 - `lexers/markdown`
 - `lexers/objc`
 - `lexers/plist`
@@ -21,6 +22,7 @@ The library currently provides public lexer modules for:
 - `lexers/shell`
 - `lexers/scribble`
 - `lexers/swift`
+- `lexers/tex`
 - `lexers/tsv`
 - `lexers/wat`
 - `lexers/yaml`

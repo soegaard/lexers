@@ -13,6 +13,7 @@
                      lexers/css
                      lexers/html
                      lexers/json
+                     lexers/latex
                      lexers/makefile
                      lexers/markdown
                      lexers/objc
@@ -23,6 +24,7 @@
                      lexers/shell
                      lexers/scribble
                      lexers/swift
+                     lexers/tex
                      lexers/token
                      lexers/tsv
                      lexers/javascript
@@ -101,6 +103,14 @@
                          lexers/makefile))
      the-eval))
 
+@(define latex-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/latex))
+     the-eval))
+
 @(define plist-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -157,6 +167,14 @@
                          lexers/swift))
      the-eval))
 
+@(define tex-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/tex))
+     the-eval))
+
 @(define tsv-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -204,6 +222,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/css]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/json]}
+ @item{@racketmodname[lexers/latex]}
  @item{@racketmodname[lexers/makefile]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
@@ -215,6 +234,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/shell]}
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/swift]}
+ @item{@racketmodname[lexers/tex]}
  @item{@racketmodname[lexers/tsv]}
  @item{@racketmodname[lexers/wat]}
  @item{@racketmodname[lexers/yaml]}]
@@ -1649,6 +1669,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
  @item{@racket['embedded-makefile]}
+ @item{@racket['embedded-latex]}
  @item{@racket['embedded-objc]}
  @item{@racket['embedded-plist]}
  @item{@racket['embedded-python]}
@@ -1656,6 +1677,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
  @item{@racket['embedded-swift]}
+ @item{@racket['embedded-tex]}
  @item{@racket['embedded-tsv]}
  @item{@racket['embedded-wat]}
  @item{@racket['embedded-yaml]}
@@ -1665,11 +1687,11 @@ Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
 @racket['embedded-javascript], @racket['embedded-json],
-@racket['embedded-makefile], @racket['embedded-objc],
+@racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
 @racket['embedded-plist], @racket['embedded-python],
 @racket['embedded-racket], @racket['embedded-shell],
-@racket['embedded-swift], @racket['embedded-tsv], @racket['embedded-wat], or
-@racket['embedded-yaml].
+@racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
+@racket['embedded-wat], or @racket['embedded-yaml].
 
 @examples[#:eval markdown-eval
 (define derived-tokens
@@ -2167,6 +2189,187 @@ Malformed Swift input is handled using the shared profile rules:
 Markdown fenced code blocks labeled @tt{swift} delegate to
 @racketmodname[lexers/swift]. Wrapped delegated Markdown tokens preserve
 Swift-derived tags and gain @racket['embedded-swift].}
+
+@section{TeX}
+
+@defmodule[lexers/tex]
+
+The projected TeX API has two entry points:
+
+@itemlist[
+ @item{@racket[make-tex-lexer] for streaming tokenization from an input port.}
+ @item{@racket[tex-string->tokens] for eager tokenization of an entire string.}]
+
+The first TeX implementation is a handwritten streaming lexer grounded in TeX's
+tokenization model, but it intentionally stays within a practical static
+subset. It covers comments, whitespace, control words, control symbols, group
+and optional delimiters, math shifts, parameter markers, and plain text runs.
+
+@defproc[(make-tex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming TeX lexer.
+
+Projected TeX categories include @racket['comment], @racket['whitespace],
+@racket['identifier], @racket['literal], @racket['delimiter], and
+@racket['unknown].
+
+@examples[#:eval tex-eval
+(define lexer
+  (make-tex-lexer #:profile 'coloring))
+(define in
+  (open-input-string "\\section{Hi}\n$x+y$\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(tex-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected TeX tokens.}
+
+The derived TeX API provides reusable language-specific structure:
+
+@defproc[(make-tex-derived-lexer)
+         (input-port? . -> . (or/c tex-derived-token? 'eof))]{
+Constructs a streaming TeX lexer that returns derived TeX tokens.}
+
+@defproc[(tex-string->derived-tokens [source string?])
+         (listof tex-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived TeX tokens.}
+
+@defproc[(tex-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived TeX tokens.}
+
+@defproc[(tex-derived-token-tags [token tex-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(tex-derived-token-has-tag? [token tex-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(tex-derived-token-text [token tex-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(tex-derived-token-start [token tex-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(tex-derived-token-end [token tex-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable TeX-specific derived tags include:
+
+@itemlist[
+ @item{@racket['tex-comment]}
+ @item{@racket['tex-whitespace]}
+ @item{@racket['tex-control-word]}
+ @item{@racket['tex-control-symbol]}
+ @item{@racket['tex-parameter]}
+ @item{@racket['tex-text]}
+ @item{@racket['tex-math-shift]}
+ @item{@racket['tex-group-delimiter]}
+ @item{@racket['tex-optional-delimiter]}
+ @item{@racket['tex-special-character]}
+ @item{@racket['malformed-token]}]
+
+Markdown fenced code blocks labeled @tt{tex} delegate to
+@racketmodname[lexers/tex]. Wrapped delegated Markdown tokens preserve
+TeX-derived tags and gain @racket['embedded-tex].}
+
+@defthing[tex-profiles immutable-hash?]{
+The profile defaults used by the TeX lexer.}
+
+@section{LaTeX}
+
+@defmodule[lexers/latex]
+
+The projected LaTeX API has two entry points:
+
+@itemlist[
+ @item{@racket[make-latex-lexer] for streaming tokenization from an input port.}
+ @item{@racket[latex-string->tokens] for eager tokenization of an entire string.}]
+
+The first LaTeX implementation builds on the TeX lexer and adds a lightweight
+classification layer for common LaTeX commands such as @tt{\section},
+@tt{\begin}, and @tt{\end}.
+
+@defproc[(make-latex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                           [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming LaTeX lexer.
+
+Projected LaTeX categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['delimiter], and @racket['unknown].}
+
+@defproc[(latex-string->tokens [source string?]
+                               [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                               [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected LaTeX tokens.}
+
+The derived LaTeX API reuses the TeX token representation and adds LaTeX tags
+where applicable:
+
+@defproc[(make-latex-derived-lexer)
+         (input-port? . -> . (or/c latex-derived-token? 'eof))]{
+Constructs a streaming LaTeX lexer that returns derived LaTeX tokens.}
+
+@defproc[(latex-string->derived-tokens [source string?])
+         (listof latex-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived LaTeX tokens.}
+
+@defproc[(latex-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived LaTeX tokens.}
+
+@defproc[(latex-derived-token-tags [token latex-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(latex-derived-token-has-tag? [token latex-derived-token?]
+                                       [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(latex-derived-token-text [token latex-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(latex-derived-token-start [token latex-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(latex-derived-token-end [token latex-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+Common additional LaTeX-oriented derived tags include:
+
+@itemlist[
+ @item{@racket['latex-command]}
+ @item{@racket['latex-environment-command]}]
+
+Markdown fenced code blocks labeled @tt{latex} delegate to
+@racketmodname[lexers/latex]. Wrapped delegated Markdown tokens preserve
+LaTeX-derived tags and gain @racket['embedded-latex].}
+
+@defthing[latex-profiles immutable-hash?]{
+The profile defaults used by the LaTeX lexer.}
 
 @section{TSV}
 
