@@ -38,6 +38,7 @@
          "../c.rkt"
          "../cpp.rkt"
          "../css.rkt"
+         "../haskell.rkt"
          "../html.rkt"
          "../javascript.rkt"
          "../json.rkt"
@@ -144,6 +145,8 @@
           (member 'shell-word tags)
           (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'haskell-variable-identifier tags)
+          (member 'haskell-constructor-identifier tags)
           (member 'rust-identifier tags)
           (member 'rust-raw-identifier tags)
           (member 'rust-lifetime tags)
@@ -195,6 +198,9 @@
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'haskell-string-literal tags)
+          (member 'haskell-char-literal tags)
+          (member 'haskell-numeric-literal tags)
           (member 'rust-string-literal tags)
           (member 'rust-raw-string-literal tags)
           (member 'rust-char-literal tags)
@@ -219,6 +225,7 @@
     [(or (member 'wat-form tags)
           (member 'wat-type tags)
           (member 'wat-instruction tags)
+          (member 'haskell-keyword tags)
           (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
@@ -254,6 +261,8 @@
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
      '(delimiter)]
      [(or (member 'c-operator tags)
+          (member 'haskell-variable-operator tags)
+          (member 'haskell-constructor-operator tags)
           (member 'pascal-operator tags)
           (member 'rust-punctuation tags)
           (member 'swift-operator tags))
@@ -307,6 +316,7 @@
     [(member primary '("cpp" "c++" "cc" "cxx" "hpp" "hh" "hxx")) 'cpp]
     [(member primary '("csv"))           'csv]
     [(member primary '("css"))           'css]
+    [(member primary '("haskell" "hs" "lhs")) 'haskell]
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("json"))          'json]
@@ -389,6 +399,15 @@
                           css-derived-token-end
                           css-derived-token-tags
                           '(embedded-css markdown-code-block))]
+    [(haskell)
+     (wrap-derived-tokens (haskell-string->derived-tokens body)
+                          body-start
+                          starts
+                          haskell-derived-token-text
+                          haskell-derived-token-start
+                          haskell-derived-token-end
+                          haskell-derived-token-tags
+                          '(embedded-haskell markdown-code-block))]
     [(html)
      (wrap-derived-tokens (html-string->derived-tokens body)
                           body-start

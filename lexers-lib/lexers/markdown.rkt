@@ -302,6 +302,8 @@
     (markdown-string->derived-tokens "```objc\n@interface Foo : NSObject\n@end\n```\n"))
   (define fenced-csv-derived-tokens
     (markdown-string->derived-tokens "```csv\nname,age\nAda,37\n```\n"))
+  (define fenced-haskell-derived-tokens
+    (markdown-string->derived-tokens "```haskell\nmodule Main where\nmain = putStrLn \"hi\"\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
   (define fenced-rust-derived-tokens
@@ -362,6 +364,12 @@
                   (markdown-derived-token-has-tag? token 'csv-field)
                   (string=? (markdown-derived-token-text token) "name")))
            fenced-csv-derived-tokens))
+  (define derived-haskell-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-haskell)
+                  (markdown-derived-token-has-tag? token 'haskell-keyword)
+                  (string=? (markdown-derived-token-text token) "module")))
+           fenced-haskell-derived-tokens))
   (define derived-python-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-python)
@@ -556,6 +564,7 @@
   (check-not-false derived-plist-token)
   (check-not-false derived-objc-token)
   (check-not-false derived-csv-token)
+  (check-not-false derived-haskell-token)
   (check-not-false derived-python-token)
   (check-not-false derived-rust-token)
   (check-not-false derived-swift-token)

@@ -11,6 +11,7 @@
                      lexers/cpp
                      lexers/csv
                      lexers/css
+                     lexers/haskell
                      lexers/html
                      lexers/json
                      lexers/latex
@@ -79,6 +80,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/html))
+     the-eval))
+
+@(define haskell-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/haskell))
      the-eval))
 
 @(define markdown-eval
@@ -238,6 +247,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/cpp]}
  @item{@racketmodname[lexers/csv]}
  @item{@racketmodname[lexers/css]}
+ @item{@racketmodname[lexers/haskell]}
  @item{@racketmodname[lexers/html]}
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/latex]}
@@ -1686,6 +1696,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-css]}
  @item{@racket['embedded-cpp]}
  @item{@racket['embedded-csv]}
+ @item{@racket['embedded-haskell]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
  @item{@racket['embedded-makefile]}
@@ -1708,6 +1719,7 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
+@racket['embedded-haskell],
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
 @racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
@@ -1727,6 +1739,124 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{Haskell}
+
+@defmodule[lexers/haskell]
+
+The projected Haskell API has two entry points:
+
+@itemlist[
+ @item{@racket[make-haskell-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[haskell-string->tokens] for eager tokenization of an entire
+       string.}]
+
+The first Haskell implementation is a handwritten streaming lexer grounded in
+the Haskell lexical-structure specification, with a small set of practical
+GHC-era additions such as pragmas. It covers whitespace, line comments,
+nested comments, pragmas, identifiers, operators, strings, characters,
+numeric literals, and delimiters.
+
+@defproc[(make-haskell-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Haskell lexer.
+
+Projected Haskell categories include @racket['comment],
+@racket['whitespace], @racket['keyword], @racket['identifier],
+@racket['literal], @racket['operator], @racket['delimiter], and
+@racket['unknown].}
+
+@examples[#:eval haskell-eval
+(define lexer
+  (make-haskell-lexer #:profile 'coloring))
+(define in
+  (open-input-string "{-# LANGUAGE OverloadedStrings #-}\nmodule Main where\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(haskell-string->tokens [source string?]
+                                 [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                 [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                 [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Haskell
+tokens.}
+
+The derived Haskell API provides reusable language-specific structure:
+
+@defproc[(make-haskell-derived-lexer)
+         (input-port? . -> . (or/c haskell-derived-token? 'eof))]{
+Constructs a streaming Haskell lexer that returns derived Haskell tokens.}
+
+@defproc[(haskell-string->derived-tokens [source string?])
+         (listof haskell-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Haskell tokens.}
+
+@defproc[(haskell-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Haskell tokens.}
+
+@defproc[(haskell-derived-token-tags [token haskell-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(haskell-derived-token-has-tag? [token haskell-derived-token?]
+                                         [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(haskell-derived-token-text [token haskell-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(haskell-derived-token-start [token haskell-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(haskell-derived-token-end [token haskell-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Haskell-specific derived tags include:
+
+@itemlist[
+ @item{@racket['haskell-comment]}
+ @item{@racket['haskell-line-comment]}
+ @item{@racket['haskell-nested-comment]}
+ @item{@racket['haskell-pragma]}
+ @item{@racket['haskell-whitespace]}
+ @item{@racket['haskell-keyword]}
+ @item{@racket['haskell-variable-identifier]}
+ @item{@racket['haskell-constructor-identifier]}
+ @item{@racket['haskell-variable-operator]}
+ @item{@racket['haskell-constructor-operator]}
+ @item{@racket['haskell-string-literal]}
+ @item{@racket['haskell-char-literal]}
+ @item{@racket['haskell-numeric-literal]}
+ @item{@racket['haskell-delimiter]}
+ @item{@racket['malformed-token]}]
+
+Malformed Haskell input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{haskell}, @tt{hs}, and @tt{lhs}
+delegate to @racketmodname[lexers/haskell]. Wrapped delegated Markdown
+tokens preserve Haskell-derived tags and gain @racket['embedded-haskell].}
+
+@defthing[haskell-profiles immutable-hash?]{
+The profile defaults used by the Haskell lexer.}
 
 @section{Objective-C}
 
