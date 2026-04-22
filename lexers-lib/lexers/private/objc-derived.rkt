@@ -316,7 +316,123 @@
              (loop)])]
          [else
           (write-one! in out)
-          (loop)])])))
+         (loop)])])))
+
+;; -----------------------------------------------------------------------------
+;; Literal validation
+
+;; oct-digit? : char? -> boolean?
+;;   Determine whether one character is an octal digit.
+(define (oct-digit? ch)
+  (and (char? ch)
+       (char<=? #\0 ch #\7)))
+
+;; hex-digit? : char? -> boolean?
+;;   Determine whether one character is a hexadecimal digit.
+(define (hex-digit? ch)
+  (and (char? ch)
+       (or (char-numeric? ch)
+           (char<=? #\a (char-downcase ch) #\f))))
+
+;; valid-objc-simple-escape? : char? -> boolean?
+;;   Determine whether one character completes a simple Objective-C escape.
+(define (valid-objc-simple-escape? ch)
+  (member ch (list #\' #\" #\? #\\ #\a #\b #\f #\n #\r #\t #\v)))
+
+;; quoted-literal-content : string? exact-nonnegative-integer? -> string?
+;;   Extract one quoted literal body by trimming prefix and delimiters.
+(define (quoted-literal-content text prefix-length)
+  (substring text
+             (+ prefix-length 1)
+             (sub1 (string-length text))))
+
+;; valid-unicode-escape-end : string? exact-nonnegative-integer? -> (or/c exact-nonnegative-integer? #f)
+;;   Return the index after one valid universal-character escape, if present.
+(define (valid-unicode-escape-end content start)
+  (define len
+    (string-length content))
+  (cond
+    [(or (>= (add1 start) len)
+         (not (member (string-ref content start) (list #\u #\U))))
+     #f]
+    [else
+     (define digits
+       (if (char=? (string-ref content start) #\u) 4 8))
+     (define end
+       (+ start 1 digits))
+     (and (<= end len)
+          (for/and ([i (in-range (add1 start) end)])
+            (hex-digit? (string-ref content i)))
+          end)]))
+
+;; valid-objc-escape-end : string? exact-nonnegative-integer? -> (or/c exact-nonnegative-integer? #f)
+;;   Return the index after one valid non-raw Objective-C escape, if present.
+(define (valid-objc-escape-end content start)
+  (define len
+    (string-length content))
+  (cond
+    [(>= (add1 start) len)
+     #f]
+    [else
+     (define next
+       (string-ref content (add1 start)))
+     (cond
+       [(valid-objc-simple-escape? next)
+        (+ start 2)]
+       [(char=? next #\x)
+        (let loop ([i (+ start 2)]
+                   [saw-hex? #f])
+          (cond
+            [(>= i len)
+             (and saw-hex? i)]
+            [(hex-digit? (string-ref content i))
+             (loop (add1 i) #t)]
+            [else
+             (and saw-hex? i)]))]
+       [(oct-digit? next)
+        (let loop ([i (+ start 1)]
+                   [count 0])
+          (cond
+            [(and (< i len)
+                  (< count 3)
+                  (oct-digit? (string-ref content i)))
+             (loop (add1 i) (add1 count))]
+            [else
+             (and (positive? count) i)]))]
+       [(member next (list #\u #\U))
+        (valid-unicode-escape-end content (add1 start))]
+       [else
+        #f])]))
+
+;; valid-objc-literal-content? : string? boolean? -> boolean?
+;;   Determine whether one ordinary Objective-C string/char literal body is valid.
+(define (valid-objc-literal-content? content char?)
+  (define len
+    (string-length content))
+  (let loop ([i 0]
+             [units 0])
+    (cond
+      [(= i len)
+       (or (not char?)
+           (= units 1))]
+      [else
+       (define ch
+         (string-ref content i))
+       (cond
+         [(char=? ch #\\)
+          (define end
+            (valid-objc-escape-end content i))
+          (and end
+               (loop end (add1 units)))]
+         [(newline-start? ch)
+          #f]
+         [else
+          (loop (add1 i) (add1 units))])])))
+
+;; valid-objc-delimited-literal? : string? exact-nonnegative-integer? boolean? -> boolean?
+;;   Determine whether one non-raw string/char literal has valid content.
+(define (valid-objc-delimited-literal? text prefix-length char?)
+  (valid-objc-literal-content? (quoted-literal-content text prefix-length) char?))
 
 ;; read-angle-header! : input-port? output-port? -> boolean?
 ;;   Consume one <...> include header name.
@@ -472,11 +588,14 @@
        (write-one! in out)
        (define terminated?
          (read-delimited-literal! in out 0 #\"))
+       (define text
+         (get-output-string out))
        (make-token-from-text start-pos
                              (current-stream-position in)
-                             (get-output-string out)
+                             text
                              (append '(literal objc-string-literal)
-                                     (if terminated?
+                                     (if (and terminated?
+                                              (valid-objc-delimited-literal? text 1 #f))
                                          '()
                                          '(objc-error malformed-token))))]
       [(and (char=? next #\@)
@@ -527,14 +646,18 @@
          (string-prefix-length in))
        (define terminated?
          (read-delimited-literal! in out prefix-length #\"))
+       (define text
+         (get-output-string out))
        (set! expect-include-target? #f)
        (make-token-from-text start-pos
                              (current-stream-position in)
-                             (get-output-string out)
+                             text
                              (append (if header-name?
                                          '(literal objc-header-name)
                                          '(literal objc-string-literal))
-                                     (if terminated?
+                                     (if (and terminated?
+                                              (or header-name?
+                                                  (valid-objc-delimited-literal? text prefix-length #f)))
                                          '()
                                          '(objc-error malformed-token))))]
       [(or (positive? (char-prefix-length in))
@@ -543,13 +666,18 @@
          (open-output-string))
        (set! line-prefix-only? #f)
        (set! expect-include-target? #f)
+       (define prefix-length
+         (char-prefix-length in))
        (define terminated?
-         (read-delimited-literal! in out (char-prefix-length in) #\'))
+         (read-delimited-literal! in out prefix-length #\'))
+       (define text
+         (get-output-string out))
        (make-token-from-text start-pos
                              (current-stream-position in)
-                             (get-output-string out)
+                             text
                              (append '(literal objc-char-literal)
-                                     (if terminated?
+                                     (if (and terminated?
+                                              (valid-objc-delimited-literal? text prefix-length #t))
                                          '()
                                          '(objc-error malformed-token))))]
       [(identifier-start-char? next)

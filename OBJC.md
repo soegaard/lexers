@@ -14,6 +14,12 @@ consumers:
 - object-literal introducers such as `@[]`, `@{}`, and `@()`
 - numeric literals, operators, and delimiters
 
+Ordinary Objective-C strings, Objective-C `@"..."` strings, and character
+literals now validate common escape structures such as simple escapes, octal
+escapes, hexadecimal escapes, and universal-character escapes. Malformed
+escapes and malformed multi-character character literals remain source-faithful
+but are tagged as malformed.
+
 The lexer is source-faithful and streaming. Consumers can reconstruct the exact
 input by concatenating token texts.
 

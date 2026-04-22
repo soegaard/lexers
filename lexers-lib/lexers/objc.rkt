@@ -195,6 +195,10 @@
     "NSString *s = @\"hi\";\nid x = @[];\n")
   (define literal-derived
     (objc-string->derived-tokens literal-source))
+  (define malformed-literal-source
+    "NSString *bad = @\"\\q\";\nchar badc = 'ab';\nchar good = '\\x41';\n")
+  (define malformed-literal-derived
+    (objc-string->derived-tokens malformed-literal-source))
   (define malformed-coloring
     (objc-string->tokens "NSString *s = @\"unterminated"
                          #:profile 'coloring
@@ -229,6 +233,21 @@
     (findf (lambda (token)
              (objc-derived-token-has-tag? token 'objc-literal-introducer))
            literal-derived))
+  (define malformed-string-token
+    (findf (lambda (token)
+             (and (objc-derived-token-has-tag? token 'malformed-token)
+                  (string=? (objc-derived-token-text token) "@\"\\q\"")))
+           malformed-literal-derived))
+  (define malformed-char-token
+    (findf (lambda (token)
+             (and (objc-derived-token-has-tag? token 'malformed-token)
+                  (string=? (objc-derived-token-text token) "'ab'")))
+           malformed-literal-derived))
+  (define valid-hex-char-token
+    (findf (lambda (token)
+             (and (objc-derived-token-has-tag? token 'objc-char-literal)
+                  (string=? (objc-derived-token-text token) "'\\x41'")))
+           malformed-literal-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 12)
                 '(delimiter keyword whitespace literal whitespace keyword whitespace identifier whitespace delimiter whitespace identifier))
@@ -236,6 +255,9 @@
   (check-not-false at-keyword-token)
   (check-not-false string-token)
   (check-not-false literal-introducer-token)
+  (check-not-false malformed-string-token)
+  (check-not-false malformed-char-token)
+  (check-not-false valid-hex-char-token)
   (check-not-false first-streaming-token)
   (check-true (contiguous-derived-stream? sample-derived))
   (check-equal? (apply string-append (map objc-derived-token-text sample-derived))

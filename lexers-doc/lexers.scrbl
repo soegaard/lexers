@@ -2233,6 +2233,12 @@ The first reusable Objective-C-specific derived tags include:
  @item{@racket['objc-error]}
  @item{@racket['malformed-token]}]
 
+Ordinary Objective-C strings, @tt{@"..."} strings, and character literals
+validate common escape structures in the derived layer, including simple,
+octal, hexadecimal, and universal-character escapes. Invalid escapes and
+malformed multi-character character literals remain source-faithful but are
+tagged with @racket['malformed-token].
+
 Malformed Objective-C input is handled using the shared profile rules:
 
 @itemlist[
