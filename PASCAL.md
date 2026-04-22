@@ -18,6 +18,8 @@ The first slice covers:
 - single-quoted strings with doubled-quote escapes
 - `#<digits>` control-string fragments
 - common Pascal operators, separators, and delimiters
+- compiler directives inside `{...}` and `(*...*)` comments such as
+  `{$mode objfpc}` and `(*$ifdef DEBUG*)`
 
 Projected Pascal categories are:
 
@@ -34,6 +36,7 @@ Projected Pascal categories are:
 The first reusable Pascal-specific derived tags include:
 
 - `pascal-comment`
+- `pascal-compiler-directive`
 - `pascal-whitespace`
 - `pascal-keyword`
 - `pascal-identifier`
@@ -45,7 +48,6 @@ The first reusable Pascal-specific derived tags include:
 - `pascal-delimiter`
 - `malformed-token`
 
-This module is intended to be source-faithful and streaming. More dialect-
-specific distinctions such as compiler directives inside comments, mode-aware
-nested-comment differences, and fuller numeric/string corners can be added
+This module is intended to be source-faithful and streaming. Mode-aware nested-
+comment differences and remaining numeric/string corners can still be added
 later within the same architecture.

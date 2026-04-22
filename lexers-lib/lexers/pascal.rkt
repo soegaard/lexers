@@ -170,6 +170,9 @@
     "program Test;\r\nbegin\r\n  writeln('hi');\r\nend.\r\n")
   (define crlf-derived
     (pascal-string->derived-tokens crlf-source))
+  (define directive-derived
+    (pascal-string->derived-tokens
+     "{$mode objfpc}\n(*$ifdef DEBUG*)\nvalue := $;\nflags := %;\noctal := &;\nx := 1e;\n"))
   (define first-streaming-token
     (first-token-before-rest? make-pascal-derived-lexer
                               "program "
@@ -199,6 +202,30 @@
              (and (pascal-derived-token-has-tag? token 'pascal-numeric-literal)
                   (string=? (pascal-derived-token-text token) "$FF")))
            sample-derived))
+  (define directive-token
+    (findf (lambda (token)
+             (pascal-derived-token-has-tag? token 'pascal-compiler-directive))
+           directive-derived))
+  (define malformed-hex-token
+    (findf (lambda (token)
+             (and (pascal-derived-token-has-tag? token 'malformed-token)
+                  (string=? (pascal-derived-token-text token) "$")))
+           directive-derived))
+  (define malformed-bin-token
+    (findf (lambda (token)
+             (and (pascal-derived-token-has-tag? token 'malformed-token)
+                  (string=? (pascal-derived-token-text token) "%")))
+           directive-derived))
+  (define malformed-oct-token
+    (findf (lambda (token)
+             (and (pascal-derived-token-has-tag? token 'malformed-token)
+                  (string=? (pascal-derived-token-text token) "&")))
+           directive-derived))
+  (define malformed-real-token
+    (findf (lambda (token)
+             (and (pascal-derived-token-has-tag? token 'malformed-token)
+                  (string=? (pascal-derived-token-text token) "1e")))
+           directive-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(keyword whitespace identifier delimiter whitespace keyword whitespace identifier))
@@ -210,6 +237,11 @@
   (check-not-false control-token)
   (check-not-false comment-token)
   (check-not-false numeric-token)
+  (check-not-false directive-token)
+  (check-not-false malformed-hex-token)
+  (check-not-false malformed-bin-token)
+  (check-not-false malformed-oct-token)
+  (check-not-false malformed-real-token)
   (check-equal? (pascal-derived-token-text escaped-identifier-token)
                 "&do")
   (check-true (contiguous-derived-stream? sample-derived))

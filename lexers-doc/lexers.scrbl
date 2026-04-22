@@ -2327,6 +2327,7 @@ The first reusable Pascal-specific derived tags include:
 
 @itemlist[
  @item{@racket['pascal-comment]}
+ @item{@racket['pascal-compiler-directive]}
  @item{@racket['pascal-whitespace]}
  @item{@racket['pascal-keyword]}
  @item{@racket['pascal-identifier]}
@@ -2337,6 +2338,10 @@ The first reusable Pascal-specific derived tags include:
  @item{@racket['pascal-operator]}
  @item{@racket['pascal-delimiter]}
  @item{@racket['malformed-token]}]
+
+Compiler directives inside brace or star comments, such as @tt{{$mode objfpc}}
+and @tt{(*$ifdef DEBUG*)}, remain comments in the projected stream while the
+derived layer preserves @racket['pascal-compiler-directive].
 
 Malformed Pascal input is handled using the shared profile rules:
 

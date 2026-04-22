@@ -347,6 +347,24 @@
     [else
      #f]))
 
+;; pascal-compiler-directive-comment? : string? -> boolean?
+;;   Determine whether one Pascal comment is a compiler directive.
+(define (pascal-compiler-directive-comment? text)
+  (define len
+    (string-length text))
+  (and (>= len 3)
+       (cond
+         [(and (char=? (string-ref text 0) #\{)
+               (char=? (string-ref text 1) #\$))
+          #t]
+         [(and (>= len 4)
+               (char=? (string-ref text 0) #\()
+               (char=? (string-ref text 1) #\*)
+               (char=? (string-ref text 2) #\$))
+          #t]
+         [else
+          #f])))
+
 ;; read-decimal-or-real! : input-port? output-port? -> void?
 ;;   Consume one decimal or real literal.
 (define (read-decimal-or-real! in out)
@@ -365,6 +383,22 @@
                (member (peek-next in) '(#\+ #\-)))
       (write-one! in out))
     (read-while! in out char-numeric?)))
+
+;; valid-pascal-decimal-or-real? : string? -> boolean?
+;;   Determine whether one decimal or real literal has a valid exponent form.
+(define (valid-pascal-decimal-or-real? text)
+  (regexp-match?
+   #px"^(?:[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$"
+   text))
+
+;; valid-pascal-prefixed-number? : string? char? (char? -> boolean?) -> boolean?
+;;   Determine whether one prefixed Pascal number contains at least one valid digit.
+(define (valid-pascal-prefixed-number? text prefix-char digit?)
+  (and (positive? (string-length text))
+       (char=? (string-ref text 0) prefix-char)
+       (> (string-length text) 1)
+       (for/and ([ch (in-string (substring text 1))])
+         (digit? ch))))
 
 ;; consume-punctuator! : input-port? output-port? -> (values string? (listof symbol?))
 ;;   Consume one Pascal punctuator using longest-match order.
@@ -429,23 +463,37 @@
          [(char=? next #\{)
           (define terminated?
             (read-nested-comment! in out "{" "}"))
+          (define text
+            (get-output-string out))
           (make-token-from-text start
                                 (current-stream-position in)
-                                (get-output-string out)
-                                (if terminated?
-                                    '(comment pascal-comment)
-                                    '(comment pascal-comment malformed-token)))]
+                                text
+                                (append
+                                 '(comment pascal-comment)
+                                 (if (pascal-compiler-directive-comment? text)
+                                     '(pascal-compiler-directive)
+                                     '())
+                                 (if terminated?
+                                     '()
+                                     '(malformed-token))))]
          [(and (char=? next #\()
                (char? (peek-next in 1))
                (char=? (peek-next in 1) #\*))
           (define terminated?
             (read-nested-comment! in out "(*" "*)"))
+          (define text
+            (get-output-string out))
           (make-token-from-text start
                                 (current-stream-position in)
-                                (get-output-string out)
-                                (if terminated?
-                                    '(comment pascal-comment)
-                                    '(comment pascal-comment malformed-token)))]
+                                text
+                                (append
+                                 '(comment pascal-comment)
+                                 (if (pascal-compiler-directive-comment? text)
+                                     '(pascal-compiler-directive)
+                                     '())
+                                 (if terminated?
+                                     '()
+                                     '(malformed-token))))]
          [(char=? next #\')
           (define terminated?
             (read-string-literal! in out))
@@ -467,17 +515,25 @@
          [(char=? next #\$)
           (write-one! in out)
           (read-while! in out hex-digit?)
+          (define text
+            (get-output-string out))
           (make-token-from-text start
                                 (current-stream-position in)
-                                (get-output-string out)
-                                '(literal pascal-numeric-literal))]
+                                text
+                                (if (valid-pascal-prefixed-number? text #\$ hex-digit?)
+                                    '(literal pascal-numeric-literal)
+                                    '(literal pascal-numeric-literal malformed-token)))]
          [(char=? next #\%)
           (write-one! in out)
           (read-while! in out bin-digit?)
+          (define text
+            (get-output-string out))
           (make-token-from-text start
                                 (current-stream-position in)
-                                (get-output-string out)
-                                '(literal pascal-numeric-literal))]
+                                text
+                                (if (valid-pascal-prefixed-number? text #\% bin-digit?)
+                                    '(literal pascal-numeric-literal)
+                                    '(literal pascal-numeric-literal malformed-token)))]
          [(char=? next #\&)
           (write-one! in out)
           (cond
@@ -490,16 +546,24 @@
                                    '(identifier pascal-identifier pascal-escaped-identifier))]
             [else
              (read-while! in out oct-digit?)
+             (define text
+               (get-output-string out))
              (make-token-from-text start
                                    (current-stream-position in)
-                                   (get-output-string out)
-                                   '(literal pascal-numeric-literal))])]
+                                   text
+                                   (if (valid-pascal-prefixed-number? text #\& oct-digit?)
+                                       '(literal pascal-numeric-literal)
+                                       '(literal pascal-numeric-literal malformed-token)))])]
          [(char-numeric? next)
           (read-decimal-or-real! in out)
+          (define text
+            (get-output-string out))
           (make-token-from-text start
                                 (current-stream-position in)
-                                (get-output-string out)
-                                '(literal pascal-numeric-literal))]
+                                text
+                                (if (valid-pascal-decimal-or-real? text)
+                                    '(literal pascal-numeric-literal)
+                                    '(literal pascal-numeric-literal malformed-token)))]
          [(identifier-start? next)
           (read-identifier! in out)
           (define text
