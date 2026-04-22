@@ -206,6 +206,19 @@
       (member ch
               '(#\_ #\- #\. #\/ #\% #\+ #\@ #\< #\^ #\? #\*))))
 
+;; escaped-comment-char? : string? exact-nonnegative-integer? -> boolean?
+;;   Determine whether a # at index is escaped by an odd backslash run.
+(define (escaped-comment-char? source index)
+  (let loop ([i (sub1 index)]
+             [count 0])
+    (cond
+      [(negative? i)
+       (odd? count)]
+      [(char=? (string-ref source i) #\\)
+       (loop (sub1 i) (add1 count))]
+      [else
+       (odd? count)])))
+
 ;; take-while-end : string? exact-nonnegative-integer? (char? -> boolean?) -> exact-nonnegative-integer?
 ;;   Find the end index of the longest matching character run.
 (define (take-while-end source index pred?)
@@ -275,10 +288,11 @@
       [(>= i (string-length line-body))
        #f]
       [else
-       (define ch
-         (string-ref line-body i))
+         (define ch
+           (string-ref line-body i))
        (cond
-         [(char=? ch #\#)
+         [(and (char=? ch #\#)
+               (not (escaped-comment-char? line-body i)))
           #f]
          [else
           (define match
@@ -301,10 +315,11 @@
       [(>= i (string-length line-body))
        #f]
       [else
-       (define ch
-         (string-ref line-body i))
+         (define ch
+           (string-ref line-body i))
        (cond
-         [(char=? ch #\#)
+         [(and (char=? ch #\#)
+               (not (escaped-comment-char? line-body i)))
           #f]
          [(and (char=? ch #\:)
                (not (and (> i 0)
@@ -487,6 +502,10 @@
             (= start (first-nonspace-index line))
             (string=? text directive-word))
        (emit! text '(keyword makefile-directive))]
+      [(and rule-colon-index
+            (< start rule-colon-index)
+            (string-prefix? text "."))
+       (emit! text '(identifier makefile-rule-target makefile-special-target))]
       [(and assignment-index
             (< start assignment-index))
        (emit! text '(identifier makefile-variable))]
@@ -525,7 +544,8 @@
           (emit-range! index end '(whitespace))
           (loop)]
          [(and (not recipe-line?)
-               (char=? ch #\#))
+               (char=? ch #\#)
+               (not (escaped-comment-char? line index)))
           (emit-range! index length '(comment))
           (loop)]
          [(char=? ch #\$)

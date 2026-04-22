@@ -196,6 +196,10 @@
     "APP = scribble-tools\n.PHONY: docs test\ndocs:\n\traco scribble +m --html --dest html scribblings/scribble-tools.scrbl\n\ntest:\n\traco test private/lang-code.rkt\n")
   (define shell-recipe-derived
     (makefile-string->derived-tokens shell-recipe-source))
+  (define escaped-comment-source
+    "VAR = value \\# not-comment\n.PHONY: all\nall: ; @echo done\n")
+  (define escaped-comment-derived
+    (makefile-string->derived-tokens escaped-comment-source))
   (define shell-recipe-raco-token
     (findf (lambda (token)
              (and (makefile-derived-token-has-tag? token 'makefile-recipe)
@@ -208,6 +212,18 @@
                   (makefile-derived-token-has-tag? token 'shell-builtin)
                   (string=? (makefile-derived-token-text token) "test")))
            shell-recipe-derived))
+  (define escaped-hash-comment-token
+    (findf (lambda (token)
+             (makefile-derived-token-has-tag? token 'comment))
+           escaped-comment-derived))
+  (define escaped-hash-text-token
+    (findf (lambda (token)
+             (string=? (makefile-derived-token-text token) "#"))
+           escaped-comment-derived))
+  (define special-target-token
+    (findf (lambda (token)
+             (makefile-derived-token-has-tag? token 'makefile-special-target))
+           escaped-comment-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(identifier whitespace operator whitespace identifier whitespace identifier delimiter))
@@ -220,6 +236,9 @@
   (check-not-false recipe-shell-token)
   (check-not-false shell-recipe-raco-token)
   (check-not-false shell-recipe-command-token)
+  (check-false escaped-hash-comment-token)
+  (check-not-false escaped-hash-text-token)
+  (check-not-false special-target-token)
   (check-equal? (makefile-derived-token-text directive-token)
                 "include")
   (check-equal? (makefile-derived-token-text assignment-token)
@@ -228,6 +247,8 @@
                 "all")
   (check-equal? (makefile-derived-token-text recipe-ref-token)
                 "$(CC)")
+  (check-equal? (makefile-derived-token-text special-target-token)
+                ".PHONY")
   (check-true (contiguous-derived-stream? sample-derived))
   (check-equal? (apply string-append (map makefile-derived-token-text sample-derived))
                 sample-source)
