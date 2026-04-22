@@ -66,7 +66,15 @@
         jsx-interpolation-end-token)
        '(jsx-interpolation-boundary)]
       [(string-token) '(string-literal)]
-      [(number-token) '(numeric-literal)]
+      [(number-token)
+       (append
+        '(numeric-literal)
+        (if (regexp-match? #px"[nN]$" text)
+            '(bigint-literal)
+            '())
+        (if (regexp-match? #px"_" text)
+            '(numeric-separator-literal)
+            '()))]
       [(regex-token) '(regex-literal)]
       [(template-chunk-token) '(template-literal template-chunk)]
       [(template-start-token

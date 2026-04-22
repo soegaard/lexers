@@ -42,7 +42,8 @@ The initial subset should include:
 - identifiers
 - a small keyword set
 - string literals
-- numeric literals
+- numeric literals, including common modern forms such as prefixed integers,
+  numeric separators, exponents, and `BigInt`
 - delimiters such as parentheses, brackets, braces, comma, semicolon, and dot
 - common operators such as `=`, `+`, `-`, `*`, and `/`
 - recoverable `unknown` output in tolerant mode
@@ -58,8 +59,6 @@ implementation:
 - template strings
 - Unicode identifier edge cases
 - automatic semicolon insertion concerns
-- bigint literals
-- numeric separators
 - TypeScript extensions
 
 This keeps the first JavaScript implementation focused on validating the shared
@@ -88,6 +87,8 @@ as:
 - static keyword usage
 - string literal
 - numeric literal
+- bigint literal
+- numeric-separator literal
 - comment
 - malformed token
 

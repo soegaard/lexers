@@ -170,6 +170,11 @@
     (javascript-string->tokens "return /ab+c/i;" #:profile 'compiler #:source-positions #f))
   (define template-tokens
     (javascript-string->tokens "`a ${name} b`" #:profile 'compiler #:source-positions #f))
+  (define numeric-forms-tokens
+    (javascript-string->tokens
+     "0xFF 0b1010 0o77 1_000 1.2e3 123n"
+     #:profile 'compiler
+     #:source-positions #f))
   (define jsx-tokens
     (javascript-string->tokens
      "const el = <Button kind=\"primary\">Hello {name}</Button>;"
@@ -200,6 +205,14 @@
     (findf (lambda (token)
              (javascript-derived-token-has-tag? token 'numeric-literal))
            derived-tokens))
+  (define derived-bigint-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'bigint-literal))
+           (javascript-string->derived-tokens "const id = 123n;")))
+  (define derived-separated-number-token
+    (findf (lambda (token)
+             (javascript-derived-token-has-tag? token 'numeric-separator-literal))
+           (javascript-string->derived-tokens "const n = 1_000;")))
   (define derived-class-name-token
     (findf (lambda (token)
              (and (javascript-derived-token-has-tag? token 'declaration-name)
@@ -292,6 +305,8 @@
   (check-equal? (stream-token-name (car template-tokens)) 'delimiter)
   (check-equal? (stream-token-name (cadr template-tokens)) 'literal)
   (check-equal? (stream-token-value (cadr template-tokens)) "a ")
+  (check-equal? (map stream-token-value (take numeric-forms-tokens 6))
+                '("0xFF" "0b1010" "0o77" "1_000" "1.2e3" "123n"))
   (check-equal? (map stream-token-name jsx-tokens)
                 '(keyword identifier operator delimiter identifier identifier
                   operator literal delimiter literal delimiter identifier
@@ -311,6 +326,8 @@
                 6)
   (check-not-false (javascript-derived-token-has-tag? derived-identifier-token 'identifier))
   (check-not-false (javascript-derived-token-has-tag? derived-number-token 'numeric-literal))
+  (check-not-false derived-bigint-token)
+  (check-not-false derived-separated-number-token)
   (check-not-false derived-class-name-token)
   (check-not-false derived-param-token)
   (check-not-false derived-property-token)

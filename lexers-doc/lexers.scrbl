@@ -3874,6 +3874,10 @@ When @racket[#:jsx?] is true, the lexer accepts a small JSX extension inside
 JavaScript expressions. The projected token categories remain the same, while
 the derived-token API exposes JSX-specific structure.
 
+The current JavaScript slice includes broader modern numeric literals, such as
+hexadecimal, binary, and octal prefixed integers, decimal exponents, numeric
+separators, and integer @tt{BigInt} suffixes.
+
 @examples[#:eval javascript-eval
 (define lexer
   (make-javascript-lexer #:profile 'coloring))
@@ -3938,7 +3942,8 @@ original source text of the emitted token. In particular:
  @item{For @racket['keyword] and @racket['identifier], the value is the matched
        identifier text, such as @racket["const"] or @racket["name"].}
  @item{For @racket['literal], the value is the matched literal text, such as
-       @racket["1"] or @racket["\"hello\""].}
+       @racket["1"], @racket["1_000"], @racket["123n"], or
+       @racket["\"hello\""].}
  @item{For @racket['comment] and @racket['whitespace], the value is the
        original comment or whitespace text when those categories are kept.}
  @item{For @racket['operator] and @racket['delimiter], the value is the matched
@@ -4046,6 +4051,8 @@ The current JavaScript scaffold may attach tags such as:
  @item{@racket['static-keyword-usage]}
  @item{@racket['string-literal]}
  @item{@racket['numeric-literal]}
+ @item{@racket['bigint-literal]}
+ @item{@racket['numeric-separator-literal]}
  @item{@racket['regex-literal]}
  @item{@racket['template-literal]}
  @item{@racket['template-chunk]}

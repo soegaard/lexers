@@ -65,6 +65,30 @@
   (or (js-ident-start? ch)
       (char-numeric? ch)))
 
+;; decimal-digit? : char? -> boolean?
+;;   Recognize a decimal digit.
+(define (decimal-digit? ch)
+  (char-numeric? ch))
+
+;; binary-digit? : char? -> boolean?
+;;   Recognize a binary digit.
+(define (binary-digit? ch)
+  (or (char=? ch #\0)
+      (char=? ch #\1)))
+
+;; octal-digit? : char? -> boolean?
+;;   Recognize an octal digit.
+(define (octal-digit? ch)
+  (and (char-numeric? ch)
+       (char<=? ch #\7)))
+
+;; hex-digit? : char? -> boolean?
+;;   Recognize a hexadecimal digit.
+(define (hex-digit? ch)
+  (or (decimal-digit? ch)
+      (member (char-downcase ch)
+              '(#\a #\b #\c #\d #\e #\f))))
+
 ;; jsx-ident-start? : char? -> boolean?
 ;;   Recognize a simplified JSX name start character.
 (define (jsx-ident-start? ch)
@@ -284,16 +308,90 @@
   (display (read-while! in js-ident-char?) out)
   (get-output-string out))
 
+;; read-js-digit-sequence! : input-port? output-port? (char? -> boolean?) -> void?
+;;   Consume one JavaScript digit sequence with optional numeric separators.
+(define (read-js-digit-sequence! in out digit?)
+  (let loop ()
+    (define next
+      (peek-char in))
+    (cond
+      [(and (char? next) (digit? next))
+       (write-char (read-char in) out)
+       (loop)]
+      [(and (char? next)
+            (char=? next #\_)
+            (let ([after (peek-char in 1)])
+              (and (char? after)
+                   (digit? after))))
+       (write-char (read-char in) out)
+       (write-char (read-char in) out)
+       (loop)]
+      [else
+       (void)])))
+
+;; read-js-exponent-part! : input-port? output-port? -> void?
+;;   Consume one decimal exponent part when present.
+(define (read-js-exponent-part! in out)
+  (define next
+    (peek-char in))
+  (when (and (char? next)
+             (member next '(#\e #\E)))
+    (write-char (read-char in) out)
+    (define sign
+      (peek-char in))
+    (when (and (char? sign)
+               (member sign '(#\+ #\-)))
+      (write-char (read-char in) out))
+    (read-js-digit-sequence! in out decimal-digit?)))
+
+;; read-js-bigint-suffix! : input-port? output-port? -> void?
+;;   Consume one BigInt suffix when present.
+(define (read-js-bigint-suffix! in out)
+  (define next
+    (peek-char in))
+  (when (and (char? next)
+             (char=? (char-downcase next) #\n))
+    (write-char (read-char in) out)))
+
+;; read-js-prefixed-number! : input-port? output-port? char? (char? -> boolean?) -> void?
+;;   Consume one prefixed JavaScript numeric literal.
+(define (read-js-prefixed-number! in out prefix-char digit?)
+  (write-char (read-char in) out)
+  (write-char (read-char in) out)
+  (read-js-digit-sequence! in out digit?)
+  (read-js-bigint-suffix! in out))
+
 ;; read-number-literal! : input-port? -> string?
-;;   Consume a small JavaScript numeric literal subset.
+;;   Consume a broader JavaScript numeric literal slice.
 (define (read-number-literal! in)
   (define out (open-output-string))
-  (display (read-while! in char-numeric?) out)
-  (define dot (peek-char in))
-  (when (and (char? dot)
-             (char=? dot #\.))
-    (write-char (read-char in) out)
-    (display (read-while! in char-numeric?) out))
+  (define first
+    (peek-char in))
+  (cond
+    [(and (char? first)
+          (char=? first #\0)
+          (let ([next (peek-char in 1)])
+            (and (char? next)
+                 (member (char-downcase next) '(#\x #\b #\o)))))
+     (define prefix
+       (char-downcase (peek-char in 1)))
+     (case prefix
+       [(#\x) (read-js-prefixed-number! in out prefix hex-digit?)]
+       [(#\b) (read-js-prefixed-number! in out prefix binary-digit?)]
+       [(#\o) (read-js-prefixed-number! in out prefix octal-digit?)])]
+    [else
+     (read-js-digit-sequence! in out decimal-digit?)
+     (define dot
+       (peek-char in))
+     (when (and (char? dot)
+                (char=? dot #\.)
+                (let ([after (peek-char in 1)])
+                  (and (char? after)
+                       (decimal-digit? after))))
+       (write-char (read-char in) out)
+       (read-js-digit-sequence! in out decimal-digit?))
+     (read-js-exponent-part! in out)
+     (read-js-bigint-suffix! in out)])
   (get-output-string out))
 
 ;; identifier-token-text! : input-port? -> string?
