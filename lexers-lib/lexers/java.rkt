@@ -206,9 +206,88 @@
     (findf (lambda (token)
              (java-derived-token-has-tag? token 'java-doc-comment))
            doc-comment-derived))
+  (define unicode-ident-source
+    "class \\u0045xample {}\n")
+  (define unicode-ident-derived
+    (java-string->derived-tokens unicode-ident-source))
+  (define unicode-ident-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-identifier)
+                  (string=? (java-derived-token-text token) "\\u0045xample")))
+           unicode-ident-derived))
+  (define unicode-comment-source
+    "\\u002f\\u002f note\nclass Example {}\n")
+  (define unicode-comment-derived
+    (java-string->derived-tokens unicode-comment-source))
+  (define unicode-comment-token
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-line-comment))
+           unicode-comment-derived))
+  (define unicode-string-source
+    "String s = \\u0022hi\\u0022;\n")
+  (define unicode-string-derived
+    (java-string->derived-tokens unicode-string-source))
+  (define unicode-string-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-string-literal)
+                  (string=? (java-derived-token-text token) "\\u0022hi\\u0022")))
+           unicode-string-derived))
+  (define literal-derived
+    (java-string->derived-tokens "boolean t = true; boolean f = false; Object x = null;\n"))
+  (define true-token
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-true-literal))
+           literal-derived))
+  (define false-token
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-false-literal))
+           literal-derived))
+  (define null-token
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-null-literal))
+           literal-derived))
+  (define unicode-name-derived
+    (java-string->derived-tokens "int café = 1;\n"))
+  (define unicode-name-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-identifier)
+                  (string=? (java-derived-token-text token) "café")))
+           unicode-name-derived))
+  (define invalid-string-derived
+    (java-string->derived-tokens "String s = \"\\q\";\n"))
+  (define invalid-string-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-string-literal)
+                  (java-derived-token-has-tag? token 'malformed-token)))
+           invalid-string-derived))
+  (define octal-char-derived
+    (java-string->derived-tokens "char c = '\\177';\n"))
+  (define octal-char-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-char-literal)
+                  (not (java-derived-token-has-tag? token 'malformed-token))))
+           octal-char-derived))
+  (define text-block-derived
+    (java-string->derived-tokens "String s = \"\"\"\nhello\n\"\"\";\n"))
+  (define text-block-token-2
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-text-block))
+           text-block-derived))
+  (define pseudo-text-block-derived
+    (java-string->derived-tokens "String s = \"\"\"hello\"\"\";\n"))
+  (define pseudo-text-block-token
+    (findf (lambda (token)
+             (java-derived-token-has-tag? token 'java-text-block))
+           pseudo-text-block-derived))
+  (define non-sealed-tokens
+    (java-string->tokens "non-sealed interface Example {}\n"
+                         #:profile 'coloring
+                         #:source-positions #f))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(keyword whitespace identifier delimiter whitespace keyword whitespace identifier))
+  (check-equal? (take (map lexer-token-name non-sealed-tokens) 4)
+                '(keyword whitespace keyword whitespace))
   (check-equal? (last (map lexer-token-name compiler-tokens))
                 'eof)
   (check-not-false string-token)
@@ -218,9 +297,26 @@
   (check-not-false comment-token)
   (check-not-false annotation-name-token)
   (check-not-false doc-comment-token)
+  (check-not-false unicode-ident-token)
+  (check-not-false unicode-comment-token)
+  (check-not-false unicode-string-token)
+  (check-not-false true-token)
+  (check-not-false false-token)
+  (check-not-false null-token)
+  (check-not-false unicode-name-token)
+  (check-not-false invalid-string-token)
+  (check-not-false octal-char-token)
+  (check-not-false text-block-token-2)
+  (check-false pseudo-text-block-token)
   (check-true (contiguous-derived-stream? sample-derived))
   (check-equal? (apply string-append (map java-derived-token-text sample-derived))
                 sample-source)
   (check-equal? (apply string-append (map java-derived-token-text crlf-derived))
                 crlf-source)
+  (check-equal? (apply string-append (map java-derived-token-text unicode-ident-derived))
+                unicode-ident-source)
+  (check-equal? (apply string-append (map java-derived-token-text unicode-comment-derived))
+                unicode-comment-source)
+  (check-equal? (apply string-append (map java-derived-token-text unicode-string-derived))
+                unicode-string-source)
   (check-not-false first-streaming-token))

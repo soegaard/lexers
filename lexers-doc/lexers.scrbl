@@ -1888,8 +1888,12 @@ The projected Java API has two entry points:
 
 The first Java implementation is a handwritten streaming lexer grounded in the
 Java lexical grammar. It covers whitespace, line and block comments,
-identifiers, keywords, string literals, text blocks, char literals, numeric
-literals, operators, and delimiters.
+identifiers, keywords, the contextual keyword @tt{non-sealed}, string literals, text blocks, char literals, numeric
+literals, operators, and delimiters. It also recognizes Java Unicode escapes
+for lexical classification while preserving exact source slices in the emitted
+tokens, validates Java escape sequences including octal escapes, and recognizes
+text blocks only when the opening delimiter has the JLS-required trailing line
+terminator.
 
 @defproc[(make-java-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -1971,6 +1975,10 @@ The first reusable Java-specific derived tags include:
  @item{@racket['java-text-block]}
  @item{@racket['java-char-literal]}
  @item{@racket['java-numeric-literal]}
+ @item{@racket['java-boolean-literal]}
+ @item{@racket['java-true-literal]}
+ @item{@racket['java-false-literal]}
+ @item{@racket['java-null-literal]}
  @item{@racket['java-operator]}
  @item{@racket['java-delimiter]}
  @item{@racket['malformed-token]}]
