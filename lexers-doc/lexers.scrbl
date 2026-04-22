@@ -2903,7 +2903,7 @@ reusable tags to the common special characters @tt{&}, @tt{_}, @tt{^}, and
 @tt{~}. It also gives reusable tags to common control-symbol spacing commands
 such as @tt{\ }, @tt{\,}, @tt{\;}, @tt{\!}, and @tt{\/}. Common accent
 control symbols such as @tt{\'} and @tt{\"} also receive their own reusable
-tag.
+tag, and group/optional delimiters distinguish opening-vs-closing roles.
 
 @defproc[(make-tex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2982,7 +2982,11 @@ The first reusable TeX-specific derived tags include:
  @item{@racket['tex-inline-math-shift]}
  @item{@racket['tex-display-math-shift]}
  @item{@racket['tex-group-delimiter]}
+ @item{@racket['tex-open-group-delimiter]}
+ @item{@racket['tex-close-group-delimiter]}
  @item{@racket['tex-optional-delimiter]}
+ @item{@racket['tex-open-optional-delimiter]}
+ @item{@racket['tex-close-optional-delimiter]}
  @item{@racket['tex-special-character]}
  @item{@racket['tex-alignment-tab]}
  @item{@racket['tex-subscript-mark]}

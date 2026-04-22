@@ -344,6 +344,26 @@
      [(#\~) '(tex-unbreakable-space)]
      [else  '()])))
 
+;; group-delimiter-tags : char? -> (listof symbol?)
+;;   Choose derived tags for one TeX group delimiter.
+(define (group-delimiter-tags ch)
+  (append
+   '(delimiter tex-group-delimiter)
+   (case ch
+     [(#\{) '(tex-open-group-delimiter)]
+     [(#\}) '(tex-close-group-delimiter)]
+     [else  '()])))
+
+;; optional-delimiter-tags : char? -> (listof symbol?)
+;;   Choose derived tags for one TeX optional delimiter.
+(define (optional-delimiter-tags ch)
+  (append
+   '(delimiter tex-optional-delimiter)
+   (case ch
+     [(#\[) '(tex-open-optional-delimiter)]
+     [(#\]) '(tex-close-optional-delimiter)]
+     [else  '()])))
+
 ;; read-control-token : position? input-port? output-port? symbol? -> tex-derived-token?
 ;;   Read one control word or control symbol token.
 (define (read-control-token start in out mode)
@@ -415,25 +435,25 @@
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-group-delimiter))]
+                                (group-delimiter-tags next))]
          [(char=? next #\})
           (write-one! in out)
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-group-delimiter))]
+                                (group-delimiter-tags next))]
          [(char=? next #\[)
           (write-one! in out)
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-optional-delimiter))]
+                                (optional-delimiter-tags next))]
          [(char=? next #\])
           (write-one! in out)
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-optional-delimiter))]
+                                (optional-delimiter-tags next))]
          [(char=? next #\$)
           (write-one! in out)
           (when (and (char? (peek-next in))

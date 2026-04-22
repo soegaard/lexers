@@ -234,6 +234,24 @@
     (findf (lambda (token)
              (tex-derived-token-has-tag? token 'tex-accent-command))
            accent-derived))
+  (define delimiter-derived
+    (tex-string->derived-tokens "{x}[y]\n"))
+  (define open-group-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-open-group-delimiter))
+           delimiter-derived))
+  (define close-group-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-close-group-delimiter))
+           delimiter-derived))
+  (define open-optional-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-open-optional-delimiter))
+           delimiter-derived))
+  (define close-optional-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-close-optional-delimiter))
+           delimiter-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 5)
                 '(identifier delimiter literal delimiter whitespace))
@@ -253,6 +271,10 @@
   (check-not-false italic-correction-token)
   (check-not-false control-space-token)
   (check-not-false accent-token)
+  (check-not-false open-group-token)
+  (check-not-false close-group-token)
+  (check-not-false open-optional-token)
+  (check-not-false close-optional-token)
   (check-equal? (tex-derived-token-text control-word-token)
                 "\\section")
   (check-equal? (tex-derived-token-text text-token)
@@ -269,6 +291,14 @@
                 "\\ ")
   (check-equal? (tex-derived-token-text accent-token)
                 "\\'")
+  (check-equal? (tex-derived-token-text open-group-token)
+                "{")
+  (check-equal? (tex-derived-token-text close-group-token)
+                "}")
+  (check-equal? (tex-derived-token-text open-optional-token)
+                "[")
+  (check-equal? (tex-derived-token-text close-optional-token)
+                "]")
   (check-equal? parameter-tokens
                 '("#1" " " "##"))
   (check-true (contiguous-derived-stream? sample-derived))

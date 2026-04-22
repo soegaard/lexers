@@ -43,7 +43,11 @@ The first reusable TeX-specific derived tags include:
 - `tex-inline-math-shift`
 - `tex-display-math-shift`
 - `tex-group-delimiter`
+- `tex-open-group-delimiter`
+- `tex-close-group-delimiter`
 - `tex-optional-delimiter`
+- `tex-open-optional-delimiter`
+- `tex-close-optional-delimiter`
 - `tex-special-character`
 - `tex-alignment-tab`
 - `tex-subscript-mark`
@@ -63,4 +67,5 @@ distinguishes display-vs-inline math shifts and the common special characters
 `tex-special-character` tag, and it now gives reusable tags to common
 control-symbol spacing constructs such as `\ `, `\,`, `\;`, `\!`, and `\/`.
 Common accent control symbols such as `\'`, `\"`, `\~`, and `\c` also receive
-their own reusable `tex-accent-command` tag.
+their own reusable `tex-accent-command` tag. Group and optional delimiters also
+distinguish opening-vs-closing roles in the derived layer.
