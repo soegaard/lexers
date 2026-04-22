@@ -189,6 +189,20 @@
   (define parameter-tokens
     (map tex-derived-token-text
          (tex-string->derived-tokens "#1 ##")))
+  (define parameter-derived
+    (tex-string->derived-tokens "#1 ## #"))
+  (define parameter-reference-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-parameter-reference))
+           parameter-derived))
+  (define parameter-escape-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-parameter-escape))
+           parameter-derived))
+  (define parameter-marker-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-parameter-marker))
+           parameter-derived))
   (define special-derived
     (tex-string->derived-tokens "$$x$$ \\(z\\) & _ ^ ~ \\[y\\] \\, \\; \\! \\/ \\ \n"))
   (define display-math-token
@@ -278,6 +292,9 @@
   (check-not-false control-space-token)
   (check-not-false accent-token)
   (check-not-false paragraph-token)
+  (check-not-false parameter-reference-token)
+  (check-not-false parameter-escape-token)
+  (check-not-false parameter-marker-token)
   (check-not-false open-group-token)
   (check-not-false close-group-token)
   (check-not-false open-optional-token)
@@ -300,6 +317,12 @@
                 "\\'")
   (check-equal? (tex-derived-token-text paragraph-token)
                 "\\par")
+  (check-equal? (tex-derived-token-text parameter-reference-token)
+                "#1")
+  (check-equal? (tex-derived-token-text parameter-escape-token)
+                "##")
+  (check-equal? (tex-derived-token-text parameter-marker-token)
+                "#")
   (check-equal? (tex-derived-token-text open-group-token)
                 "{")
   (check-equal? (tex-derived-token-text close-group-token)

@@ -39,6 +39,9 @@ The first reusable TeX-specific derived tags include:
 - `tex-control-symbol`
 - `tex-paragraph-command`
 - `tex-parameter`
+- `tex-parameter-reference`
+- `tex-parameter-escape`
+- `tex-parameter-marker`
 - `tex-text`
 - `tex-math-shift`
 - `tex-inline-math-shift`

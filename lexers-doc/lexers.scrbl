@@ -2992,6 +2992,9 @@ The first reusable TeX-specific derived tags include:
  @item{@racket['tex-control-symbol]}
  @item{@racket['tex-paragraph-command]}
  @item{@racket['tex-parameter]}
+ @item{@racket['tex-parameter-reference]}
+ @item{@racket['tex-parameter-escape]}
+ @item{@racket['tex-parameter-marker]}
  @item{@racket['tex-text]}
  @item{@racket['tex-math-shift]}
  @item{@racket['tex-inline-math-shift]}

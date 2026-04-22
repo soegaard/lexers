@@ -335,7 +335,22 @@
      [(string=? text "$$")
       '(tex-display-math-shift)]
      [else
-      '(tex-inline-math-shift)])))
+     '(tex-inline-math-shift)])))
+
+;; parameter-tags : string? -> (listof symbol?)
+;;   Choose derived tags for one TeX parameter token spelling.
+(define (parameter-tags text)
+  (append
+   '(identifier tex-parameter)
+   (cond
+     [(string=? text "##")
+      '(tex-parameter-escape)]
+     [(and (= (string-length text) 2)
+           (char=? (string-ref text 0) #\#)
+           (char-numeric? (string-ref text 1)))
+      '(tex-parameter-reference)]
+     [else
+      '(tex-parameter-marker)])))
 
 ;; special-character-tags : char? -> (listof symbol?)
 ;;   Choose derived tags for one TeX special character.
@@ -473,7 +488,7 @@
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(identifier tex-parameter))]
+                                (parameter-tags (get-output-string out)))]
          [(member next '(#\& #\_ #\^ #\~))
           (write-one! in out)
           (make-token-from-text start
