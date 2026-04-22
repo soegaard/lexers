@@ -190,7 +190,7 @@
     (map tex-derived-token-text
          (tex-string->derived-tokens "#1 ##")))
   (define special-derived
-    (tex-string->derived-tokens "$$x$$ \\(z\\) & _ ^ ~ \\[y\\]\n"))
+    (tex-string->derived-tokens "$$x$$ \\(z\\) & _ ^ ~ \\[y\\] \\, \\; \\! \\/ \\ \n"))
   (define display-math-token
     (findf (lambda (token)
              (tex-derived-token-has-tag? token 'tex-display-math-shift))
@@ -216,6 +216,18 @@
     (findf (lambda (token)
              (tex-derived-token-has-tag? token 'tex-unbreakable-space))
            special-derived))
+  (define spacing-command-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-spacing-command))
+           special-derived))
+  (define italic-correction-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-italic-correction))
+           special-derived))
+  (define control-space-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-control-space))
+           special-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 5)
                 '(identifier delimiter literal delimiter whitespace))
@@ -231,6 +243,9 @@
   (check-not-false subscript-token)
   (check-not-false superscript-token)
   (check-not-false unbreakable-space-token)
+  (check-not-false spacing-command-token)
+  (check-not-false italic-correction-token)
+  (check-not-false control-space-token)
   (check-equal? (tex-derived-token-text control-word-token)
                 "\\section")
   (check-equal? (tex-derived-token-text text-token)
@@ -239,6 +254,12 @@
                 "$$")
   (check-equal? (tex-derived-token-text inline-math-token)
                 "\\(")
+  (check-equal? (tex-derived-token-text spacing-command-token)
+                "\\,")
+  (check-equal? (tex-derived-token-text italic-correction-token)
+                "\\/")
+  (check-equal? (tex-derived-token-text control-space-token)
+                "\\ ")
   (check-equal? parameter-tokens
                 '("#1" " " "##"))
   (check-true (contiguous-derived-stream? sample-derived))

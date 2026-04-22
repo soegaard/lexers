@@ -2900,7 +2900,8 @@ subset. It covers comments, whitespace, control words, control symbols, group
 and optional delimiters, math shifts, parameter markers, and plain text runs.
 The derived layer distinguishes inline-vs-display math shifts and gives
 reusable tags to the common special characters @tt{&}, @tt{_}, @tt{^}, and
-@tt{~}.
+@tt{~}. It also gives reusable tags to common control-symbol spacing commands
+such as @tt{\ }, @tt{\,}, @tt{\;}, @tt{\!}, and @tt{\/}.
 
 @defproc[(make-tex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2985,6 +2986,9 @@ The first reusable TeX-specific derived tags include:
  @item{@racket['tex-subscript-mark]}
  @item{@racket['tex-superscript-mark]}
  @item{@racket['tex-unbreakable-space]}
+ @item{@racket['tex-control-space]}
+ @item{@racket['tex-spacing-command]}
+ @item{@racket['tex-italic-correction]}
  @item{@racket['malformed-token]}]
 
 Markdown fenced code blocks labeled @tt{tex} delegate to

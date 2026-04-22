@@ -49,6 +49,9 @@ The first reusable TeX-specific derived tags include:
 - `tex-subscript-mark`
 - `tex-superscript-mark`
 - `tex-unbreakable-space`
+- `tex-control-space`
+- `tex-spacing-command`
+- `tex-italic-correction`
 - `malformed-token`
 
 This module is intended to be source-faithful and streaming. More complete
@@ -56,4 +59,5 @@ TeX-specific behavior, especially catcode-sensitive tokenization, can be added
 later without changing the basic architecture. The derived layer now also
 distinguishes display-vs-inline math shifts and the common special characters
 `&`, `_`, `^`, and `~` instead of exposing them only through the generic
-`tex-special-character` tag.
+`tex-special-character` tag, and it now gives reusable tags to common
+control-symbol spacing constructs such as `\ `, `\,`, `\;`, `\!`, and `\/`.

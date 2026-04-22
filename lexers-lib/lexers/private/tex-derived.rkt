@@ -297,6 +297,12 @@
 ;;   Choose derived tags for one control symbol.
 (define (control-symbol-tags text)
   (cond
+    [(string=? text "\\ ")
+     '(identifier tex-control-symbol tex-control-space)]
+    [(member text '("\\," "\\;" "\\!" "\\:"))
+     '(identifier tex-control-symbol tex-spacing-command)]
+    [(string=? text "\\/")
+     '(identifier tex-control-symbol tex-italic-correction)]
     [(or (string=? text "\\(")
          (string=? text "\\)")
          (string=? text "\\[")
