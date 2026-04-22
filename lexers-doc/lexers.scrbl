@@ -2998,7 +2998,8 @@ The projected LaTeX API has two entry points:
 The first LaTeX implementation builds on the TeX lexer and adds a lightweight
 classification layer for common LaTeX commands such as @tt{\section},
 @tt{\begin}, and @tt{\end}. Environment names in forms such as
-@tt{\begin\{itemize\}} receive their own derived tag.
+@tt{\begin\{itemize\}} receive their own derived tag, and @tt{\verb|...|}
+spans receive a dedicated verbatim-literal tag.
 
 @defproc[(make-latex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -3058,7 +3059,8 @@ Common additional LaTeX-oriented derived tags include:
 @itemlist[
  @item{@racket['latex-command]}
  @item{@racket['latex-environment-command]}
- @item{@racket['latex-environment-name]}]
+ @item{@racket['latex-environment-name]}
+ @item{@racket['latex-verbatim-literal]}]
 
 Markdown fenced code blocks labeled @tt{latex} delegate to
 @racketmodname[lexers/latex]. Wrapped delegated Markdown tokens preserve

@@ -243,6 +243,28 @@
                  (char=? next #\#)))
     (write-one! in out)))
 
+;; read-verb-delimited! : input-port? output-port? -> boolean?
+;;   Consume one LaTeX \verb-style delimited literal and report whether it terminated.
+(define (read-verb-delimited! in out)
+  (define delimiter
+    (read-char in))
+  (write-char delimiter out)
+  (let loop ()
+    (define next
+      (peek-next in))
+    (cond
+      [(eof-object? next)
+       #f]
+      [(newline-start? next)
+       #f]
+      [else
+       (write-one! in out)
+       (cond
+         [(char=? next delimiter)
+          #t]
+         [else
+          (loop)])])))
+
 ;; read-text! : input-port? output-port? -> void?
 ;;   Consume one plain-text run until a special character begins.
 (define (read-text! in out)
@@ -310,6 +332,8 @@
 (define (make-tex-derived-reader [mode 'tex])
   (define latex-environment-state
     'none)
+  (define latex-verb-state
+    'none)
   (lambda (in)
     (define next
       (peek-next in))
@@ -323,6 +347,16 @@
          (open-output-string))
        (define base-token
          (cond
+         [(and (eq? mode 'latex)
+               (eq? latex-verb-state 'expect-delimiter))
+          (define terminated?
+            (read-verb-delimited! in out))
+          (make-token-from-text start
+                                (current-stream-position in)
+                                (get-output-string out)
+                                (if terminated?
+                                    '(literal latex-verbatim-literal)
+                                    '(literal latex-verbatim-literal malformed-token)))]
          [(tex-whitespace? next)
           (read-whitespace! in out)
           (make-token-from-text start
@@ -400,9 +434,16 @@
          (cond
            [(tex-derived-token-has-tag? token 'whitespace)
             (void)]
+           [(and (eq? latex-verb-state 'expect-delimiter)
+                 (or (tex-derived-token-has-tag? token 'latex-verbatim-literal)
+                     (tex-derived-token-has-tag? token 'malformed-token)))
+            (set! latex-verb-state 'none)]
            [(and (tex-derived-token-has-tag? token 'latex-environment-command)
                  (member (tex-derived-token-text token) '("\\begin" "\\end")))
             (set! latex-environment-state 'expect-open)]
+           [(and (tex-derived-token-has-tag? token 'latex-command)
+                 (string=? (tex-derived-token-text token) "\\verb"))
+            (set! latex-verb-state 'expect-delimiter)]
            [(and (eq? latex-environment-state 'expect-open)
                  (tex-derived-token-has-tag? token 'tex-group-delimiter)
                  (string=? (tex-derived-token-text token) "{"))

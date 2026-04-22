@@ -14,9 +14,11 @@ This means:
   - `latex-command`
   - `latex-environment-command`
   - `latex-environment-name`
+  - `latex-verbatim-literal`
 
 The first version is intentionally conservative. It aims to make ordinary
 LaTeX source useful for preview and syntax-coloring consumers without trying to
 parse the macro language. Environment names in forms such as
 `\begin{itemize}` and `\end{itemize}` now receive their own derived tag instead
-of remaining plain TeX text.
+of remaining plain TeX text. LaTeX `\verb|...|` spans now also receive a
+distinct verbatim-literal tag.
