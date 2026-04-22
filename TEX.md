@@ -37,6 +37,7 @@ The first reusable TeX-specific derived tags include:
 - `tex-whitespace`
 - `tex-control-word`
 - `tex-control-symbol`
+- `tex-paragraph-command`
 - `tex-parameter`
 - `tex-text`
 - `tex-math-shift`
@@ -69,3 +70,4 @@ control-symbol spacing constructs such as `\ `, `\,`, `\;`, `\!`, and `\/`.
 Common accent control symbols such as `\'`, `\"`, `\~`, and `\c` also receive
 their own reusable `tex-accent-command` tag. Group and optional delimiters also
 distinguish opening-vs-closing roles in the derived layer.
+The plain-TeX paragraph command `\par` also receives its own reusable tag.

@@ -281,6 +281,8 @@
   (define name
     (substring text 1))
   (cond
+    [(string=? name "par")
+     '(keyword tex-control-word tex-paragraph-command)]
     [(and (eq? mode 'latex)
           (set-member? latex-command-words name))
      (append '(identifier tex-control-word latex-command keyword)
@@ -293,10 +295,13 @@
     [else
      '(identifier tex-control-word)]))
 
-;; control-symbol-tags : string? -> (listof symbol?)
+;; control-symbol-tags : string? symbol? -> (listof symbol?)
 ;;   Choose derived tags for one control symbol.
-(define (control-symbol-tags text)
+(define (control-symbol-tags text mode)
   (cond
+    [(and (eq? mode 'latex)
+          (string=? text "\\\\"))
+     '(keyword tex-control-symbol latex-command latex-line-break-command)]
     [(string=? text "\\ ")
      '(identifier tex-control-symbol tex-control-space)]
     [(member text '("\\'" "\\`" "\\\"" "\\^" "\\~" "\\=" "\\." "\\u"
@@ -383,7 +388,7 @@
                            (current-stream-position in)
                            (get-output-string out)
                            (if terminated?
-                               (control-symbol-tags (get-output-string out))
+                               (control-symbol-tags (get-output-string out) mode)
                                '(malformed-token tex-control-symbol)))]))
 
 ;; make-tex-derived-reader : [symbol?] -> (input-port? -> (or/c tex-derived-token? 'eof))

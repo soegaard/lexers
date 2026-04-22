@@ -15,10 +15,11 @@ This means:
   - `latex-environment-command`
   - `latex-environment-name`
   - `latex-verbatim-literal`
+  - `latex-line-break-command`
 
 The first version is intentionally conservative. It aims to make ordinary
 LaTeX source useful for preview and syntax-coloring consumers without trying to
 parse the macro language. Environment names in forms such as
 `\begin{itemize}` and `\end{itemize}` now receive their own derived tag instead
 of remaining plain TeX text. LaTeX `\verb|...|` spans now also receive a
-distinct verbatim-literal tag.
+distinct verbatim-literal tag, and `\\` receives a dedicated line-break tag.

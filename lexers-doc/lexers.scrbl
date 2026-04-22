@@ -2903,7 +2903,8 @@ reusable tags to the common special characters @tt{&}, @tt{_}, @tt{^}, and
 @tt{~}. It also gives reusable tags to common control-symbol spacing commands
 such as @tt{\ }, @tt{\,}, @tt{\;}, @tt{\!}, and @tt{\/}. Common accent
 control symbols such as @tt{\'} and @tt{\"} also receive their own reusable
-tag, and group/optional delimiters distinguish opening-vs-closing roles.
+tag, and group/optional delimiters distinguish opening-vs-closing roles. The
+plain-TeX paragraph command @tt{\par} also receives its own reusable tag.
 
 @defproc[(make-tex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2976,6 +2977,7 @@ The first reusable TeX-specific derived tags include:
  @item{@racket['tex-whitespace]}
  @item{@racket['tex-control-word]}
  @item{@racket['tex-control-symbol]}
+ @item{@racket['tex-paragraph-command]}
  @item{@racket['tex-parameter]}
  @item{@racket['tex-text]}
  @item{@racket['tex-math-shift]}
@@ -3019,7 +3021,8 @@ The first LaTeX implementation builds on the TeX lexer and adds a lightweight
 classification layer for common LaTeX commands such as @tt{\section},
 @tt{\begin}, and @tt{\end}. Environment names in forms such as
 @tt{\begin\{itemize\}} receive their own derived tag, and @tt{\verb|...|}
-spans receive a dedicated verbatim-literal tag.
+spans receive a dedicated verbatim-literal tag. The common LaTeX line-break
+command @tt{\\} also receives its own derived tag.
 
 @defproc[(make-latex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -3080,7 +3083,8 @@ Common additional LaTeX-oriented derived tags include:
  @item{@racket['latex-command]}
  @item{@racket['latex-environment-command]}
  @item{@racket['latex-environment-name]}
- @item{@racket['latex-verbatim-literal]}]
+ @item{@racket['latex-verbatim-literal]}
+ @item{@racket['latex-line-break-command]}]
 
 Markdown fenced code blocks labeled @tt{latex} delegate to
 @racketmodname[lexers/latex]. Wrapped delegated Markdown tokens preserve

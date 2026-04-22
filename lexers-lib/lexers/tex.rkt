@@ -234,6 +234,12 @@
     (findf (lambda (token)
              (tex-derived-token-has-tag? token 'tex-accent-command))
            accent-derived))
+  (define paragraph-derived
+    (tex-string->derived-tokens "\\par\n"))
+  (define paragraph-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-paragraph-command))
+           paragraph-derived))
   (define delimiter-derived
     (tex-string->derived-tokens "{x}[y]\n"))
   (define open-group-token
@@ -271,6 +277,7 @@
   (check-not-false italic-correction-token)
   (check-not-false control-space-token)
   (check-not-false accent-token)
+  (check-not-false paragraph-token)
   (check-not-false open-group-token)
   (check-not-false close-group-token)
   (check-not-false open-optional-token)
@@ -291,6 +298,8 @@
                 "\\ ")
   (check-equal? (tex-derived-token-text accent-token)
                 "\\'")
+  (check-equal? (tex-derived-token-text paragraph-token)
+                "\\par")
   (check-equal? (tex-derived-token-text open-group-token)
                 "{")
   (check-equal? (tex-derived-token-text close-group-token)
