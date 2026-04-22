@@ -166,6 +166,18 @@
     (haskell-string->tokens sample-source
                             #:profile 'compiler
                             #:source-positions #f))
+  (define layout-source
+    "main = do\n  putStrLn \"hi\"\n  print 'x'\n")
+  (define layout-compiler-tokens
+    (haskell-string->tokens layout-source
+                            #:profile 'compiler
+                            #:source-positions #f))
+  (define let-layout-source
+    "f x = let\n  a = 1\n  b = 2\n in a + b\n")
+  (define let-layout-compiler-tokens
+    (haskell-string->tokens let-layout-source
+                            #:profile 'compiler
+                            #:source-positions #f))
   (define crlf-source
     "module Main where\r\nmain = putStrLn \"hi\"\r\n"
     )
@@ -204,6 +216,10 @@
                 '(comment whitespace keyword whitespace identifier whitespace keyword whitespace))
   (check-equal? (last (map lexer-token-name compiler-tokens))
                 'eof)
+  (check-equal? (map lexer-token-value layout-compiler-tokens)
+                '("main" "=" "do" "{" "putStrLn" "\"hi\"" ";" "print" "'x'" "}" #f))
+  (check-equal? (map lexer-token-value let-layout-compiler-tokens)
+                '("f" "x" "=" "let" "{" "a" "=" "1" ";" "b" "=" "2" "}" "in" "a" "+" "b" #f))
   (check-not-false pragma-token)
   (check-not-false keyword-token)
   (check-not-false string-token)

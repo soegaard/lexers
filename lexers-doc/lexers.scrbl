@@ -2019,7 +2019,10 @@ The first Haskell implementation is a handwritten streaming lexer grounded in
 the Haskell lexical-structure specification, with a small set of practical
 GHC-era additions such as pragmas. It covers whitespace, line comments,
 nested comments, pragmas, identifiers, operators, strings, characters,
-numeric literals, and delimiters.
+numeric literals, and delimiters. In the @racket['compiler] profile, the
+projected token stream also inserts ordinary Haskell layout tokens for
+@tt{let}, @tt{where}, @tt{do}, and @tt{of}, while the @racket['coloring]
+profile remains source-faithful.
 
 @defproc[(make-haskell-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

@@ -50,6 +50,14 @@ The first reusable Haskell-specific derived tags include:
 - `haskell-delimiter`
 - `malformed-token`
 
-This module is intended to be source-faithful and streaming. Layout handling,
-full escape-gap support, and broader GHC-extension surfaces can be added later
-within the same architecture.
+This module is intended to be source-faithful and streaming. Layout handling is
+now profile-sensitive:
+
+- in `coloring`, the projected stream remains source-faithful and does not
+  synthesize layout tokens
+- in `compiler`, the projected stream inserts virtual layout `{`, `;`, and `}`
+  tokens for ordinary `let`, `where`, `do`, and `of` layouts
+
+The derived-token API remains source-faithful and does not synthesize virtual
+layout tokens. Full escape-gap support and broader GHC-extension surfaces can
+still be added later within the same architecture.
