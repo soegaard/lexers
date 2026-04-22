@@ -238,6 +238,52 @@
     (findf (lambda (token)
              (c-derived-token-has-tag? token 'c-line-splice))
            splice-derived))
+  (define digraph-source
+    "%:define X 1\nint a<:2:> = <% X %>;\n")
+  (define digraph-derived
+    (c-string->derived-tokens digraph-source))
+  (define digraph-project
+    (c-string->tokens digraph-source
+                      #:profile 'coloring
+                      #:source-positions #f))
+  (define malformed-escape-coloring
+    (c-string->tokens "\"\\q\""
+                      #:profile 'coloring
+                      #:source-positions #f))
+  (define valid-escape-source
+    "char a = '\\x41';\nchar b = '\\101';\n")
+  (define valid-escape-derived
+    (c-string->derived-tokens valid-escape-source))
+  (define invalid-char-derived
+    (c-string->derived-tokens "char bad = '\\q';\n"))
+  (define invalid-char-token
+    (findf (lambda (token)
+             (and (c-derived-token-has-tag? token 'c-char-literal)
+                  (c-derived-token-has-tag? token 'malformed-token)))
+           invalid-char-derived))
+  (define ucn-source
+    "int \\u0041 = 1;\nchar *s = \"\\u0041\";\n")
+  (define ucn-derived
+    (c-string->derived-tokens ucn-source))
+  (define ucn-identifier-token
+    (findf (lambda (token)
+             (and (c-derived-token-has-tag? token 'c-identifier)
+                  (string=? (c-derived-token-text token) "\\u0041")))
+           ucn-derived))
+  (define ucn-string-token
+    (findf (lambda (token)
+             (and (c-derived-token-has-tag? token 'c-string-literal)
+                  (string=? (c-derived-token-text token) "\"\\u0041\"")))
+           ucn-derived))
+  (define trigraph-splice-source
+    "#define X(a, b) a + ??/\n  b\n")
+  (define trigraph-splice-derived
+    (c-string->derived-tokens trigraph-splice-source))
+  (define trigraph-splice-token
+    (findf (lambda (token)
+             (and (c-derived-token-has-tag? token 'c-line-splice)
+                  (string=? (c-derived-token-text token) "??/\n")))
+           trigraph-splice-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 12)
                 '(delimiter keyword whitespace literal whitespace delimiter keyword whitespace identifier whitespace literal whitespace))
@@ -248,6 +294,10 @@
   (check-not-false string-token)
   (check-not-false char-token)
   (check-not-false splice-token)
+  (check-not-false invalid-char-token)
+  (check-not-false ucn-identifier-token)
+  (check-not-false ucn-string-token)
+  (check-not-false trigraph-splice-token)
   (check-not-false first-streaming-token)
   (check-equal? (c-derived-token-text directive-token)
                 "include")
@@ -260,9 +310,21 @@
                 comment-source)
   (check-equal? (apply string-append (map c-derived-token-text crlf-derived))
                 crlf-source)
+  (check-equal? (apply string-append (map c-derived-token-text digraph-derived))
+                digraph-source)
+  (check-equal? (apply string-append (map c-derived-token-text valid-escape-derived))
+                valid-escape-source)
+  (check-equal? (apply string-append (map c-derived-token-text ucn-derived))
+                ucn-source)
+  (check-equal? (apply string-append (map c-derived-token-text trigraph-splice-derived))
+                trigraph-splice-source)
+  (check-equal? (take (map lexer-token-name digraph-project) 10)
+                '(delimiter keyword whitespace identifier whitespace literal whitespace keyword whitespace identifier))
   (check-equal? (map lexer-token-value (take malformed-coloring 1))
                 '("\"unterminated"))
   (check-equal? (map lexer-token-name malformed-coloring)
+                '(unknown eof))
+  (check-equal? (map lexer-token-name malformed-escape-coloring)
                 '(unknown eof))
   (check-exn exn:fail:read?
              malformed-compiler-thunk))

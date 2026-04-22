@@ -60,12 +60,13 @@
 ;; C delimiters.
 (define c-delimiters
   (list->set
-   '("#" "(" ")" "[" "]" "{" "}" "," ";" ":" "?")))
+   '("#" "%:" "(" ")" "[" "]" "{" "}" "," ";" ":" "?")))
 
 ;; C operators and punctuators in longest-match order.
 (define c-symbol-tokens
-  '(">>=" "<<=" "..."
-    "##" "->" "++" "--" "<<"
+  '("%:%:" ">>=" "<<=" "..."
+    "??=" "??/" "??'" "??(" "??)" "??!" "??<" "??>" "??-"
+    "##" "%:" "<%" "%>" "<:" ":>" "->" "++" "--" "<<"
     ">>" "<=" ">=" "==" "!="
     "&&" "||" "*=" "/=" "%="
     "+=" "-=" "&=" "^=" "|="
@@ -166,6 +167,24 @@
   (or (identifier-start-char? ch)
       (char-numeric? ch)))
 
+;; identifier-start-at? : input-port? -> boolean?
+;;   Determine whether the next source begins one identifier-start unit.
+(define (identifier-start-at? in)
+  (define next
+    (peek-next in))
+  (or (and (char? next)
+           (identifier-start-char? next))
+      (universal-character-name-length-at in)))
+
+;; identifier-continuation-at? : input-port? -> boolean?
+;;   Determine whether the next source begins one identifier-continuation unit.
+(define (identifier-continuation-at? in)
+  (define next
+    (peek-next in))
+  (or (and (char? next)
+           (identifier-char? next))
+      (universal-character-name-length-at in)))
+
 ;; pp-number-char? : char? -> boolean?
 ;;   Recognize a broad preprocessing-number continuation character.
 (define (pp-number-char? ch)
@@ -179,7 +198,61 @@
 ;; delimiter-token? : string? -> boolean?
 ;;   Determine whether a token spelling is delimiter-like.
 (define (delimiter-token? text)
-  (set-member? c-delimiters text))
+  (or (set-member? c-delimiters text)
+      (member text '("<:" ":>" "<%" "%>" "??=" "??(" "??)" "??<" "??>"))))
+
+;; hex-digit? : char? -> boolean?
+;;   Recognize one hexadecimal digit.
+(define (hex-digit? ch)
+  (or (char-numeric? ch)
+      (member (char-downcase ch)
+              '(#\a #\b #\c #\d #\e #\f))))
+
+;; octal-digit? : char? -> boolean?
+;;   Recognize one octal digit.
+(define (octal-digit? ch)
+  (and (char-numeric? ch)
+       (char<=? ch #\7)))
+
+;; universal-character-introducer? : (or/c char? eof-object?) -> boolean?
+;;   Determine whether a character introduces a universal character name.
+(define (universal-character-introducer? ch)
+  (and (char? ch)
+       (member ch '(#\u #\U))))
+
+;; universal-character-name-length-at : input-port? [exact-nonnegative-integer?] -> (or/c exact-nonnegative-integer? #f)
+;;   Return the raw length of a universal character name beginning at the current position.
+(define (universal-character-name-length-at in [skip 0])
+  (define slash
+    (peek-next in skip))
+  (define marker
+    (peek-next in (add1 skip)))
+  (cond
+    [(or (not (char? slash))
+         (not (char=? slash #\\))
+         (not (universal-character-introducer? marker)))
+     #f]
+    [else
+     (define hex-count
+       (cond
+         [(char=? marker #\u) 4]
+         [else                8]))
+     (define ok?
+       (for/and ([i (in-range hex-count)])
+         (define ch
+           (peek-next in (+ skip 2 i)))
+         (and (char? ch)
+              (hex-digit? ch))))
+     (and ok?
+          (+ 2 hex-count))]))
+
+;; consume-universal-character-name! : input-port? output-port? -> void?
+;;   Consume one universal character name known to be present.
+(define (consume-universal-character-name! in out)
+  (define len
+    (universal-character-name-length-at in))
+  (for ([i (in-range len)])
+    (write-one! in out)))
 
 ;; -----------------------------------------------------------------------------
 ;; Small scanners
@@ -197,6 +270,24 @@
        (write-one! in out))]
     [else
      (write-one! in out)]))
+
+;; trigraph-line-splice-at? : input-port? -> boolean?
+;;   Determine whether the next input begins a trigraph backslash line splice.
+(define (trigraph-line-splice-at? in)
+  (and (char? (peek-next in 0))
+       (char=? (peek-next in 0) #\?)
+       (char? (peek-next in 1))
+       (char=? (peek-next in 1) #\?)
+       (char? (peek-next in 2))
+       (char=? (peek-next in 2) #\/)
+       (newline-start? (peek-next in 3))))
+
+;; read-trigraph-line-splice! : input-port? output-port? -> void?
+;;   Consume one trigraph backslash line splice.
+(define (read-trigraph-line-splice! in out)
+  (for ([i (in-range 3)])
+    (write-one! in out))
+  (read-newline! in out))
 
 ;; read-line-comment! : input-port? output-port? -> void?
 ;;   Consume one // comment without its terminating newline.
@@ -244,7 +335,21 @@
 ;; read-identifier! : input-port? output-port? -> void?
 ;;   Consume one C identifier candidate.
 (define (read-identifier! in out)
-  (read-while! in out identifier-char?))
+  (let loop ()
+    (cond
+      [(universal-character-name-length-at in)
+       (consume-universal-character-name! in out)
+       (loop)]
+      [else
+       (define next
+         (peek-next in))
+       (cond
+         [(and (char? next)
+               (identifier-char? next))
+          (write-one! in out)
+          (loop)]
+         [else
+          (void)])])))
 
 ;; string-prefix-length : input-port? -> exact-nonnegative-integer?
 ;;   Determine the length of the current string-literal prefix.
@@ -294,42 +399,74 @@
      0]))
 
 ;; read-delimited-literal! : input-port? output-port? exact-nonnegative-integer? char? -> boolean?
-;;   Consume one string-like literal with an optional prefix.
+;;                        -> (values boolean? boolean?)
+;;   Consume one string-like literal with an optional prefix and report
+;;   termination and lexical escape validity.
 (define (read-delimited-literal! in out prefix-length delimiter)
   (for ([i (in-range prefix-length)])
     (write-one! in out))
   (write-one! in out)
-  (let loop ()
+  (let loop ([valid? #t])
     (define next
       (peek-next in))
     (cond
       [(eof-object? next)
-       #f]
+       (values #f valid?)]
       [else
        (define ch
          next)
        (cond
          [(char=? ch delimiter)
           (write-one! in out)
-          #t]
+          (values #t valid?)]
          [(newline-start? ch)
-          #f]
+          (values #f valid?)]
          [(char=? ch #\\)
           (write-one! in out)
           (define escaped
             (peek-next in))
           (cond
             [(eof-object? escaped)
-             #f]
+             (values #f #f)]
             [(newline-start? escaped)
              (read-newline! in out)
-             (loop)]
+             (loop valid?)]
+            [(member escaped '(#\' #\" #\? #\\ #\a #\b #\f #\n #\r #\t #\v))
+             (write-one! in out)
+             (loop valid?)]
+            [(universal-character-introducer? escaped)
+             (cond
+               [(universal-character-name-length-at in 1)
+                (write-one! in out)
+                (consume-universal-character-name! in out)
+                (loop valid?)]
+               [else
+                (write-one! in out)
+                (loop #f)])]
+            [(char=? escaped #\x)
+             (write-one! in out)
+             (define first-hex
+               (peek-next in))
+             (cond
+               [(and (char? first-hex)
+                     (hex-digit? first-hex))
+                (read-while! in out hex-digit?)
+                (loop valid?)]
+               [else
+                (loop #f)])]
+            [(octal-digit? escaped)
+             (write-one! in out)
+             (for ([i (in-range 2)])
+               (when (and (char? (peek-next in))
+                          (octal-digit? (peek-next in)))
+                 (write-one! in out)))
+             (loop valid?)]
             [else
              (write-one! in out)
-             (loop)])]
+             (loop #f)])]
          [else
           (write-one! in out)
-          (loop)])])))
+          (loop valid?)])])))
 
 ;; read-angle-header! : input-port? output-port? -> boolean?
 ;;   Consume one <...> include header name.
@@ -418,12 +555,17 @@
                              (current-stream-position in)
                              (get-output-string out)
                              '(whitespace c-whitespace))]
-      [(and (char=? next #\\)
-            (newline-start? (peek-next in 1)))
+      [(or (and (char=? next #\\)
+                (newline-start? (peek-next in 1)))
+           (trigraph-line-splice-at? in))
        (define out
          (open-output-string))
-       (write-one! in out)
-       (read-newline! in out)
+       (cond
+         [(trigraph-line-splice-at? in)
+          (read-trigraph-line-splice! in out)]
+         [else
+          (write-one! in out)
+          (read-newline! in out)])
        (make-token-from-text start-pos
                              (current-stream-position in)
                              (get-output-string out)
@@ -484,7 +626,7 @@
          expect-include-target?)
        (define prefix-length
          (string-prefix-length in))
-       (define terminated?
+       (define-values (terminated? valid?)
          (read-delimited-literal! in out prefix-length #\"))
        (set! expect-include-target? #f)
        (make-token-from-text start-pos
@@ -493,7 +635,7 @@
                              (append (if header-name?
                                          '(literal c-header-name)
                                          '(literal c-string-literal))
-                                     (if terminated?
+                                     (if (and terminated? valid?)
                                          '()
                                          '(c-error malformed-token))))]
       [(or (positive? (char-prefix-length in))
@@ -502,16 +644,16 @@
          (open-output-string))
        (set! line-prefix-only? #f)
        (set! expect-include-target? #f)
-       (define terminated?
+       (define-values (terminated? valid?)
          (read-delimited-literal! in out (char-prefix-length in) #\'))
        (make-token-from-text start-pos
                              (current-stream-position in)
                              (get-output-string out)
                              (append '(literal c-char-literal)
-                                     (if terminated?
+                                     (if (and terminated? valid?)
                                          '()
                                          '(c-error malformed-token))))]
-      [(identifier-start-char? next)
+      [(identifier-start-at? in)
        (define out
          (open-output-string))
        (set! line-prefix-only? #f)
@@ -568,7 +710,7 @@
           (define pp-marker?
             (and line-prefix-only?
                  (not in-preprocessor?)
-                 (string=? token-text "#")))
+                 (member token-text '("#" "%:"))))
           (set! line-prefix-only? #f)
           (cond
             [pp-marker?

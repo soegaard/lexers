@@ -796,7 +796,9 @@ The first C implementation is a handwritten streaming lexer grounded primarily
 in C lexical and preprocessing-token rules. It is preprocessor-aware from the
 first slice, so directive lines like @tt{#include} and @tt{#define} are
 tokenized directly instead of being flattened into ordinary punctuation and
-identifiers.
+identifiers. It also recognizes C digraph punctuators and validates string and
+character escape sequences so malformed escapes stay inside one malformed
+literal token.
 
 @defproc[(make-c-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                        [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

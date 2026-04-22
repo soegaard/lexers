@@ -15,8 +15,10 @@ Current scope:
 - numeric literals
 - string and character literals
 - operators and delimiters
+- digraph punctuators such as `%:`, `<:`, `:>`, `<%`, `%>`, and `%:%:`
 - backslash-newline line splicing
 - malformed unterminated comment and literal handling
+- malformed string and character escape-sequence handling
 
 The lexer is preprocessor-aware from the beginning, because real C files are not
 very useful without directive lines and include targets.
