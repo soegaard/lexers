@@ -195,6 +195,10 @@
     "let text = \"\"\"hello\nworld\"\"\"\n")
   (define multiline-string-derived
     (swift-string->derived-tokens multiline-string-source))
+  (define raw-string-source
+    "let regex = #\"\\\\d+\"#\nlet block = ##\"\"\"line\nvalue \\#(x)\"\"\"##\n")
+  (define raw-string-derived
+    (swift-string->derived-tokens raw-string-source))
   (define malformed-coloring
     (swift-string->tokens "let text = \"unterminated\n"
                           #:profile 'coloring
@@ -237,6 +241,10 @@
     (findf (lambda (token)
              (swift-derived-token-has-tag? token 'swift-string-literal))
            multiline-string-derived))
+  (define raw-string-token
+    (findf (lambda (token)
+             (swift-derived-token-has-tag? token 'swift-raw-string-literal))
+           raw-string-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(keyword whitespace identifier whitespace whitespace keyword whitespace identifier))
@@ -277,6 +285,7 @@
   (check-not-false operator-token)
   (check-not-false comment-token)
   (check-not-false multiline-string-token)
+  (check-not-false raw-string-token)
   (check-not-false first-streaming-token)
   (check-equal? (map lexer-token-name malformed-coloring)
                 '(keyword whitespace identifier whitespace operator whitespace unknown whitespace eof))
@@ -288,6 +297,8 @@
                 nested-comment-source)
   (check-equal? (apply string-append (map swift-derived-token-text multiline-string-derived))
                 multiline-string-source)
+  (check-equal? (apply string-append (map swift-derived-token-text raw-string-derived))
+                raw-string-source)
   (check-equal? (apply string-append (map swift-derived-token-text crlf-derived))
                 crlf-source)
   (check-equal? (swift-derived-token-text first-streaming-token)

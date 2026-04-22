@@ -2831,6 +2831,7 @@ The first reusable Swift-specific derived tags include:
  @item{@racket['swift-keyword]}
  @item{@racket['swift-identifier]}
  @item{@racket['swift-string-literal]}
+ @item{@racket['swift-raw-string-literal]}
  @item{@racket['swift-numeric-literal]}
  @item{@racket['swift-attribute]}
  @item{@racket['swift-pound-directive]}
@@ -2838,6 +2839,10 @@ The first reusable Swift-specific derived tags include:
  @item{@racket['swift-delimiter]}
  @item{@racket['swift-error]}
  @item{@racket['malformed-token]}]
+
+Both ordinary Swift strings and raw strings with @tt{#} delimiters project as
+@racket['literal], while the derived layer preserves
+@racket['swift-raw-string-literal] for the raw forms.
 
 Malformed Swift input is handled using the shared profile rules:
 

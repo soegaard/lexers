@@ -295,6 +295,76 @@
 (define (read-operator! in out)
   (read-while! in out operator-char?))
 
+;; swift-raw-string-opener : input-port? -> (or/c (cons/c exact-positive-integer? boolean?) #f)
+;;   Determine whether the current position starts one raw Swift string.
+(define (swift-raw-string-opener in)
+  (let loop ([hashes 0])
+    (define next
+      (peek-next in hashes))
+    (cond
+      [(and (char? next)
+            (char=? next #\#))
+       (loop (add1 hashes))]
+      [(zero? hashes)
+       #f]
+      [(and (char? next)
+            (char=? next #\")
+            (char? (peek-next in (add1 hashes)))
+            (char? (peek-next in (+ hashes 2)))
+            (char=? (peek-next in (add1 hashes)) #\")
+            (char=? (peek-next in (+ hashes 2)) #\"))
+       (cons hashes #t)]
+      [(and (char? next)
+            (char=? next #\"))
+       (cons hashes #f)]
+      [else
+       #f])))
+
+;; read-swift-raw-string! : input-port? output-port? exact-positive-integer? boolean? -> boolean?
+;;   Consume one raw Swift string literal and report whether it terminated.
+(define (read-swift-raw-string! in out hash-count triple?)
+  (for ([i (in-range hash-count)])
+    (write-one! in out))
+  (for ([i (in-range (if triple? 3 1))])
+    (write-one! in out))
+  (let loop ()
+    (define next
+      (peek-next in))
+    (cond
+      [(eof-object? next)
+       #f]
+      [triple?
+       (cond
+         [(and (char=? next #\")
+               (char? (peek-next in 1))
+               (char? (peek-next in 2))
+               (char=? (peek-next in 1) #\")
+               (char=? (peek-next in 2) #\")
+               (for/and ([i (in-range hash-count)])
+                 (and (char? (peek-next in (+ 3 i)))
+                      (char=? (peek-next in (+ 3 i)) #\#))))
+          (for ([i (in-range (+ 3 hash-count))])
+            (write-one! in out))
+          #t]
+         [else
+          (write-one! in out)
+          (loop)])]
+      [else
+       (cond
+         [(newline-start? next)
+          #f]
+         [(and (char=? next #\")
+               (for/and ([i (in-range hash-count)])
+                 (and (char? (peek-next in (add1 i)))
+                      (char=? (peek-next in (add1 i)) #\#))))
+          (write-one! in out)
+          (for ([i (in-range hash-count)])
+            (write-one! in out))
+          #t]
+         [else
+          (write-one! in out)
+          (loop)])])))
+
 ;; read-swift-string! : input-port? output-port? -> boolean?
 ;;   Consume one Swift string literal and report whether it terminated.
 (define (read-swift-string! in out)
@@ -437,13 +507,35 @@
                                 text
                                 '(malformed-token swift-error))])]
       [(char=? next #\#)
-       (define out
-         (open-output-string))
-       (read-pound-directive! in out)
-       (make-token-from-text start-pos
-                             (current-stream-position in)
-                             (get-output-string out)
-                             '(keyword swift-keyword swift-pound-directive))]
+       (define raw-opener
+         (swift-raw-string-opener in))
+       (cond
+         [raw-opener
+          (define out
+            (open-output-string))
+          (define terminated?
+            (read-swift-raw-string! in out (car raw-opener) (cdr raw-opener)))
+          (define text
+            (get-output-string out))
+          (cond
+            [terminated?
+             (make-token-from-text start-pos
+                                   (current-stream-position in)
+                                   text
+                                   '(literal swift-string-literal swift-raw-string-literal))]
+            [else
+             (make-token-from-text start-pos
+                                   (current-stream-position in)
+                                   text
+                                   '(malformed-token swift-error))])]
+         [else
+          (define out
+            (open-output-string))
+          (read-pound-directive! in out)
+          (make-token-from-text start-pos
+                                (current-stream-position in)
+                                (get-output-string out)
+                                '(keyword swift-keyword swift-pound-directive))])]
       [(char=? next #\@)
        (define out
          (open-output-string))

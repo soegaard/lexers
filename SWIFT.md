@@ -13,6 +13,7 @@ preview consumers:
 - attributes such as `@IBOutlet`
 - pound directives and conditionals such as `#if` and `#available`
 - string literals, including multiline strings
+- raw string literals with `#` delimiters, including multiline raw strings
 - numeric literals
 - operators and delimiters
 - malformed unterminated comments and strings
@@ -27,6 +28,7 @@ Derived tags in the first slice include:
 - `swift-keyword`
 - `swift-identifier`
 - `swift-string-literal`
+- `swift-raw-string-literal`
 - `swift-numeric-literal`
 - `swift-attribute`
 - `swift-pound-directive`
