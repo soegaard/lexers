@@ -42,6 +42,10 @@ The derived layer carries reusable shell-specific tags such as:
 - `shell-command-substitution`
 - `shell-comment`
 - `shell-punctuation`
+- `shell-pipeline-operator`
+- `shell-logical-operator`
+- `shell-redirection-operator`
+- `shell-heredoc-operator`
 
 ## First Slice
 
@@ -53,7 +57,8 @@ The first shell lexer covers:
 - Bash/Zsh ANSI-C strings such as `$'line\n'`
 - backtick and `$(...)` command substitution
 - `$name` and `${...}` variables
-- common shell punctuation and operators
+- common shell punctuation and operators, including distinct tags for
+  pipelines, logical operators, redirections, and heredoc introducers
 - shared Bourne-style keywords and builtins
 - Zsh builtins
 - PowerShell keywords and verb-noun command names

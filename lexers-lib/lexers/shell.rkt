@@ -219,6 +219,11 @@
   (define ansi-derived
     (shell-string->derived-tokens ansi-source
                                   #:shell 'bash))
+  (define punctuation-source
+    "cat <<EOF | grep hi && echo ok >out\n")
+  (define punctuation-derived
+    (shell-string->derived-tokens punctuation-source
+                                  #:shell 'bash))
   (define malformed-tokens
     (shell-string->tokens "\"unterminated"
                           #:profile 'coloring
@@ -264,6 +269,22 @@
     (findf (lambda (token)
              (shell-derived-token-has-tag? token 'shell-ansi-string-literal))
            ansi-derived))
+  (define heredoc-operator-token
+    (findf (lambda (token)
+             (shell-derived-token-has-tag? token 'shell-heredoc-operator))
+           punctuation-derived))
+  (define pipeline-token
+    (findf (lambda (token)
+             (shell-derived-token-has-tag? token 'shell-pipeline-operator))
+           punctuation-derived))
+  (define logical-token
+    (findf (lambda (token)
+             (shell-derived-token-has-tag? token 'shell-logical-operator))
+           punctuation-derived))
+  (define redirection-token
+    (findf (lambda (token)
+             (shell-derived-token-has-tag? token 'shell-redirection-operator))
+           punctuation-derived))
 
   (check-equal? (take (map lexer-token-name bash-tokens) 6)
                 '(keyword whitespace identifier whitespace keyword whitespace))
@@ -275,6 +296,10 @@
   (check-not-false zsh-token)
   (check-not-false powershell-keyword-token)
   (check-not-false ansi-string-token)
+  (check-not-false heredoc-operator-token)
+  (check-not-false pipeline-token)
+  (check-not-false logical-token)
+  (check-not-false redirection-token)
 
   (check-equal? (map lexer-token-name malformed-tokens)
                 '(unknown eof))
@@ -284,6 +309,14 @@
                 fidelity-source)
   (check-equal? (reconstruct-derived-source ansi-derived)
                 ansi-source)
+  (check-equal? (shell-derived-token-text heredoc-operator-token)
+                "<<")
+  (check-equal? (shell-derived-token-text pipeline-token)
+                "|")
+  (check-equal? (shell-derived-token-text logical-token)
+                "&&")
+  (check-equal? (shell-derived-token-text redirection-token)
+                ">")
   (check-equal? (apply string-append
                        (map (lambda (token)
                               (token-source-slice fidelity-source token))

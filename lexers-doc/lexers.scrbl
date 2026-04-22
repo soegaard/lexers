@@ -2520,6 +2520,9 @@ The first shell implementation is a handwritten lexer for reusable shell
 tokenization. It currently supports Bash, Zsh, and PowerShell. The public API
 defaults to Bash and accepts @racket[#:shell 'bash], @racket[#:shell 'zsh],
 and @racket[#:shell 'powershell] (with @racket['pwsh] accepted as an alias).
+The derived layer also distinguishes pipelines, logical operators,
+redirections, and heredoc introducers instead of exposing them only through
+generic shell punctuation tags.
 
 @defproc[(make-shell-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2628,6 +2631,10 @@ The current shell scaffold may attach tags such as:
  @item{@racket['shell-option]}
  @item{@racket['shell-numeric-literal]}
  @item{@racket['shell-punctuation]}
+ @item{@racket['shell-pipeline-operator]}
+ @item{@racket['shell-logical-operator]}
+ @item{@racket['shell-redirection-operator]}
+ @item{@racket['shell-heredoc-operator]}
  @item{@racket['malformed-token]}]
 
 In Bash and Zsh, ANSI-C quoted strings such as @tt{$'line\n'} project as

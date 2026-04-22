@@ -446,6 +446,23 @@
     [else
      '(identifier shell-word)]))
 
+;; shell-punctuation-tags : string? -> (listof symbol?)
+;;   Classify one shell punctuation token by reusable syntax role.
+(define (shell-punctuation-tags text)
+  (append
+   '(delimiter shell-punctuation)
+   (cond
+     [(member text '("|" "|&"))
+      '(shell-pipeline-operator)]
+     [(member text '("&&" "||"))
+      '(shell-logical-operator)]
+     [(member text '("<" ">" ">>" "<&" ">&" ">|"))
+      '(shell-redirection-operator)]
+     [(member text '("<<" "<<-" "<<<"))
+      '(shell-heredoc-operator)]
+     [else
+      '()])))
+
 ;; -----------------------------------------------------------------------------
 ;; Public reader
 
@@ -510,7 +527,7 @@
             (read-variable! in out shell)]
            [(shell-punctuation-char? next)
             (read-punctuation! in out)
-            '(delimiter shell-punctuation)]
+            (shell-punctuation-tags (get-output-string out))]
            [else
             (read-shell-word! in out)
             (shell-word-tags shell
