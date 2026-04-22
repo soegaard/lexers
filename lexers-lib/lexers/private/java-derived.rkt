@@ -430,7 +430,8 @@
 (define (read-identifier! in out backslash-run)
   (read-java-while! in out backslash-run ident-char?))
 
-;; read-digit-sequence! : input-port? output-port? (char? -> boolean?) -> void?
+;; read-digit-sequence! : input-port? output-port? (char? -> boolean?)
+;;                       -> (values boolean? exact-nonnegative-integer?)
 ;;   Consume one digit sequence that may contain separating underscores.
 (define (read-digit-sequence! in out backslash-run digit?)
   (let loop ([backslash-run backslash-run]
@@ -449,7 +450,7 @@
          (consume-java-char! in out backslash-run))
        (loop (consume-java-char! in out after-underscore) #t)]
       [else
-       backslash-run])))
+       (values saw-digit? backslash-run)])))
 
 ;; read-int-suffix! : input-port? output-port? -> void?
 ;;   Consume an integer suffix when present.
@@ -473,8 +474,9 @@
     [else
      backslash-run]))
 
-;; read-decimal-exponent! : input-port? output-port? -> void?
-;;   Consume one decimal exponent when present.
+;; read-decimal-exponent! : input-port? output-port? exact-nonnegative-integer?
+;;                          -> (values boolean? exact-nonnegative-integer?)
+;;   Consume one decimal exponent when present and report whether it is valid.
 (define (read-decimal-exponent! in out backslash-run)
   (cond
     [(and (char? (peek-java-char in 0 backslash-run))
@@ -488,12 +490,15 @@
           (consume-java-char! in out after-e)]
          [else
           after-e]))
-     (read-digit-sequence! in out after-sign decimal-digit?)]
+     (define-values (saw-digit? after-digits)
+       (read-digit-sequence! in out after-sign decimal-digit?))
+     (values saw-digit? after-digits)]
     [else
-     backslash-run]))
+     (values #t backslash-run)]))
 
-;; read-binary-exponent! : input-port? output-port? -> void?
-;;   Consume one hexadecimal floating exponent when present.
+;; read-binary-exponent! : input-port? output-port? exact-nonnegative-integer?
+;;                         -> (values boolean? exact-nonnegative-integer?)
+;;   Consume one hexadecimal floating exponent when present and report whether it is valid.
 (define (read-binary-exponent! in out backslash-run)
   (cond
     [(and (char? (peek-java-char in 0 backslash-run))
@@ -507,14 +512,17 @@
           (consume-java-char! in out after-p)]
          [else
           after-p]))
-     (read-digit-sequence! in out after-sign decimal-digit?)]
+     (define-values (saw-digit? after-digits)
+       (read-digit-sequence! in out after-sign decimal-digit?))
+     (values saw-digit? after-digits)]
     [else
-     backslash-run]))
+     (values #t backslash-run)]))
 
-;; read-decimal-number! : input-port? output-port? -> void?
-;;   Consume one decimal integer or floating literal.
+;; read-decimal-number! : input-port? output-port? exact-nonnegative-integer?
+;;                        -> (values boolean? exact-nonnegative-integer?)
+;;   Consume one decimal integer or floating literal and report whether it is valid.
 (define (read-decimal-number! in out backslash-run)
-  (define after-digits
+  (define-values (_saw-digits? after-digits)
     (read-digit-sequence! in out backslash-run decimal-digit?))
   (cond
     [(and (char? (peek-java-char in 0 after-digits))
@@ -523,65 +531,78 @@
                     (char=? (peek-java-char in 1 after-digits) #\.))))
      (define after-dot
        (consume-java-char! in out after-digits))
-     (define after-fraction
+     (define-values (_saw-fraction? after-fraction)
        (read-digit-sequence! in out after-dot decimal-digit?))
-     (define after-exponent
+     (define-values (valid-exponent? after-exponent)
        (read-decimal-exponent! in out after-fraction))
-     (read-float-suffix! in out after-exponent)]
+     (values valid-exponent?
+             (read-float-suffix! in out after-exponent))]
     [else
-     (define after-exponent
+     (define-values (valid-exponent? after-exponent)
        (read-decimal-exponent! in out after-digits))
      (cond
        [(and (char? (peek-java-char in 0 after-exponent))
              (member (char-downcase (peek-java-char in 0 after-exponent))
                      '(#\f #\d)))
-        (read-float-suffix! in out after-exponent)]
+        (values valid-exponent?
+                (read-float-suffix! in out after-exponent))]
        [else
-        (read-int-suffix! in out after-exponent)])]))
+        (values valid-exponent?
+                (read-int-suffix! in out after-exponent))])]))
 
-;; read-number-from-dot! : input-port? output-port? -> void?
+;; read-number-from-dot! : input-port? output-port? exact-nonnegative-integer?
+;;                         -> (values boolean? exact-nonnegative-integer?)
 ;;   Consume one floating literal that starts with a decimal point.
 (define (read-number-from-dot! in out backslash-run)
   (define after-dot
     (consume-java-char! in out backslash-run))
-  (define after-fraction
+  (define-values (saw-fraction? after-fraction)
     (read-digit-sequence! in out after-dot decimal-digit?))
-  (define after-exponent
+  (define-values (valid-exponent? after-exponent)
     (read-decimal-exponent! in out after-fraction))
-  (read-float-suffix! in out after-exponent))
+  (values (and saw-fraction? valid-exponent?)
+          (read-float-suffix! in out after-exponent)))
 
-;; read-prefixed-integer! : input-port? output-port? (char? -> boolean?) -> void?
+;; read-prefixed-integer! : input-port? output-port? exact-nonnegative-integer? (char? -> boolean?)
+;;                          -> (values boolean? exact-nonnegative-integer?)
 ;;   Consume one prefixed integer literal and an optional integer suffix.
 (define (read-prefixed-integer! in out backslash-run digit?)
-  (define after-digits
+  (define-values (saw-digits? after-digits)
     (read-digit-sequence! in out backslash-run digit?))
-  (read-int-suffix! in out after-digits))
+  (values saw-digits?
+          (read-int-suffix! in out after-digits)))
 
-;; read-hex-number! : input-port? output-port? -> void?
-;;   Consume one hexadecimal integer or floating literal.
+;; read-hex-number! : input-port? output-port? exact-nonnegative-integer?
+;;                    -> (values boolean? exact-nonnegative-integer?)
+;;   Consume one hexadecimal integer or floating literal and report whether it is valid.
 (define (read-hex-number! in out backslash-run)
-  (define after-digits
+  (define-values (saw-leading-digits? after-digits)
     (read-digit-sequence! in out backslash-run hex-digit?))
   (cond
     [(and (char? (peek-java-char in 0 after-digits))
           (char=? (peek-java-char in 0 after-digits) #\.))
      (define after-dot
        (consume-java-char! in out after-digits))
-     (define after-fraction
+     (define-values (saw-fraction-digits? after-fraction)
        (read-digit-sequence! in out after-dot hex-digit?))
-     (define after-exponent
+     (define-values (valid-exponent? after-exponent)
        (read-binary-exponent! in out after-fraction))
-     (read-float-suffix! in out after-exponent)]
+     (values (and (or saw-leading-digits? saw-fraction-digits?)
+                  valid-exponent?)
+             (read-float-suffix! in out after-exponent))]
     [(and (char? (peek-java-char in 0 after-digits))
           (member (peek-java-char in 0 after-digits) '(#\p #\P)))
-     (define after-exponent
+     (define-values (valid-exponent? after-exponent)
        (read-binary-exponent! in out after-digits))
-     (read-float-suffix! in out after-exponent)]
+     (values (and saw-leading-digits? valid-exponent?)
+             (read-float-suffix! in out after-exponent))]
     [else
-     (read-int-suffix! in out after-digits)]))
+     (values saw-leading-digits?
+             (read-int-suffix! in out after-digits))]))
 
-;; read-number! : input-port? output-port? -> void?
-;;   Consume one Java numeric literal.
+;; read-number! : input-port? output-port? exact-nonnegative-integer?
+;;                -> (values boolean? exact-nonnegative-integer?)
+;;   Consume one Java numeric literal and report whether it is valid.
 (define (read-number! in out backslash-run)
   (cond
     [(and (char? (peek-java-char in 0 backslash-run))
@@ -940,13 +961,25 @@
               [else
                '(identifier java-identifier)])]
            [(decimal-digit? next)
-            (set! backslash-run (read-number! in out backslash-run))
-            '(literal java-numeric-literal)]
+            (define-values (valid? next-backslash-run)
+              (read-number! in out backslash-run))
+            (set! backslash-run next-backslash-run)
+            (cond
+              [valid?
+               '(literal java-numeric-literal)]
+              [else
+               '(literal java-numeric-literal malformed-token)])]
            [(and (char=? next #\.)
                  (char? (peek-java-char in 1 backslash-run))
                  (decimal-digit? (peek-java-char in 1 backslash-run)))
-            (set! backslash-run (read-number-from-dot! in out backslash-run))
-            '(literal java-numeric-literal)]
+            (define-values (valid? next-backslash-run)
+              (read-number-from-dot! in out backslash-run))
+            (set! backslash-run next-backslash-run)
+            (cond
+              [valid?
+               '(literal java-numeric-literal)]
+              [else
+               '(literal java-numeric-literal malformed-token)])]
            [else
             (define punctuator
               (punctuator-at in backslash-run))

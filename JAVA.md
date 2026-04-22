@@ -19,6 +19,7 @@ The first slice covers:
 - numeric literals
 - operators and delimiters
 - Java escape-sequence validation, including octal escapes
+- malformed numeric literals such as missing exponent or prefix digits
 
 Projected Java categories are:
 
@@ -60,4 +61,6 @@ slice includes Java Unicode-escape preprocessing for lexical classification
 while still preserving the exact raw source text in derived and projected
 tokens. Text blocks are recognized only when the opening delimiter matches the
 JLS shape of @tt{\"\"\"} followed by optional horizontal whitespace and a line
-terminator.
+terminator. Numeric literals now validate the required digit-bearing parts of
+their syntax, so forms such as @tt{1e}, @tt{0x}, and @tt{0b} remain
+source-faithful but are tagged with @tt{malformed-token}.

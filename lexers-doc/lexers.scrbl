@@ -1910,7 +1910,9 @@ literals, operators, and delimiters. It also recognizes Java Unicode escapes
 for lexical classification while preserving exact source slices in the emitted
 tokens, validates Java escape sequences including octal escapes, and recognizes
 text blocks only when the opening delimiter has the JLS-required trailing line
-terminator.
+terminator. Numeric literals validate their required digit-bearing parts, so
+malformed forms such as @tt{1e}, @tt{0x}, and @tt{0b} remain source-faithful
+but are tagged with @racket['malformed-token].
 
 @defproc[(make-java-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

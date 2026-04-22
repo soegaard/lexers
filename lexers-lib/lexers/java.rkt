@@ -279,6 +279,30 @@
     (findf (lambda (token)
              (java-derived-token-has-tag? token 'java-text-block))
            pseudo-text-block-derived))
+  (define malformed-exponent-derived
+    (java-string->derived-tokens "double x = 1e;\n"))
+  (define malformed-exponent-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-numeric-literal)
+                  (java-derived-token-has-tag? token 'malformed-token)
+                  (string=? (java-derived-token-text token) "1e")))
+           malformed-exponent-derived))
+  (define malformed-hex-derived
+    (java-string->derived-tokens "int x = 0x;\n"))
+  (define malformed-hex-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-numeric-literal)
+                  (java-derived-token-has-tag? token 'malformed-token)
+                  (string=? (java-derived-token-text token) "0x")))
+           malformed-hex-derived))
+  (define malformed-binary-derived
+    (java-string->derived-tokens "int x = 0b;\n"))
+  (define malformed-binary-token
+    (findf (lambda (token)
+             (and (java-derived-token-has-tag? token 'java-numeric-literal)
+                  (java-derived-token-has-tag? token 'malformed-token)
+                  (string=? (java-derived-token-text token) "0b")))
+           malformed-binary-derived))
   (define non-sealed-tokens
     (java-string->tokens "non-sealed interface Example {}\n"
                          #:profile 'coloring
@@ -308,6 +332,9 @@
   (check-not-false octal-char-token)
   (check-not-false text-block-token-2)
   (check-false pseudo-text-block-token)
+  (check-not-false malformed-exponent-token)
+  (check-not-false malformed-hex-token)
+  (check-not-false malformed-binary-token)
   (check-true (contiguous-derived-stream? sample-derived))
   (check-equal? (apply string-append (map java-derived-token-text sample-derived))
                 sample-source)
@@ -319,4 +346,6 @@
                 unicode-comment-source)
   (check-equal? (apply string-append (map java-derived-token-text unicode-string-derived))
                 unicode-string-source)
+  (check-equal? (apply string-append (map java-derived-token-text malformed-exponent-derived))
+                "double x = 1e;\n")
   (check-not-false first-streaming-token))
