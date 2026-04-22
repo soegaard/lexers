@@ -196,6 +196,10 @@
     "auto s = R\"tag(hello)tag\";\nchar c = '\\n';\nauto n = 12_km;\n")
   (define literal-derived
     (cpp-string->derived-tokens literal-source))
+  (define malformed-literal-source
+    "auto bad = \"\\q\";\nchar badc = 'ab';\nchar good = '\\x41';\n")
+  (define malformed-literal-derived
+    (cpp-string->derived-tokens malformed-literal-source))
   (define splice-source
     "#define VALUE(a, b) a + \\\n  b\n")
   (define splice-derived
@@ -249,6 +253,21 @@
              (and (cpp-derived-token-has-tag? token 'cpp-delimiter)
                   (string=? (cpp-derived-token-text token) "::")))
            sample-derived))
+  (define malformed-string-token
+    (findf (lambda (token)
+             (and (cpp-derived-token-has-tag? token 'malformed-token)
+                  (string=? (cpp-derived-token-text token) "\"\\q\"")))
+           malformed-literal-derived))
+  (define malformed-char-token
+    (findf (lambda (token)
+             (and (cpp-derived-token-has-tag? token 'malformed-token)
+                  (string=? (cpp-derived-token-text token) "'ab'")))
+           malformed-literal-derived))
+  (define valid-hex-char-token
+    (findf (lambda (token)
+             (and (cpp-derived-token-has-tag? token 'cpp-char-literal)
+                  (string=? (cpp-derived-token-text token) "'\\x41'")))
+           malformed-literal-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 12)
                 '(delimiter keyword whitespace literal whitespace delimiter keyword whitespace identifier whitespace literal whitespace))
@@ -261,6 +280,9 @@
   (check-not-false numeric-token)
   (check-not-false splice-token)
   (check-not-false scope-token)
+  (check-not-false malformed-string-token)
+  (check-not-false malformed-char-token)
+  (check-not-false valid-hex-char-token)
   (check-not-false first-streaming-token)
   (check-equal? (cpp-derived-token-text directive-token)
                 "include")

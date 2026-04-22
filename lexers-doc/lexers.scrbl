@@ -998,6 +998,11 @@ The first reusable C++-specific derived tags include:
  @item{@racket['cpp-error]}
  @item{@racket['malformed-token]}]
 
+Ordinary C++ strings and character literals validate common escape structures
+in the derived layer, including simple, octal, hexadecimal, and universal-
+character escapes. Invalid escapes and malformed multi-character character
+literals remain source-faithful but are tagged with @racket['malformed-token].
+
 Malformed C++ input is handled using the shared profile rules:
 
 @itemlist[

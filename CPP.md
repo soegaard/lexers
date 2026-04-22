@@ -15,6 +15,11 @@ most for reusable preview and coloring consumers:
 - raw string literals such as `R"(text)"`
 - operators and punctuators such as `::`, `->`, and `.*`
 
+Ordinary C++ string and character literals now validate common escape
+structures such as simple escapes, octal escapes, hexadecimal escapes, and
+universal-character escapes. Malformed escapes and malformed multi-character
+character literals remain source-faithful but are tagged as malformed.
+
 The lexer is source-faithful and streaming. Consumers can reconstruct the exact
 input by concatenating token texts.
 
