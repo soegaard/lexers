@@ -14,6 +14,7 @@ The current lexer covers:
 - element names and delimiters
 - attribute names and quoted attribute values
 - plist value text for `key`, `string`, `data`, `date`, `integer`, and `real`
+- XML entity references such as `&amp;` and `&#10;` inside plist text
 - CRLF-preserving source fidelity
 
 The lexer is streaming and designed to work well for preview-oriented tools

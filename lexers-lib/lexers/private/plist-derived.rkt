@@ -97,6 +97,44 @@
       (write-char next out)))
   (get-output-string out))
 
+;; advance-position : position? string? -> position?
+;;   Advance one parser-tools-compatible position across text.
+(define (advance-position start text)
+  (let loop ([index 0]
+             [line  (position-line start)]
+             [col   (position-col start)]
+             [off   (position-offset start)])
+    (cond
+      [(>= index (string-length text))
+       (make-stream-position off line col)]
+      [else
+       (define ch
+         (string-ref text index))
+       (cond
+         [(char=? ch #\return)
+          (cond
+            [(and (< (add1 index) (string-length text))
+                  (char=? (string-ref text (add1 index)) #\newline))
+             (loop (+ index 2)
+                   (add1 line)
+                   0
+                   (+ off 2))]
+            [else
+             (loop (add1 index)
+                   (add1 line)
+                   0
+                   (add1 off))])]
+         [(char=? ch #\newline)
+          (loop (add1 index)
+                (add1 line)
+                0
+                (add1 off))]
+         [else
+          (loop (add1 index)
+                line
+                (add1 col)
+                (add1 off))])])))
+
 ;; read-while! : input-port? (char? -> boolean?) -> string?
 ;;   Consume characters while the predicate holds.
 (define (read-while! in pred?)
@@ -208,6 +246,143 @@
      '(literal plist-real-text)]
     [else
      '(literal plist-text)]))
+
+;; plist-entity-char? : char? -> boolean?
+;;   Recognize one XML entity-name character.
+(define (plist-entity-char? ch)
+  (or (char-alphabetic? ch)
+      (char-numeric? ch)
+      (member ch '(#\_ #\- #\. #\:))))
+
+;; plist-entity-length : string? exact-nonnegative-integer? -> (or/c exact-positive-integer? #f)
+;;   Determine whether source has one XML entity reference at index.
+(define (plist-entity-length source index)
+  (define len
+    (string-length source))
+  (cond
+    [(or (>= index len)
+         (not (char=? (string-ref source index) #\&)))
+     #f]
+    [else
+     (let loop ([i (add1 index)])
+       (cond
+         [(>= i len)
+          #f]
+         [else
+          (define ch
+            (string-ref source i))
+          (cond
+            [(char=? ch #\;)
+             (define body
+               (substring source (add1 index) i))
+             (cond
+               [(regexp-match? #px"^[A-Za-z_:][A-Za-z0-9_.:-]*$" body)
+                (+ (- i index) 1)]
+               [(regexp-match? #px"^#[0-9]+$" body)
+                (+ (- i index) 1)]
+               [(regexp-match? #px"^#x[0-9A-Fa-f]+$" body)
+                (+ (- i index) 1)]
+               [else
+                #f])]
+            [(or (plist-entity-char? ch)
+                 (and (= i (add1 index))
+                      (char=? ch #\#))
+                 (and (> i (+ index 2))
+                      (char=? (string-ref source (add1 index)) #\#)
+                      (char=? (string-ref source (+ index 2)) #\x)
+                      (or (char-numeric? ch)
+                          (member ch '(#\a #\b #\c #\d #\e #\f
+                                       #\A #\B #\C #\D #\E #\F)))))
+             (loop (add1 i))]
+            [else
+             #f])]))]))
+
+;; text-entity-tags : (listof symbol?) -> (listof symbol?)
+;;   Refine text tags for one XML entity reference.
+(define (text-entity-tags base-tags)
+  (append '(literal plist-entity)
+          (filter (lambda (tag)
+                    (member tag
+                            '(plist-text
+                              plist-key-text
+                              plist-string-text
+                              plist-data-text
+                              plist-date-text
+                              plist-integer-text
+                              plist-real-text)))
+                  base-tags)))
+
+;; text->derived-tokens : input-port? position? (or/c string? #f) string? -> (listof plist-derived-token?)
+;;   Split one plist text run into ordinary text and entity-reference tokens.
+(define (text->derived-tokens in start-pos current-text-element text)
+  (define base-tags
+    (plist-text-tags current-text-element text))
+  (cond
+    [(or (member 'whitespace base-tags)
+         (not (regexp-match? #px"&" text)))
+     (list (plist-derived-token (if (member 'whitespace base-tags)
+                                    'whitespace
+                                    'literal)
+                                text
+                                start-pos
+                                (current-stream-position in)
+                                base-tags))]
+    [else
+     (define tokens
+       '())
+     (define cursor
+       0)
+     (define token-start
+       start-pos)
+
+     ;; add-chunk! : exact-nonnegative-integer? exact-nonnegative-integer? (listof symbol?) -> void?
+     ;;   Add one text chunk token and advance the local position cursor.
+     (define (add-chunk! start end tags)
+       (define chunk
+         (substring text start end))
+       (define token
+         (plist-derived-token 'literal
+                              chunk
+                              token-start
+                              (advance-position token-start chunk)
+                              tags))
+       (set! tokens (append tokens (list token)))
+       (set! token-start (plist-derived-token-end token))
+       (set! cursor end))
+
+     (let loop ()
+       (cond
+         [(>= cursor (string-length text))
+          tokens]
+         [else
+          (define next-entity
+            (let find ([i cursor])
+              (cond
+                [(>= i (string-length text))
+                 #f]
+                [(char=? (string-ref text i) #\&)
+                 i]
+                [else
+                 (find (add1 i))])))
+          (cond
+            [(not next-entity)
+             (add-chunk! cursor (string-length text) base-tags)
+             tokens]
+            [(> next-entity cursor)
+             (add-chunk! cursor next-entity base-tags)
+             (loop)]
+            [else
+             (define entity-length
+               (plist-entity-length text cursor))
+             (cond
+               [entity-length
+                (add-chunk! cursor
+                            (+ cursor entity-length)
+                            (text-entity-tags base-tags))
+                (loop)]
+               [else
+                (add-chunk! cursor (add1 cursor) base-tags)
+                (loop)])])]))]))
 
 ;; -----------------------------------------------------------------------------
 ;; Tag parsing
@@ -448,18 +623,14 @@
                (set! pending tokens)
                (loop)])]
            [else
-            (define start
+           (define start
               (current-stream-position in))
             (define text
               (read-plist-text! in))
             (set! pending
-                  (list (plist-derived-token (if (regexp-match? #px"^[ \t\r\n]+$" text)
-                                                'whitespace
-                                                'literal)
-                                             text
-                                             start
-                                             (current-stream-position in)
-                                             (plist-text-tags (and (pair? open-stack)
-                                                                   (car open-stack))
-                                                              text))))
+                  (text->derived-tokens in
+                                        start
+                                        (and (pair? open-stack)
+                                             (car open-stack))
+                                        text))
             (loop)])]))))

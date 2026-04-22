@@ -1416,6 +1416,7 @@ The first reusable plist-specific derived tags include:
  @item{@racket['plist-closing-tag-name]}
  @item{@racket['plist-attribute-name]}
  @item{@racket['plist-attribute-value]}
+ @item{@racket['plist-entity]}
  @item{@racket['plist-key-text]}
  @item{@racket['plist-string-text]}
  @item{@racket['plist-data-text]}

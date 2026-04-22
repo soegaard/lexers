@@ -151,7 +151,7 @@
     token)
 
   (define sample-source
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleName</key><string>Lexers</string><true/></dict></plist>\n")
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>CFBundleName</key><string>Lexers &amp; More</string><true/></dict></plist>\n")
   (define sample-derived
     (plist-string->derived-tokens sample-source))
   (define sample-tokens
@@ -195,6 +195,10 @@
              (and (plist-derived-token-has-tag? token 'plist-attribute-value)
                   (plist-derived-token-has-tag? token 'malformed-token)))
            malformed-attribute-derived))
+  (define entity-token
+    (findf (lambda (token)
+             (plist-derived-token-has-tag? token 'plist-entity))
+           sample-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 4)
                 '(keyword whitespace keyword whitespace))
@@ -204,10 +208,13 @@
   (check-not-false string-token)
   (check-not-false doctype-token)
   (check-not-false xml-token)
+  (check-not-false entity-token)
   (check-equal? (plist-derived-token-text key-token)
                 "CFBundleName")
   (check-equal? (plist-derived-token-text string-token)
-                "Lexers")
+                "Lexers ")
+  (check-equal? (plist-derived-token-text entity-token)
+                "&amp;")
   (check-not-false malformed-attribute-token)
   (check-equal? (plist-derived-token-text malformed-attribute-token)
                 "1.0")
