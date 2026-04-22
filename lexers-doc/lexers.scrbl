@@ -405,6 +405,14 @@ The projected CSS API has two entry points:
  @item{@racket[make-css-lexer] for streaming tokenization from an input port.}
  @item{@racket[css-string->tokens] for eager tokenization of an entire string.}]
 
+The CSS module also exposes a raw-token API for parser-oriented consumers:
+
+@itemlist[
+ @item{@racket[make-css-raw-lexer] for streaming CSS Syntax-oriented raw
+       tokens from an input port.}
+ @item{@racket[css-string->raw-tokens] for eager raw tokenization of an entire
+       string.}]
+
 @defproc[(make-css-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
@@ -512,6 +520,60 @@ original source text of the emitted token. In particular:
 (position-offset (lexer-token-end first-token))
 ]}
 
+@defproc[(make-css-raw-lexer)
+         (input-port? . -> . (or/c 'eof css-raw-token?))]{
+Constructs a streaming CSS lexer for the raw-token layer.
+
+The result is a procedure of one argument, an input port. Each call reads the
+next raw CSS token from the port and returns either one @racket[css-raw-token?]
+value or @racket['eof].
+
+This layer stays close to CSS Syntax Level 3 token categories and is intended
+for parser consumers that need stable raw token kinds instead of the broader
+projected categories.
+
+@examples[#:eval css-eval
+(define raw-lexer
+  (make-css-raw-lexer))
+(define raw-in
+  (open-input-string "@media color 12px"))
+(port-count-lines! raw-in)
+(list (css-raw-token-kind (raw-lexer raw-in))
+      (css-raw-token-kind (raw-lexer raw-in))
+      (css-raw-token-kind (raw-lexer raw-in)))
+]}
+
+@defproc[(css-string->raw-tokens [source string?])
+         (listof css-raw-token?)]{
+Tokenizes an entire CSS string into raw CSS token values.
+
+This is a convenience wrapper over @racket[make-css-raw-lexer]. It opens a
+string port, enables line counting, repeatedly calls the raw lexer until it
+returns @racket['eof], and returns the resulting raw token list.}
+
+@defproc[(css-raw-token? [v any/c])
+         boolean?]{
+Recognizes raw CSS token values returned by @racket[make-css-raw-lexer] and
+@racket[css-string->raw-tokens].}
+
+@defproc[(css-raw-token-kind [token css-raw-token?])
+         symbol?]{
+Returns the CSS Syntax-oriented raw token kind for @racket[token], such as
+@racket['ident-token], @racket['function-token], @racket['at-keyword-token],
+@racket['number-token], or @racket['dimension-token].}
+
+@defproc[(css-raw-token-text [token css-raw-token?])
+         string?]{
+Returns the exact source text corresponding to a raw CSS token.}
+
+@defproc[(css-raw-token-start [token css-raw-token?])
+         position?]{
+Returns the starting source position for a raw CSS token.}
+
+@defproc[(css-raw-token-end [token css-raw-token?])
+         position?]{
+Returns the ending source position for a raw CSS token.}
+
 @defproc[(make-css-derived-lexer)
          (input-port? . -> . (or/c 'eof css-derived-token?))]{
 Constructs a streaming CSS lexer for the derived-token layer.
@@ -549,6 +611,14 @@ returns @racket['eof], and returns the resulting list of derived tokens.}
          boolean?]{
 Recognizes derived CSS token values returned by
 @racket[make-css-derived-lexer] and @racket[css-string->derived-tokens].}
+
+@defproc[(css-derived-token-raw [token css-derived-token?])
+         css-raw-token?]{
+Returns the raw CSS token wrapped by a derived CSS token.}
+
+@defproc[(css-derived-token-raw-kind [token css-derived-token?])
+         symbol?]{
+Returns the CSS Syntax-oriented raw token kind wrapped by a derived CSS token.}
 
 @defproc[(css-derived-token-tags [token css-derived-token?])
          (listof symbol?)]{

@@ -133,6 +133,12 @@ these distinctions into broader categories.
 The CSS design should distinguish between a raw token layer and a derived
 classification layer.
 
+The public API should expose both layers:
+
+- a raw-token API suitable for parser consumers
+- a derived-token API suitable for language-aware tools that want both the raw
+  token and additional CSS-specific classifications
+
 ### Raw Token Layer
 
 The raw token layer should stay close to CSS Syntax Level 3.
@@ -160,6 +166,16 @@ This layer should be spec-grounded and stable. It provides the cleanest basis
 for correctness, for later parser-oriented use, and for comparison against the
 CSS specification.
 
+The public API for this layer should be:
+
+- `make-css-raw-lexer`
+- `css-string->raw-tokens`
+- `css-raw-token?`
+- `css-raw-token-kind`
+- `css-raw-token-text`
+- `css-raw-token-start`
+- `css-raw-token-end`
+
 ### Derived Classification Layer
 
 On top of the raw token layer, the lexer design may support derived
@@ -178,6 +194,10 @@ Examples include:
 
 These classifications should not replace the raw token layer. Instead, they
 should enrich it.
+
+The derived-token API should also expose the wrapped raw token directly, so
+consumers that start from derived tokens can still inspect spec-grounded raw
+token kinds without guessing from projected categories.
 
 For example:
 

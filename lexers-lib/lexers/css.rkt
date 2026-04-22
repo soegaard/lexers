@@ -8,10 +8,26 @@
 
 ;; make-css-lexer      : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based CSS lexer.
+;; make-css-raw-lexer  : -> (input-port? -> (or/c css-raw-token? 'eof))
+;;   Construct a port-based CSS lexer that returns raw CSS token values.
 ;; make-css-derived-lexer : -> (input-port? -> (or/c css-derived-token? 'eof))
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
+;; css-raw-token? : any/c -> boolean?
+;;   Recognize a raw CSS token value returned by the raw-token API.
+;; css-raw-token-kind : css-raw-token? -> symbol?
+;;   Extract the CSS Syntax-oriented raw token kind for one raw token.
+;; css-raw-token-text : css-raw-token? -> string?
+;;   Extract the exact source text corresponding to one raw CSS token.
+;; css-raw-token-start : css-raw-token? -> position?
+;;   Extract the starting source position for one raw CSS token.
+;; css-raw-token-end : css-raw-token? -> position?
+;;   Extract the ending source position for one raw CSS token.
 ;; css-derived-token? : any/c -> boolean?
 ;;   Recognize a derived CSS token value returned by the derived-token API.
+;; css-derived-token-raw : css-derived-token? -> css-raw-token?
+;;   Extract the raw CSS token wrapped by one derived CSS token.
+;; css-derived-token-raw-kind : css-derived-token? -> symbol?
+;;   Extract the CSS Syntax-oriented raw token kind from one derived CSS token.
 ;; css-derived-token-tags : css-derived-token? -> (listof symbol?)
 ;;   Extract the CSS-specific classification tags for one derived token.
 ;; css-derived-token-has-tag? : css-derived-token? symbol? -> boolean?
@@ -24,20 +40,31 @@
 ;;   Extract the ending source position for one derived CSS token.
 ;; css-string->tokens  : string? keyword-arguments -> (listof token-like?)
 ;;   Tokenize an entire CSS string using the CSS lexer.
+;; css-string->raw-tokens : string? -> (listof css-raw-token?)
+;;   Tokenize an entire CSS string into raw CSS token values.
 ;; css-string->derived-tokens : string? -> (listof css-derived-token?)
 ;;   Tokenize an entire CSS string into derived CSS token values.
 ;; css-profiles        : immutable-hash?
 ;;   Profile defaults for the public CSS lexer.
 
 (provide make-css-lexer
+         make-css-raw-lexer
          make-css-derived-lexer
+         css-raw-token?
+         css-raw-token-kind
+         css-raw-token-text
+         css-raw-token-start
+         css-raw-token-end
          css-derived-token?
+         css-derived-token-raw
+         css-derived-token-raw-kind
          css-derived-token-tags
          css-derived-token-has-tag?
          css-derived-token-text
          css-derived-token-start
          css-derived-token-end
          css-string->tokens
+         css-string->raw-tokens
          css-string->derived-tokens
          css-profiles)
 
@@ -49,16 +76,57 @@
                     [css-derived-token-tags private-css-derived-token-tags]
                     [make-css-derived-classifier private-make-css-derived-classifier]
                     [css-derived-token-has-tag? private-css-derived-token-has-tag?])
-         "private/css-raw.rkt"
+         (rename-in "private/css-raw.rkt"
+                    [css-raw-token? private-css-raw-token?]
+                    [css-raw-token-kind private-css-raw-token-kind]
+                    [css-raw-token-text private-css-raw-token-text]
+                    [css-raw-token-start private-css-raw-token-start]
+                    [css-raw-token-end private-css-raw-token-end]
+                    [read-css-raw-token private-read-css-raw-token])
          "private/css-tokenize.rkt"
          "private/parser-tools-compat.rkt")
 
 (define css-profiles css-profile-defaults)
 
+;; css-raw-token? : any/c -> boolean?
+;;   Recognize a raw CSS token value returned by the raw-token API.
+(define (css-raw-token? v)
+  (private-css-raw-token? v))
+
+;; css-raw-token-kind : css-raw-token? -> symbol?
+;;   Extract the CSS Syntax-oriented raw token kind for one raw token.
+(define (css-raw-token-kind token)
+  (private-css-raw-token-kind token))
+
+;; css-raw-token-text : css-raw-token? -> string?
+;;   Extract the exact source text corresponding to one raw CSS token.
+(define (css-raw-token-text token)
+  (private-css-raw-token-text token))
+
+;; css-raw-token-start : css-raw-token? -> position?
+;;   Extract the starting source position for one raw CSS token.
+(define (css-raw-token-start token)
+  (private-css-raw-token-start token))
+
+;; css-raw-token-end : css-raw-token? -> position?
+;;   Extract the ending source position for one raw CSS token.
+(define (css-raw-token-end token)
+  (private-css-raw-token-end token))
+
 ;; css-derived-token? : any/c -> boolean?
 ;;   Recognize a derived CSS token value returned by the derived-token API.
 (define (css-derived-token? v)
   (private-css-derived-token? v))
+
+;; css-derived-token-raw : css-derived-token? -> css-raw-token?
+;;   Extract the raw CSS token wrapped by one derived CSS token.
+(define (css-derived-token-raw token)
+  (private-css-derived-token-raw token))
+
+;; css-derived-token-raw-kind : css-derived-token? -> symbol?
+;;   Extract the CSS Syntax-oriented raw token kind from one derived CSS token.
+(define (css-derived-token-raw-kind token)
+  (css-raw-token-kind (css-derived-token-raw token)))
 
 ;; css-derived-token-tags : css-derived-token? -> (listof symbol?)
 ;;   Extract the CSS-specific classification tags for one derived token.
@@ -73,17 +141,17 @@
 ;; css-derived-token-text : css-derived-token? -> string?
 ;;   Extract the source text corresponding to one derived CSS token.
 (define (css-derived-token-text token)
-  (css-raw-token-text (private-css-derived-token-raw token)))
+  (css-raw-token-text (css-derived-token-raw token)))
 
 ;; css-derived-token-start : css-derived-token? -> position?
 ;;   Extract the starting source position for one derived CSS token.
 (define (css-derived-token-start token)
-  (css-raw-token-start (private-css-derived-token-raw token)))
+  (css-raw-token-start (css-derived-token-raw token)))
 
 ;; css-derived-token-end : css-derived-token? -> position?
 ;;   Extract the ending source position for one derived CSS token.
 (define (css-derived-token-end token)
-  (css-raw-token-end (private-css-derived-token-raw token)))
+  (css-raw-token-end (css-derived-token-raw token)))
 
 ;; make-css-lexer : keyword-arguments -> (input-port? -> token-like?)
 ;;   Construct a port-based CSS lexer.
@@ -96,13 +164,18 @@
                      #:source-positions source-positions))
   (make-css-token-reader config))
 
+;; make-css-raw-lexer : -> (input-port? -> (or/c css-raw-token? 'eof))
+;;   Construct a port-based CSS lexer that returns raw CSS token values.
+(define (make-css-raw-lexer)
+  private-read-css-raw-token)
+
 ;; make-css-derived-lexer : -> (input-port? -> (or/c css-derived-token? 'eof))
 ;;   Construct a port-based CSS lexer that returns derived CSS token values.
 (define (make-css-derived-lexer)
   (define classify-css-token
     (private-make-css-derived-classifier))
   (lambda (in)
-    (define raw-token (read-css-raw-token in))
+    (define raw-token (private-read-css-raw-token in))
     (cond
       [(eq? raw-token 'eof) 'eof]
       [else                 (classify-css-token raw-token)])))
@@ -124,6 +197,23 @@
     (cond
       [(eof-token? token) (reverse (cons token tokens))]
       [else               (loop (cons token tokens))])))
+
+;; css-string->raw-tokens : string? -> (listof css-raw-token?)
+;;   Tokenize an entire CSS string into raw CSS token values.
+(define (css-string->raw-tokens source)
+  (define lexer
+    (make-css-raw-lexer))
+  (define in
+    (open-input-string source))
+  (port-count-lines! in)
+  (let loop ([tokens '()])
+    (define token
+      (lexer in))
+    (cond
+      [(eq? token 'eof)
+       (reverse tokens)]
+      [else
+       (loop (cons token tokens))])))
 
 ;; css-string->derived-tokens : string? -> (listof css-derived-token?)
 ;;   Tokenize an entire CSS string into derived CSS token values.
@@ -201,6 +291,8 @@
     (css-string->tokens "u+4??" #:profile 'compiler #:source-positions #f))
   (define unicode-range-near-miss-tokens
     (css-string->tokens "u+" #:profile 'compiler #:source-positions #f))
+  (define raw-tokens
+    (css-string->raw-tokens "@media color 12px"))
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
@@ -243,8 +335,18 @@
              (string=? (css-derived-token-text token)
                        "#main"))
            derived-tokens))
+  (define raw-at-token
+    (car raw-tokens))
+  (define raw-ident-token
+    (caddr raw-tokens))
+  (define raw-dimension-token
+    (list-ref raw-tokens 4))
 
   (check-true (pair? coloring-tokens))
+  (check-true (css-raw-token? raw-at-token))
+  (check-equal? (css-raw-token-kind raw-at-token) 'at-keyword-token)
+  (check-equal? (css-raw-token-text raw-ident-token) "color")
+  (check-equal? (css-raw-token-kind raw-dimension-token) 'dimension-token)
   (check-true (position-token? (car coloring-tokens)))
   (check-equal? (stream-token-name (car coloring-tokens)) 'comment)
   (check-equal? (stream-token-name (car compiler-tokens)) 'identifier)
@@ -309,6 +411,8 @@
   (check-not-false (css-derived-token-has-tag? derived-at-rule-token 'at-rule-name))
   (check-equal? (css-derived-token-text derived-at-rule-token)
                 "@media")
+  (check-equal? (css-derived-token-raw-kind derived-at-rule-token)
+                'at-keyword-token)
   (check-not-false (css-derived-token-has-tag? derived-color-token 'color-literal))
   (check-not-false
    (member 'color-literal
