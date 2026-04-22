@@ -13,7 +13,10 @@ This means:
 - derived tokens keep TeX tags and may additionally carry:
   - `latex-command`
   - `latex-environment-command`
+  - `latex-environment-name`
 
 The first version is intentionally conservative. It aims to make ordinary
 LaTeX source useful for preview and syntax-coloring consumers without trying to
-parse the macro language.
+parse the macro language. Environment names in forms such as
+`\begin{itemize}` and `\end{itemize}` now receive their own derived tag instead
+of remaining plain TeX text.

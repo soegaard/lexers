@@ -43,6 +43,15 @@
 (define (tex-derived-token-has-tag? token tag)
   (member tag (tex-derived-token-tags token)))
 
+;; add-tags : tex-derived-token? (listof symbol?) -> tex-derived-token?
+;;   Return one token with extra derived tags added.
+(define (add-tags token extra-tags)
+  (struct-copy tex-derived-token
+               token
+               [tags (remove-duplicates
+                      (append (tex-derived-token-tags token)
+                              extra-tags))]))
+
 ;; -----------------------------------------------------------------------------
 ;; Classification tables
 
@@ -299,6 +308,8 @@
 ;; make-tex-derived-reader : [symbol?] -> (input-port? -> (or/c tex-derived-token? 'eof))
 ;;   Construct a stateful TeX-derived-token reader.
 (define (make-tex-derived-reader [mode 'tex])
+  (define latex-environment-state
+    'none)
   (lambda (in)
     (define next
       (peek-next in))
@@ -310,7 +321,8 @@
          (current-stream-position in))
        (define out
          (open-output-string))
-       (cond
+       (define base-token
+         (cond
          [(tex-whitespace? next)
           (read-whitespace! in out)
           (make-token-from-text start
@@ -375,4 +387,37 @@
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(literal tex-text))])])))
+                                '(literal tex-text))]))
+       (define token
+         (cond
+           [(and (eq? mode 'latex)
+                 (eq? latex-environment-state 'expect-name)
+                 (tex-derived-token-has-tag? base-token 'tex-text))
+            (add-tags base-token '(latex-environment-name))]
+           [else
+            base-token]))
+       (when (eq? mode 'latex)
+         (cond
+           [(tex-derived-token-has-tag? token 'whitespace)
+            (void)]
+           [(and (tex-derived-token-has-tag? token 'latex-environment-command)
+                 (member (tex-derived-token-text token) '("\\begin" "\\end")))
+            (set! latex-environment-state 'expect-open)]
+           [(and (eq? latex-environment-state 'expect-open)
+                 (tex-derived-token-has-tag? token 'tex-group-delimiter)
+                 (string=? (tex-derived-token-text token) "{"))
+            (set! latex-environment-state 'expect-name)]
+           [(eq? latex-environment-state 'expect-open)
+            (set! latex-environment-state 'none)]
+           [(and (eq? latex-environment-state 'expect-name)
+                 (tex-derived-token-has-tag? token 'latex-environment-name))
+            (set! latex-environment-state 'expect-close)]
+           [(and (eq? latex-environment-state 'expect-close)
+                 (tex-derived-token-has-tag? token 'tex-group-delimiter)
+                 (string=? (tex-derived-token-text token) "}"))
+            (set! latex-environment-state 'none)]
+           [(eq? latex-environment-state 'expect-close)
+            (set! latex-environment-state 'none)]
+           [else
+            (void)]))
+       token])))

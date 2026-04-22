@@ -142,11 +142,18 @@
     (findf (lambda (token)
              (latex-derived-token-has-tag? token 'latex-environment-command))
            sample-derived))
+  (define env-name-token
+    (findf (lambda (token)
+             (latex-derived-token-has-tag? token 'latex-environment-name))
+           sample-derived))
 
   (check-not-false command-token)
   (check-not-false env-token)
+  (check-not-false env-name-token)
   (check-equal? (latex-derived-token-text command-token)
                 "\\section")
+  (check-equal? (latex-derived-token-text env-name-token)
+                "itemize")
   (check-equal? (take (map lexer-token-name sample-tokens) 4)
                 '(keyword delimiter literal delimiter))
   (check-equal? (apply string-append (map latex-derived-token-text sample-derived))
