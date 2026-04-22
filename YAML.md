@@ -18,6 +18,11 @@ Double-quoted scalars now validate the common YAML escape forms, including
 simple escapes and hexadecimal Unicode escapes. Invalid escape sequences remain
 source-faithful but are tagged as malformed.
 
+Block-scalar headers now validate the compact indicator forms accepted by YAML:
+an optional chomping indicator, an optional nonzero indentation indicator, and
+no duplicate compact indicators. Malformed headers remain source-faithful but
+are tagged as malformed instead of quietly enabling block-scalar mode.
+
 The first version is deliberately parser-lite. It focuses on reusable token and
 derived-tag structure rather than full YAML loading semantics.
 

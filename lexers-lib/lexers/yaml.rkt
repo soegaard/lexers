@@ -192,6 +192,10 @@
     "run: |\n  echo hi\n  echo bye\nnext: done\n")
   (define block-derived
     (yaml-string->derived-tokens block-source))
+  (define malformed-block-source
+    "run: |++\n  echo hi\n")
+  (define malformed-block-derived
+    (yaml-string->derived-tokens malformed-block-source))
   (define flow-source
     "with: {node-version: 25.2.1, stable: true}\n")
   (define flow-derived
@@ -238,6 +242,11 @@
     (findf (lambda (token)
              (yaml-derived-token-has-tag? token 'yaml-block-scalar-content))
            block-derived))
+  (define malformed-block-header-token
+    (findf (lambda (token)
+             (and (yaml-derived-token-has-tag? token 'yaml-block-scalar-header)
+                  (yaml-derived-token-has-tag? token 'malformed-token)))
+           malformed-block-derived))
   (define bool-token
     (findf (lambda (token)
              (yaml-derived-token-has-tag? token 'yaml-boolean))
@@ -269,6 +278,7 @@
   (check-not-false sequence-token)
   (check-not-false block-header-token)
   (check-not-false block-content-token)
+  (check-not-false malformed-block-header-token)
   (check-not-false bool-token)
   (check-not-false directive-token)
   (check-not-false document-marker-token)
@@ -287,6 +297,8 @@
                 "name")
   (check-equal? (yaml-derived-token-text block-header-token)
                 "|")
+  (check-equal? (yaml-derived-token-text malformed-block-header-token)
+                "|++")
   (check-equal? (yaml-derived-token-text directive-token)
                 "%YAML")
   (check-equal? (map lexer-token-name malformed-coloring)

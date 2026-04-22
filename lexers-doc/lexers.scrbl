@@ -1439,7 +1439,10 @@ The first YAML implementation is a handwritten streaming lexer grounded
 primarily in the YAML 1.2.2 lexical and structural rules. The first slice is
 deliberately parser-lite, but it covers practical block mappings, block
 sequences, flow delimiters, directives, document markers, quoted scalars, plain
-scalars, comments, and block scalar bodies.
+scalars, comments, and block scalar bodies. Block-scalar headers validate the
+compact YAML indicator forms, so malformed headers remain source-faithful but
+are tagged with @racket['malformed-token] instead of enabling block-scalar
+mode.
 
 @defproc[(make-yaml-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                           [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

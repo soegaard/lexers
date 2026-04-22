@@ -422,27 +422,45 @@
       [else
        (loop (add1 i))])))
 
-;; scan-block-header : string? exact-nonnegative-integer? -> exact-nonnegative-integer?
-;;   Scan one block-scalar header token.
+;; scan-block-header : string? exact-nonnegative-integer? -> (values exact-nonnegative-integer? boolean?)
+;;   Scan one block-scalar header token and report whether its compact header is valid.
 (define (scan-block-header body start)
-  (let loop ([i (add1 start)])
+  (let loop ([i (add1 start)]
+             [saw-chomp? #f]
+             [saw-indent? #f]
+             [valid? #t])
     (cond
       [(>= i (string-length body))
-       i]
+       (values i valid?)]
       [else
        (define ch
          (string-ref body i))
        (cond
-         [(or (char-numeric? ch)
-              (member ch '(#\+ #\-)))
-          (loop (add1 i))]
+         [(or (whitespace-char? ch)
+              (char=? ch #\#))
+          (values i valid?)]
+         [(member ch '(#\+ #\-))
+          (loop (add1 i)
+                #t
+                saw-indent?
+                (and valid? (not saw-chomp?)))]
+         [(char-numeric? ch)
+          (loop (add1 i)
+                saw-chomp?
+                #t
+                (and valid?
+                     (not saw-indent?)
+                     (not (char=? ch #\0))))]
          [else
-          i])])))
+          (loop (add1 i)
+                saw-chomp?
+                saw-indent?
+                #f)])])))
 
 ;; block-indent-after-header : string? exact-nonnegative-integer? exact-nonnegative-integer? -> exact-nonnegative-integer?
 ;;   Determine the minimum content indentation for a block scalar.
 (define (block-indent-after-header body start current-indent)
-  (define header-end
+  (define-values (header-end _valid?)
     (scan-block-header body start))
   (define header-text
     (substring body start header-end))
@@ -564,11 +582,19 @@
              (loop (add1 i) #f)]
             [(or (char=? ch #\|)
                  (char=? ch #\>))
-             (define end
+             (define-values (end valid?)
                (scan-block-header body i))
              (emit-body! i end '(delimiter yaml-block-scalar-header))
-             (set! next-block-scalar-indent
-                   (block-indent-after-header body i current-indent))
+             (unless valid?
+               (set! rev-tokens
+                     (cons (struct-copy yaml-derived-token
+                                        (car rev-tokens)
+                                        [kind 'malformed]
+                                        [tags '(delimiter yaml-block-scalar-header yaml-error malformed-token)])
+                           (cdr rev-tokens))))
+             (when valid?
+               (set! next-block-scalar-indent
+                     (block-indent-after-header body i current-indent)))
              (loop end #f)]
             [(char=? ch #\&)
              (define end
