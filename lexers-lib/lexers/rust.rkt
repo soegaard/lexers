@@ -166,6 +166,9 @@
     "fn main() {\r\n    let s = r#\"hi\"#;\r\n}\r\n")
   (define crlf-derived
     (rust-string->derived-tokens crlf-source))
+  (define literal-derived
+    (rust-string->derived-tokens
+     "let ok = \"a\\n\\u{41}\";\nlet bad = \"\\q\";\nlet b = b\"A\\x41\";\nlet badb = b\"æ\";\nlet ch = '\\u{41}';\nlet badch = 'ab';\n"))
   (define first-streaming-token
     (first-token-before-rest? make-rust-derived-lexer
                               "fn "
@@ -190,6 +193,31 @@
     (findf (lambda (token)
              (rust-derived-token-has-tag? token 'rust-comment))
            sample-derived))
+  (define malformed-string-token
+    (findf (lambda (token)
+             (and (rust-derived-token-has-tag? token 'malformed-token)
+                  (string=? (rust-derived-token-text token) "\"\\q\"")))
+           literal-derived))
+  (define valid-byte-string-token
+    (findf (lambda (token)
+             (and (rust-derived-token-has-tag? token 'rust-byte-string-literal)
+                  (string=? (rust-derived-token-text token) "b\"A\\x41\"")))
+           literal-derived))
+  (define malformed-byte-string-token
+    (findf (lambda (token)
+             (and (rust-derived-token-has-tag? token 'malformed-token)
+                  (string=? (rust-derived-token-text token) "b\"æ\"")))
+           literal-derived))
+  (define valid-char-token
+    (findf (lambda (token)
+             (and (rust-derived-token-has-tag? token 'rust-char-literal)
+                  (string=? (rust-derived-token-text token) "'\\u{41}'")))
+           literal-derived))
+  (define malformed-char-token
+    (findf (lambda (token)
+             (and (rust-derived-token-has-tag? token 'malformed-token)
+                  (string=? (rust-derived-token-text token) "'ab'")))
+           literal-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(keyword whitespace identifier delimiter delimiter whitespace delimiter whitespace))
@@ -200,6 +228,11 @@
   (check-not-false char-token)
   (check-not-false lifetime-token)
   (check-not-false comment-token)
+  (check-not-false malformed-string-token)
+  (check-not-false valid-byte-string-token)
+  (check-not-false malformed-byte-string-token)
+  (check-not-false valid-char-token)
+  (check-not-false malformed-char-token)
   (check-equal? (rust-derived-token-text raw-identifier-token)
                 "r#type")
   (check-true (contiguous-derived-stream? sample-derived))

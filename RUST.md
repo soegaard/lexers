@@ -18,6 +18,11 @@ The first slice covers:
 - numeric literals with suffixes
 - common Rust punctuation and delimiters
 
+The current implementation also validates the ordinary escape structure of
+string, byte string, char, byte, and C string literals. Invalid escape
+sequences and malformed multi-character char literals remain source-faithful
+but are tagged as malformed.
+
 Projected Rust categories are:
 
 - `comment`

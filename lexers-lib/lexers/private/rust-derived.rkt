@@ -323,6 +323,172 @@
        (write-one! in out)
        (loop #f)])))
 
+;; -----------------------------------------------------------------------------
+;; Literal validation
+
+;; ascii-char? : char? -> boolean?
+;;   Determine whether one character is ASCII.
+(define (ascii-char? ch)
+  (< (char->integer ch) 128))
+
+;; oct-digit? : char? -> boolean?
+;;   Determine whether one character is an octal digit.
+(define (oct-digit? ch)
+  (and (char? ch)
+       (char<=? #\0 ch #\7)))
+
+;; hex-digit? : char? -> boolean?
+;;   Determine whether one character is a hexadecimal digit.
+(define (hex-digit? ch)
+  (and (char? ch)
+       (or (char-numeric? ch)
+           (char<=? #\a (char-downcase ch) #\f))))
+
+;; valid-rust-simple-escape? : char? -> boolean?
+;;   Determine whether one character completes a simple Rust escape.
+(define (valid-rust-simple-escape? ch)
+  (member ch (list #\n #\r #\t #\\ #\0 #\' #\")))
+
+;; rust-quoted-literal-content : string? exact-nonnegative-integer? -> string?
+;;   Extract one quoted-literal body by trimming prefix and delimiters.
+(define (rust-quoted-literal-content text prefix-len)
+  (substring text
+             (add1 prefix-len)
+             (sub1 (string-length text))))
+
+;; valid-rust-unicode-escape-end : string? exact-nonnegative-integer? -> (or/c exact-nonnegative-integer? #f)
+;;   Return the index after one valid Rust unicode escape, if present.
+(define (valid-rust-unicode-escape-end content start)
+  (define len
+    (string-length content))
+  (if (or (>= (+ start 2) len)
+          (not (char=? (string-ref content start) #\u))
+          (not (char=? (string-ref content (add1 start)) #\{)))
+      #f
+      (let loop ([i          (+ start 2)]
+                 [hex-count  0]
+                 [last-hex?  #f])
+        (if (>= i len)
+            #f
+            (let ([next (string-ref content i)])
+              (cond
+                [(char=? next #\})
+                 (and (positive? hex-count)
+                      (<= hex-count 6)
+                      last-hex?
+                      (add1 i))]
+                [(hex-digit? next)
+                 (loop (add1 i) (add1 hex-count) #t)]
+                [(char=? next #\_)
+                 (and (positive? hex-count)
+                      last-hex?
+                      (loop (add1 i) hex-count #f))]
+                [else
+                 #f]))))))
+
+;; valid-rust-string-escape-end : string? exact-nonnegative-integer? boolean? boolean? -> (or/c exact-nonnegative-integer? #f)
+;;   Return the index after one valid Rust string-style escape, if present.
+(define (valid-rust-string-escape-end content start bytes? continuation?)
+  (define len
+    (string-length content))
+  (cond
+    [(>= (add1 start) len)
+     #f]
+    [else
+     (define next
+       (string-ref content (add1 start)))
+     (cond
+       [(valid-rust-simple-escape? next)
+        (+ start 2)]
+       [(and (char=? next #\x)
+             (< (+ start 3) len)
+             (oct-digit? (string-ref content (+ start 2)))
+             (hex-digit? (string-ref content (+ start 3))))
+        (+ start 4)]
+       [(and (not bytes?)
+             (char=? next #\u))
+        (valid-rust-unicode-escape-end content (add1 start))]
+       [(and continuation?
+             (char=? next #\newline))
+        (let loop ([i (+ start 2)])
+          (cond
+            [(>= i len)
+             i]
+            [else
+             (define ch
+               (string-ref content i))
+             (cond
+               [(member ch (list #\space #\tab #\newline #\return))
+                (loop (add1 i))]
+               [else
+                i])]))]
+       [else
+        #f])]))
+
+;; valid-rust-string-content? : string? boolean? boolean? -> boolean?
+;;   Determine whether one Rust string-like literal body is valid.
+(define (valid-rust-string-content? content bytes? continuation?)
+  (define len
+    (string-length content))
+  (let loop ([i 0])
+    (cond
+      [(= i len)
+       #t]
+      [else
+       (define ch
+         (string-ref content i))
+       (cond
+         [(char=? ch #\\)
+          (define end
+            (valid-rust-string-escape-end content i bytes? continuation?))
+          (and end
+               (loop end))]
+         [(char=? ch #\return)
+          #f]
+         [(and bytes? (not (ascii-char? ch)))
+          #f]
+         [else
+          (loop (add1 i))])])))
+
+;; valid-rust-char-content? : string? boolean? -> boolean?
+;;   Determine whether one Rust char-like literal body is valid.
+(define (valid-rust-char-content? content bytes?)
+  (define len
+    (string-length content))
+  (cond
+    [(zero? len)
+     #f]
+    [(char=? (string-ref content 0) #\\)
+     (define end
+       (valid-rust-string-escape-end content 0 bytes? #f))
+     (and end
+          (= end len))]
+    [(not (= len 1))
+     #f]
+    [else
+     (define ch
+       (string-ref content 0))
+     (and (not (member ch (list #\' #\\ #\newline #\return #\tab)))
+          (or (not bytes?)
+              (ascii-char? ch)))]))
+
+;; valid-rust-quoted-literal? : string? symbol? -> boolean?
+;;   Determine whether one quoted Rust literal has valid escape/content structure.
+(define (valid-rust-quoted-literal? text kind)
+  (case kind
+    [(string)
+     (valid-rust-string-content? (rust-quoted-literal-content text 0) #f #t)]
+    [(char)
+     (valid-rust-char-content? (rust-quoted-literal-content text 0) #f)]
+    [(byte)
+     (valid-rust-char-content? (rust-quoted-literal-content text 1) #t)]
+    [(byte-string)
+     (valid-rust-string-content? (rust-quoted-literal-content text 1) #t #t)]
+    [(c-string)
+     (valid-rust-string-content? (rust-quoted-literal-content text 1) #f #t)]
+    [else
+     #f]))
+
 ;; raw-string-prefix-length : input-port? string? -> (or/c exact-nonnegative-integer? #f)
 ;;   Determine whether prefix is followed by a valid raw-string opener.
 (define (raw-string-prefix-length in prefix)
@@ -509,10 +675,13 @@
              (write-one! in out)
              (define terminated?
                (read-char-literal! in out))
+             (define text
+               (get-output-string out))
              (make-token-from-text start
                                    (current-stream-position in)
-                                   (get-output-string out)
-                                   (if terminated?
+                                   text
+                                   (if (and terminated?
+                                            (valid-rust-quoted-literal? text 'byte))
                                        '(literal rust-byte-literal)
                                        '(malformed-token rust-byte-literal)))]
             [(and (char=? next #\b)
@@ -521,10 +690,13 @@
              (write-one! in out)
              (define terminated?
                (read-string-literal! in out))
+             (define text
+               (get-output-string out))
              (make-token-from-text start
                                    (current-stream-position in)
-                                   (get-output-string out)
-                                   (if terminated?
+                                   text
+                                   (if (and terminated?
+                                            (valid-rust-quoted-literal? text 'byte-string))
                                        '(literal rust-byte-string-literal)
                                        '(malformed-token rust-byte-string-literal)))]
             [(and (char=? next #\b)
@@ -548,10 +720,13 @@
             [(char=? next #\")
              (define terminated?
                (read-string-literal! in out))
+             (define text
+               (get-output-string out))
              (make-token-from-text start
                                    (current-stream-position in)
-                                   (get-output-string out)
-                                   (if terminated?
+                                   text
+                                   (if (and terminated?
+                                            (valid-rust-quoted-literal? text 'string))
                                        '(literal rust-string-literal)
                                        '(malformed-token rust-string-literal)))]
             [(char=? next #\r)
@@ -586,10 +761,13 @@
              (write-one! in out)
              (define terminated?
                (read-string-literal! in out))
+             (define text
+               (get-output-string out))
              (make-token-from-text start
                                    (current-stream-position in)
-                                   (get-output-string out)
-                                   (if terminated?
+                                   text
+                                   (if (and terminated?
+                                            (valid-rust-quoted-literal? text 'c-string))
                                        '(literal rust-c-string-literal)
                                        '(malformed-token rust-c-string-literal)))]
             [(and (char=? next #\c)
@@ -623,10 +801,13 @@
                [else
                 (define terminated?
                   (read-char-literal! in out))
+                (define text
+                  (get-output-string out))
                 (make-token-from-text start
                                       (current-stream-position in)
-                                      (get-output-string out)
-                                      (if terminated?
+                                      text
+                                      (if (and terminated?
+                                               (valid-rust-quoted-literal? text 'char))
                                           '(literal rust-char-literal)
                                           '(malformed-token rust-char-literal)))])]
             [(char-numeric? next)

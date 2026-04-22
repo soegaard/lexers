@@ -2719,6 +2719,11 @@ The first reusable Rust-specific derived tags include:
  @item{@racket['rust-delimiter]}
  @item{@racket['malformed-token]}]
 
+Ordinary Rust strings, byte strings, chars, bytes, and C strings validate
+their escape structure in the derived layer. Invalid escapes and malformed
+multi-character char literals remain source-faithful but are tagged with
+@racket['malformed-token].
+
 Malformed Rust input is handled using the shared profile rules:
 
 @itemlist[
