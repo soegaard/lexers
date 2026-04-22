@@ -228,6 +228,12 @@
     (findf (lambda (token)
              (tex-derived-token-has-tag? token 'tex-control-space))
            special-derived))
+  (define accent-derived
+    (tex-string->derived-tokens "\\'e \\~n \\\"o\n"))
+  (define accent-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-accent-command))
+           accent-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 5)
                 '(identifier delimiter literal delimiter whitespace))
@@ -246,6 +252,7 @@
   (check-not-false spacing-command-token)
   (check-not-false italic-correction-token)
   (check-not-false control-space-token)
+  (check-not-false accent-token)
   (check-equal? (tex-derived-token-text control-word-token)
                 "\\section")
   (check-equal? (tex-derived-token-text text-token)
@@ -260,6 +267,8 @@
                 "\\/")
   (check-equal? (tex-derived-token-text control-space-token)
                 "\\ ")
+  (check-equal? (tex-derived-token-text accent-token)
+                "\\'")
   (check-equal? parameter-tokens
                 '("#1" " " "##"))
   (check-true (contiguous-derived-stream? sample-derived))

@@ -299,6 +299,9 @@
   (cond
     [(string=? text "\\ ")
      '(identifier tex-control-symbol tex-control-space)]
+    [(member text '("\\'" "\\`" "\\\"" "\\^" "\\~" "\\=" "\\." "\\u"
+                    "\\v" "\\H" "\\c" "\\d" "\\b" "\\t" "\\r"))
+     '(identifier tex-control-symbol tex-accent-command)]
     [(member text '("\\," "\\;" "\\!" "\\:"))
      '(identifier tex-control-symbol tex-spacing-command)]
     [(string=? text "\\/")

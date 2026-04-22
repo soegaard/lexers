@@ -50,6 +50,7 @@ The first reusable TeX-specific derived tags include:
 - `tex-superscript-mark`
 - `tex-unbreakable-space`
 - `tex-control-space`
+- `tex-accent-command`
 - `tex-spacing-command`
 - `tex-italic-correction`
 - `malformed-token`
@@ -61,3 +62,5 @@ distinguishes display-vs-inline math shifts and the common special characters
 `&`, `_`, `^`, and `~` instead of exposing them only through the generic
 `tex-special-character` tag, and it now gives reusable tags to common
 control-symbol spacing constructs such as `\ `, `\,`, `\;`, `\!`, and `\/`.
+Common accent control symbols such as `\'`, `\"`, `\~`, and `\c` also receive
+their own reusable `tex-accent-command` tag.
