@@ -2609,6 +2609,7 @@ The current shell scaffold may attach tags such as:
  @item{@racket['shell-builtin]}
  @item{@racket['shell-word]}
  @item{@racket['shell-string-literal]}
+ @item{@racket['shell-ansi-string-literal]}
  @item{@racket['shell-variable]}
  @item{@racket['shell-command-substitution]}
  @item{@racket['shell-comment]}
@@ -2616,6 +2617,10 @@ The current shell scaffold may attach tags such as:
  @item{@racket['shell-numeric-literal]}
  @item{@racket['shell-punctuation]}
  @item{@racket['malformed-token]}]
+
+In Bash and Zsh, ANSI-C quoted strings such as @tt{$'line\n'} project as
+@racket['literal] while the derived layer preserves
+@racket['shell-ansi-string-literal].
 
 Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
 @tt{bash}, @tt{sh}, @tt{shell}, @tt{zsh}, @tt{powershell}, @tt{pwsh}, and

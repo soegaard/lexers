@@ -227,7 +227,13 @@
          [(char=? ch quote)
           #t]
          [else
-          (loop #f)])])))
+         (loop #f)])])))
+
+;; read-ansi-string-literal! : input-port? output-port? -> boolean?
+;;   Consume one Bash/Zsh ANSI-C string literal and report whether it terminated.
+(define (read-ansi-string-literal! in out)
+  (write-one! in out)
+  (read-string-literal! in out #\'))
 
 ;; read-shell-braced-var! : input-port? output-port? -> boolean?
 ;;   Consume one ${...} variable form and report whether it terminated.
@@ -471,6 +477,15 @@
            [(and (char=? next #\#) comment-context?)
             (read-line-comment! in out)
             '(comment shell-comment)]
+           [(and (not (eq? shell 'powershell))
+                 (char=? next #\$)
+                 (char? (peek-next in 1))
+                 (char=? (peek-next in 1) #\'))
+            (define terminated?
+              (read-ansi-string-literal! in out))
+            (cond
+              [terminated? '(literal shell-string-literal shell-ansi-string-literal)]
+              [else        '(malformed-token shell-string-literal shell-ansi-string-literal)])]
            [(or (char=? next #\") (char=? next #\'))
             (define terminated?
               (read-string-literal! in out next))

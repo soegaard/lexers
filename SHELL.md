@@ -37,6 +37,7 @@ The derived layer carries reusable shell-specific tags such as:
 - `shell-builtin`
 - `shell-word`
 - `shell-string-literal`
+- `shell-ansi-string-literal`
 - `shell-variable`
 - `shell-command-substitution`
 - `shell-comment`
@@ -49,6 +50,7 @@ The first shell lexer covers:
 - whitespace
 - `#` line comments in ordinary shell comment positions
 - single-quoted and double-quoted strings
+- Bash/Zsh ANSI-C strings such as `$'line\n'`
 - backtick and `$(...)` command substitution
 - `$name` and `${...}` variables
 - common shell punctuation and operators

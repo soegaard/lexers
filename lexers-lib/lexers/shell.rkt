@@ -214,6 +214,11 @@
   (define powershell-derived
     (shell-string->derived-tokens powershell-source
                                   #:shell 'powershell))
+  (define ansi-source
+    "printf $'line\\n'\n")
+  (define ansi-derived
+    (shell-string->derived-tokens ansi-source
+                                  #:shell 'bash))
   (define malformed-tokens
     (shell-string->tokens "\"unterminated"
                           #:profile 'coloring
@@ -255,6 +260,10 @@
              (and (shell-derived-token-has-tag? token 'shell-keyword)
                   (string=? (shell-derived-token-text token) "Write-Host")))
            powershell-derived))
+  (define ansi-string-token
+    (findf (lambda (token)
+             (shell-derived-token-has-tag? token 'shell-ansi-string-literal))
+           ansi-derived))
 
   (check-equal? (take (map lexer-token-name bash-tokens) 6)
                 '(keyword whitespace identifier whitespace keyword whitespace))
@@ -265,6 +274,7 @@
   (check-not-false comment-token)
   (check-not-false zsh-token)
   (check-not-false powershell-keyword-token)
+  (check-not-false ansi-string-token)
 
   (check-equal? (map lexer-token-name malformed-tokens)
                 '(unknown eof))
@@ -272,6 +282,8 @@
   (check-true (contiguous-derived-stream? bash-derived))
   (check-equal? (reconstruct-derived-source fidelity-derived)
                 fidelity-source)
+  (check-equal? (reconstruct-derived-source ansi-derived)
+                ansi-source)
   (check-equal? (apply string-append
                        (map (lambda (token)
                               (token-source-slice fidelity-source token))
