@@ -189,6 +189,33 @@
   (define parameter-tokens
     (map tex-derived-token-text
          (tex-string->derived-tokens "#1 ##")))
+  (define special-derived
+    (tex-string->derived-tokens "$$x$$ \\(z\\) & _ ^ ~ \\[y\\]\n"))
+  (define display-math-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-display-math-shift))
+           special-derived))
+  (define inline-math-token
+    (findf (lambda (token)
+             (and (tex-derived-token-has-tag? token 'tex-inline-math-shift)
+                  (string=? (tex-derived-token-text token) "\\(")))
+           special-derived))
+  (define alignment-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-alignment-tab))
+           special-derived))
+  (define subscript-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-subscript-mark))
+           special-derived))
+  (define superscript-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-superscript-mark))
+           special-derived))
+  (define unbreakable-space-token
+    (findf (lambda (token)
+             (tex-derived-token-has-tag? token 'tex-unbreakable-space))
+           special-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 5)
                 '(identifier delimiter literal delimiter whitespace))
@@ -198,10 +225,20 @@
   (check-not-false control-word-token)
   (check-not-false control-symbol-token)
   (check-not-false math-token)
+  (check-not-false display-math-token)
+  (check-not-false inline-math-token)
+  (check-not-false alignment-token)
+  (check-not-false subscript-token)
+  (check-not-false superscript-token)
+  (check-not-false unbreakable-space-token)
   (check-equal? (tex-derived-token-text control-word-token)
                 "\\section")
   (check-equal? (tex-derived-token-text text-token)
                 "Hi")
+  (check-equal? (tex-derived-token-text display-math-token)
+                "$$")
+  (check-equal? (tex-derived-token-text inline-math-token)
+                "\\(")
   (check-equal? parameter-tokens
                 '("#1" " " "##"))
   (check-true (contiguous-derived-stream? sample-derived))

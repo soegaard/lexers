@@ -301,9 +301,39 @@
          (string=? text "\\)")
          (string=? text "\\[")
          (string=? text "\\]"))
-     '(delimiter tex-control-symbol tex-math-shift)]
+     (append
+      '(delimiter tex-control-symbol tex-math-shift)
+      (cond
+        [(or (string=? text "\\(")
+             (string=? text "\\)"))
+         '(tex-inline-math-shift)]
+        [else
+         '(tex-display-math-shift)]))]
     [else
      '(identifier tex-control-symbol)]))
+
+;; math-shift-tags : string? -> (listof symbol?)
+;;   Choose derived tags for one dollar-based TeX math shift.
+(define (math-shift-tags text)
+  (append
+   '(delimiter tex-math-shift)
+   (cond
+     [(string=? text "$$")
+      '(tex-display-math-shift)]
+     [else
+      '(tex-inline-math-shift)])))
+
+;; special-character-tags : char? -> (listof symbol?)
+;;   Choose derived tags for one TeX special character.
+(define (special-character-tags ch)
+  (append
+   '(delimiter tex-special-character)
+   (case ch
+     [(#\&) '(tex-alignment-tab)]
+     [(#\_) '(tex-subscript-mark)]
+     [(#\^) '(tex-superscript-mark)]
+     [(#\~) '(tex-unbreakable-space)]
+     [else  '()])))
 
 ;; read-control-token : position? input-port? output-port? symbol? -> tex-derived-token?
 ;;   Read one control word or control symbol token.
@@ -403,7 +433,7 @@
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-math-shift))]
+                                (math-shift-tags (get-output-string out)))]
          [(char=? next #\#)
           (read-parameter! in out)
           (make-token-from-text start
@@ -415,7 +445,7 @@
           (make-token-from-text start
                                 (current-stream-position in)
                                 (get-output-string out)
-                                '(delimiter tex-special-character))]
+                                (special-character-tags next))]
          [else
           (read-text! in out)
           (make-token-from-text start

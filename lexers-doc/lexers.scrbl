@@ -2898,6 +2898,9 @@ The first TeX implementation is a handwritten streaming lexer grounded in TeX's
 tokenization model, but it intentionally stays within a practical static
 subset. It covers comments, whitespace, control words, control symbols, group
 and optional delimiters, math shifts, parameter markers, and plain text runs.
+The derived layer distinguishes inline-vs-display math shifts and gives
+reusable tags to the common special characters @tt{&}, @tt{_}, @tt{^}, and
+@tt{~}.
 
 @defproc[(make-tex-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2973,9 +2976,15 @@ The first reusable TeX-specific derived tags include:
  @item{@racket['tex-parameter]}
  @item{@racket['tex-text]}
  @item{@racket['tex-math-shift]}
+ @item{@racket['tex-inline-math-shift]}
+ @item{@racket['tex-display-math-shift]}
  @item{@racket['tex-group-delimiter]}
  @item{@racket['tex-optional-delimiter]}
  @item{@racket['tex-special-character]}
+ @item{@racket['tex-alignment-tab]}
+ @item{@racket['tex-subscript-mark]}
+ @item{@racket['tex-superscript-mark]}
+ @item{@racket['tex-unbreakable-space]}
  @item{@racket['malformed-token]}]
 
 Markdown fenced code blocks labeled @tt{tex} delegate to

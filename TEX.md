@@ -40,11 +40,20 @@ The first reusable TeX-specific derived tags include:
 - `tex-parameter`
 - `tex-text`
 - `tex-math-shift`
+- `tex-inline-math-shift`
+- `tex-display-math-shift`
 - `tex-group-delimiter`
 - `tex-optional-delimiter`
 - `tex-special-character`
+- `tex-alignment-tab`
+- `tex-subscript-mark`
+- `tex-superscript-mark`
+- `tex-unbreakable-space`
 - `malformed-token`
 
 This module is intended to be source-faithful and streaming. More complete
 TeX-specific behavior, especially catcode-sensitive tokenization, can be added
-later without changing the basic architecture.
+later without changing the basic architecture. The derived layer now also
+distinguishes display-vs-inline math shifts and the common special characters
+`&`, `_`, `^`, and `~` instead of exposing them only through the generic
+`tex-special-character` tag.
