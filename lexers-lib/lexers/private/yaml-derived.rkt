@@ -337,13 +337,55 @@
          [else
           (loop (add1 i))])])))
 
-;; scan-quoted-string : string? exact-nonnegative-integer? char? -> (values exact-nonnegative-integer? boolean?)
-;;   Scan one single-line quoted scalar and report end index plus termination.
+;; hex-digit? : char? -> boolean?
+;;   Determine whether one character is a hexadecimal digit.
+(define (hex-digit? ch)
+  (and (char? ch)
+       (or (char-numeric? ch)
+           (char<=? #\a (char-downcase ch) #\f))))
+
+;; valid-yaml-double-escape-end : string? exact-nonnegative-integer? -> (or/c exact-nonnegative-integer? #f)
+;;   Return the index after one valid YAML double-quoted escape, if present.
+(define (valid-yaml-double-escape-end body start)
+  (define len
+    (string-length body))
+  (cond
+    [(>= (add1 start) len)
+     #f]
+    [else
+     (define next
+       (string-ref body (add1 start)))
+     (cond
+       [(member next
+                (list #\0 #\a #\b #\t #\newline #\v #\f #\r #\e #\space #\" #\/ #\\
+                      #\N #\_ #\L #\P))
+        (+ start 2)]
+       [(char=? next #\x)
+        (and (<= (+ start 4) len)
+             (hex-digit? (string-ref body (+ start 2)))
+             (hex-digit? (string-ref body (+ start 3)))
+             (+ start 4))]
+       [(char=? next #\u)
+        (and (<= (+ start 6) len)
+             (for/and ([i (in-range (+ start 2) (+ start 6))])
+               (hex-digit? (string-ref body i)))
+             (+ start 6))]
+       [(char=? next #\U)
+        (and (<= (+ start 10) len)
+             (for/and ([i (in-range (+ start 2) (+ start 10))])
+               (hex-digit? (string-ref body i)))
+             (+ start 10))]
+       [else
+        #f])]))
+
+;; scan-quoted-string : string? exact-nonnegative-integer? char? -> (values exact-nonnegative-integer? boolean? boolean?)
+;;   Scan one single-line quoted scalar and report end index, termination, and validity.
 (define (scan-quoted-string body start quote)
-  (let loop ([i (add1 start)])
+  (let loop ([i (add1 start)]
+             [valid? #t])
     (cond
       [(>= i (string-length body))
-       (values (string-length body) #f)]
+       (values (string-length body) #f valid?)]
       [else
        (define ch
          (string-ref body i))
@@ -353,15 +395,20 @@
             [(and (char=? quote #\')
                   (< (add1 i) (string-length body))
                   (char=? (string-ref body (add1 i)) #\'))
-             (loop (+ i 2))]
+             (loop (+ i 2) valid?)]
             [else
-             (values (add1 i) #t)])]
+             (values (add1 i) #t valid?)])]
          [(and (char=? quote #\")
-               (char=? ch #\\)
-               (< (add1 i) (string-length body)))
-          (loop (+ i 2))]
+               (char=? ch #\\))
+          (define end
+            (valid-yaml-double-escape-end body i))
+          (cond
+            [end
+             (loop end valid?)]
+            [else
+             (loop (min (+ i 2) (string-length body)) #f)])]
          [else
-          (loop (add1 i))])])))
+          (loop (add1 i) valid?)])])))
 
 ;; scan-plain-scalar : string? exact-nonnegative-integer? -> exact-nonnegative-integer?
 ;;   Scan one plain scalar token.
@@ -540,12 +587,12 @@
              (loop end #f)]
             [(or (char=? ch #\")
                  (char=? ch #\'))
-             (define-values (end terminated?)
+             (define-values (end terminated? valid?)
                (scan-quoted-string body i ch))
              (emit-body! i
                          end
                          (append '(literal yaml-string-literal)
-                                 (if terminated?
+                                 (if (and terminated? valid?)
                                      '()
                                      '(yaml-error malformed-token))))
              (loop end #f)]

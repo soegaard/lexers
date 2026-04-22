@@ -200,6 +200,10 @@
     "%YAML 1.2\n---\nkey: value\n...\n")
   (define directive-derived
     (yaml-string->derived-tokens directive-source))
+  (define quoted-source
+    "good: \"line\\n\\u0041\"\nbad: \"\\q\"\n")
+  (define quoted-derived
+    (yaml-string->derived-tokens quoted-source))
   (define malformed-coloring
     (yaml-string->tokens "name: \"unterminated\n"
                          #:profile 'coloring
@@ -246,6 +250,16 @@
     (findf (lambda (token)
              (yaml-derived-token-has-tag? token 'yaml-document-marker))
            directive-derived))
+  (define valid-quoted-token
+    (findf (lambda (token)
+             (and (yaml-derived-token-has-tag? token 'yaml-string-literal)
+                  (string=? (yaml-derived-token-text token) "\"line\\n\\u0041\"")))
+           quoted-derived))
+  (define malformed-quoted-token
+    (findf (lambda (token)
+             (and (yaml-derived-token-has-tag? token 'malformed-token)
+                  (string=? (yaml-derived-token-text token) "\"\\q\"")))
+           quoted-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 10)
                 '(literal delimiter whitespace literal whitespace literal delimiter whitespace whitespace literal))
@@ -258,6 +272,8 @@
   (check-not-false bool-token)
   (check-not-false directive-token)
   (check-not-false document-marker-token)
+  (check-not-false valid-quoted-token)
+  (check-not-false malformed-quoted-token)
   (check-not-false first-streaming-token)
   (check-true (contiguous-derived-stream? sample-derived))
   (check-true (contiguous-derived-stream? block-derived))

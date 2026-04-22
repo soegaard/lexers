@@ -14,6 +14,10 @@ rules, with an emphasis on the parts that show up in real local corpus files:
 - block scalar headers and content
 - anchors, aliases, and tags
 
+Double-quoted scalars now validate the common YAML escape forms, including
+simple escapes and hexadecimal Unicode escapes. Invalid escape sequences remain
+source-faithful but are tagged as malformed.
+
 The first version is deliberately parser-lite. It focuses on reusable token and
 derived-tag structure rather than full YAML loading semantics.
 

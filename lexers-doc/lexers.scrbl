@@ -1533,6 +1533,11 @@ The first reusable YAML-specific derived tags include:
  @item{@racket['yaml-error]}
  @item{@racket['malformed-token]}]
 
+Double-quoted YAML scalars validate common escape forms in the derived layer,
+including simple escapes plus @tt{\xXX}, @tt{\uXXXX}, and @tt{\UXXXXXXXX}
+Unicode escapes. Invalid escape sequences remain source-faithful but are tagged
+with @racket['malformed-token].
+
 Malformed YAML input is handled using the shared profile rules:
 
 @itemlist[
