@@ -48,6 +48,12 @@ The first reusable Go-specific derived tags include:
 - `malformed-token`
 
 This module is intended to be source-faithful and streaming. Semicolon
-insertion is intentionally deferred for now, because the first lexer slice is
-focused on exact-source tokenization instead of synthesized parser-facing
-tokens.
+insertion is now profile-sensitive:
+
+- in `coloring`, the lexer stays source-faithful and does not synthesize
+  semicolons
+- in `compiler`, the projected token stream inserts Go semicolons at newline
+  and EOF boundaries where the specification requires them
+
+The derived-token API remains source-faithful and does not synthesize virtual
+semicolon tokens.

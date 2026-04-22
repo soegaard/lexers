@@ -166,6 +166,12 @@
     (go-string->tokens sample-source
                        #:profile 'compiler
                        #:source-positions #f))
+  (define semicolon-source
+    "package main\nfunc main() {\n\tprintln(\"hi\")\n\treturn\n}\n")
+  (define semicolon-compiler-tokens
+    (go-string->tokens semicolon-source
+                       #:profile 'compiler
+                       #:source-positions #f))
   (define crlf-source
     "package main\r\n\r\nfunc main() {\r\n\tprintln(\"hi\")\r\n}\r\n")
   (define crlf-derived
@@ -199,6 +205,9 @@
                 '(keyword whitespace identifier whitespace keyword whitespace literal whitespace))
   (check-equal? (last (map lexer-token-name compiler-tokens))
                 'eof)
+  (check-equal? (map lexer-token-value semicolon-compiler-tokens)
+                '("package" "main" ";" "func" "main" "(" ")" "{"
+                  "println" "(" "\"hi\"" ")" ";" "return" ";" "}" ";" #f))
   (check-not-false raw-string-token)
   (check-not-false rune-token)
   (check-not-false numeric-token)

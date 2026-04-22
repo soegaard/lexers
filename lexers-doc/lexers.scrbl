@@ -1779,7 +1779,10 @@ The projected Go API has two entry points:
 The first Go implementation is a handwritten streaming lexer grounded in the
 official Go lexical specification. It covers whitespace, line and general
 comments, identifiers, keywords, string and rune literals, numeric and
-imaginary literals, operators, and delimiters.
+imaginary literals, operators, and delimiters. In the @racket['compiler]
+profile, the projected token stream also performs Go semicolon insertion at the
+newline and EOF boundaries required by the specification, while the
+@racket['coloring] profile remains source-faithful.
 
 @defproc[(make-go-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
