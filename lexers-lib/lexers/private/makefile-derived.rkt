@@ -384,6 +384,25 @@
        [else
         2])]))
 
+;; variable-reference-tags : string? exact-nonnegative-integer? (listof symbol?) -> (listof symbol?)
+;;   Classify one variable reference spelling with reusable form tags.
+(define (variable-reference-tags source index extra-tags)
+  (define base-tags
+    '(identifier makefile-variable-reference))
+  (define form-tags
+    (cond
+      [(>= (add1 index) (string-length source))
+       '(malformed-token)]
+      [else
+       (define next
+         (string-ref source (add1 index)))
+       (case next
+         [(#\() '(makefile-paren-variable-reference)]
+         [(#\{) '(makefile-brace-variable-reference)]
+         [(#\$) '(makefile-dollar-variable-reference)]
+         [else  '(makefile-simple-variable-reference)])]))
+  (append base-tags form-tags extra-tags))
+
 ;; tokenize-line : string? position? -> (listof makefile-derived-token?)
 ;;   Tokenize one physical Makefile line.
 (define (tokenize-line line start-pos)
@@ -456,7 +475,7 @@
            (min end (+ cursor ref-length)))
          (emit-range! cursor
                       ref-end
-                      '(identifier makefile-variable-reference makefile-recipe))
+                      (variable-reference-tags line cursor '(makefile-recipe)))
          (loop ref-end ref-end)]
         [else
          (loop (add1 cursor) chunk-start)])))
@@ -553,7 +572,7 @@
             (variable-reference-length line index))
           (emit-range! index
                        (min length (+ index ref-length))
-                       '(identifier makefile-variable-reference))
+                       (variable-reference-tags line index '()))
           (loop)]
          [(and assignment-index
                (= index assignment-index))
@@ -561,7 +580,19 @@
           (loop)]
          [(and rule-colon-index
                (= index rule-colon-index))
-          (emit! ":" '(delimiter))
+          (define delimiter-text
+            (cond
+              [(string-prefix-at? line index "::")
+               "::"]
+              [else
+               ":"]))
+          (emit! delimiter-text
+                 (append '(delimiter makefile-rule-delimiter)
+                         (cond
+                           [(string=? delimiter-text "::")
+                            '(makefile-double-colon-delimiter)]
+                           [else
+                            '()])))
           (loop)]
          [else
           (define delimiter-match
@@ -570,7 +601,15 @@
                    delimiter)))
          (cond
             [delimiter-match
-             (emit! delimiter-match '(delimiter))
+             (emit! delimiter-match
+                    (append '(delimiter)
+                            (case (string-ref delimiter-match 0)
+                              [(#\;)
+                               '(makefile-recipe-separator)]
+                              [(#\|)
+                               '(makefile-order-only-delimiter)]
+                              [else
+                               '()])))
              (loop)]
             [else
              (define end

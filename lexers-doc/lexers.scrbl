@@ -1320,7 +1320,12 @@ The first reusable Makefile-specific derived tags include:
  @item{@racket['makefile-variable]}
  @item{@racket['makefile-assignment-operator]}
  @item{@racket['makefile-rule-target]}
+ @item{@racket['makefile-rule-delimiter]}
  @item{@racket['makefile-variable-reference]}
+ @item{@racket['makefile-paren-variable-reference]}
+ @item{@racket['makefile-brace-variable-reference]}
+ @item{@racket['makefile-recipe-separator]}
+ @item{@racket['makefile-order-only-delimiter]}
  @item{@racket['malformed-token]}]
 
 Markdown fenced code blocks labeled @tt{make}, @tt{makefile}, or @tt{mk}
