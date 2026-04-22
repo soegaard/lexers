@@ -2449,6 +2449,9 @@ The first reusable Python-specific derived tags include:
  @item{@racket['python-identifier]}
  @item{@racket['python-string-literal]}
  @item{@racket['python-bytes-literal]}
+ @item{@racket['python-f-string-literal]}
+ @item{@racket['python-t-string-literal]}
+ @item{@racket['python-raw-string-literal]}
  @item{@racket['python-numeric-literal]}
  @item{@racket['python-operator]}
  @item{@racket['python-delimiter]}
@@ -2456,6 +2459,10 @@ The first reusable Python-specific derived tags include:
  @item{@racket['python-dedent]}
  @item{@racket['python-error]}
  @item{@racket['malformed-token]}]
+
+Ordinary, bytes, formatted, template, and raw-prefixed Python strings all
+project as @racket['literal], while the derived layer preserves the more
+specific string-literal tags above.
 
 Malformed Python input is handled using the shared profile rules:
 

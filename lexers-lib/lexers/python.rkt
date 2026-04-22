@@ -208,6 +208,9 @@
       (python-string->tokens "\"unterminated"
                              #:profile 'compiler
                              #:source-positions #f)))
+  (define prefixed-derived
+    (python-string->derived-tokens
+     "fr\"value {x}\"\nrb\"bytes\"\nt\"tmpl {x}\"\nbf\"oops\"\n"))
   (define crlf-source
     "def answer():\r\n    return 42\r\n")
   (define crlf-derived
@@ -245,6 +248,28 @@
     (findf (lambda (token)
              (python-derived-token-has-tag? token 'python-nl))
            bracket-derived))
+  (define formatted-string-token
+    (findf (lambda (token)
+             (python-derived-token-has-tag? token 'python-f-string-literal))
+           prefixed-derived))
+  (define raw-bytes-token
+    (findf (lambda (token)
+             (python-derived-token-has-tag? token 'python-bytes-literal))
+           prefixed-derived))
+  (define template-string-token
+    (findf (lambda (token)
+             (python-derived-token-has-tag? token 'python-t-string-literal))
+           prefixed-derived))
+  (define invalid-prefix-identifier
+    (findf (lambda (token)
+             (and (python-derived-token-has-tag? token 'python-identifier)
+                  (string=? (python-derived-token-text token) "bf")))
+           prefixed-derived))
+  (define invalid-prefix-string
+    (findf (lambda (token)
+             (and (python-derived-token-has-tag? token 'python-string-literal)
+                  (string=? (python-derived-token-text token) "\"oops\"")))
+           prefixed-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 8)
                 '(keyword whitespace identifier delimiter identifier delimiter delimiter whitespace))
@@ -257,6 +282,14 @@
   (check-not-false triple-string-token)
   (check-not-false line-join-token)
   (check-not-false nl-token)
+  (check-not-false formatted-string-token)
+  (check-not-false raw-bytes-token)
+  (check-not-false template-string-token)
+  (check-not-false invalid-prefix-identifier)
+  (check-not-false invalid-prefix-string)
+  (check-not-false (python-derived-token-has-tag? formatted-string-token 'python-string-literal))
+  (check-not-false (python-derived-token-has-tag? formatted-string-token 'python-raw-string-literal))
+  (check-not-false (python-derived-token-has-tag? raw-bytes-token 'python-raw-string-literal))
   (check-not-false first-streaming-token)
   (check-not-false (python-derived-token-has-tag? first-streaming-token
                                                   'python-keyword))

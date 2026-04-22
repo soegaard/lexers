@@ -25,6 +25,8 @@ The first reusable scope includes:
 - identifiers, keywords, and soft keywords
 - numeric literals
 - ordinary and triple-quoted strings
+- valid Python string-prefix combinations, including raw, bytes, formatted, and
+  template strings
 - operators and delimiters
 - malformed tokens
 
@@ -46,6 +48,9 @@ The first reusable Python-specific derived tags include:
 - `python-identifier`
 - `python-string-literal`
 - `python-bytes-literal`
+- `python-f-string-literal`
+- `python-t-string-literal`
+- `python-raw-string-literal`
 - `python-numeric-literal`
 - `python-operator`
 - `python-delimiter`
@@ -71,6 +76,10 @@ The projected Python lexer maps into the shared stream categories:
 
 Soft keywords currently project as `keyword`, while the derived layer preserves
 the more specific `python-soft-keyword` tag.
+
+String-like literals still project as `literal`, while the derived layer
+distinguishes ordinary string literals, bytes literals, formatted string
+literals, template string literals, and raw-string forms.
 
 ## Markdown Delegation
 

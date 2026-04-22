@@ -209,6 +209,11 @@
   (member (char-downcase ch)
           '(#\r #\b #\f #\u #\t)))
 
+;; Valid Python string prefixes, case-insensitive.
+(define python-string-prefixes
+  (list->set
+   '("" "r" "u" "b" "br" "rb" "f" "fr" "rf" "t" "tr" "rt")))
+
 ;; number-tail-char? : char? -> boolean?
 ;;   Recognize a broad tail character for numeric literals.
 (define (number-tail-char? ch)
@@ -261,22 +266,30 @@
 ;;   Determine whether a string prefix is followed by a quote.
 (define (string-prefix-length in)
   (cond
-    [(member (peek-next in) '(#\" #\'))
+    [(member (peek-next in) (list #\" #\'))
      0]
     [else
-     (let loop ([i 0])
-       (define next
-         (peek-next in i))
-       (cond
-         [(and (< i 3)
-               (char? next)
-               (string-prefix-char? next))
-          (loop (add1 i))]
-         [(and (positive? i)
-               (member next '(#\" #\')))
-          i]
-         [else
-          #f]))]))
+     (for/or ([len '(2 1)])
+       (define quote
+         (peek-next in len))
+       (define prefix
+         (let loop ([i     0]
+                    [chars null])
+           (cond
+             [(= i len)
+              chars]
+             [else
+              (define next
+                (peek-next in i))
+              (and (char? next)
+                   (string-prefix-char? next)
+                   (loop (add1 i)
+                         (cons (char-downcase next) chars)))])))
+        (and (list? prefix)
+            (member quote (list #\" #\'))
+            (set-member? python-string-prefixes
+                         (list->string (reverse prefix)))
+            len))]))
 
 ;; prefix-raw? : string? -> boolean?
 ;;   Determine whether a consumed string prefix is raw.
@@ -289,6 +302,18 @@
 (define (prefix-bytes? prefix)
   (for/or ([ch (in-string prefix)])
     (char=? (char-downcase ch) #\b)))
+
+;; prefix-formatted? : string? -> boolean?
+;;   Determine whether a consumed string prefix is formatted-string-oriented.
+(define (prefix-formatted? prefix)
+  (for/or ([ch (in-string prefix)])
+    (char=? (char-downcase ch) #\f)))
+
+;; prefix-template? : string? -> boolean?
+;;   Determine whether a consumed string prefix is template-string-oriented.
+(define (prefix-template? prefix)
+  (for/or ([ch (in-string prefix)])
+    (char=? (char-downcase ch) #\t)))
 
 ;; read-python-string! : input-port? output-port? -> boolean?
 ;;   Consume one Python string literal and report whether it terminated.
@@ -733,10 +758,19 @@
                (substring text 0 prefix-len))
              (define tags
                (append
-                (list 'literal
-                      (if (prefix-bytes? prefix)
-                          'python-bytes-literal
-                          'python-string-literal))
+                '(literal)
+                (cond
+                  [(prefix-bytes? prefix)
+                   '(python-bytes-literal)]
+                  [(prefix-formatted? prefix)
+                   '(python-string-literal python-f-string-literal)]
+                  [(prefix-template? prefix)
+                   '(python-string-literal python-t-string-literal)]
+                  [else
+                   '(python-string-literal)])
+                (if (prefix-raw? prefix)
+                    '(python-raw-string-literal)
+                    '())
                 (if terminated?
                     '()
                     '(malformed-token python-error))))
