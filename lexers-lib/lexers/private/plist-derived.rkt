@@ -358,9 +358,9 @@
                (define value
                  (read-unquoted-value! in))
                (add-token! value-start
-                           'literal
+                           'malformed
                            value
-                           '(literal plist-attribute-value))]))
+                           '(malformed-token plist-attribute-value))]))
           (loop)])])))
 
 ;; -----------------------------------------------------------------------------

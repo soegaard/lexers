@@ -1342,7 +1342,9 @@ The projected plist API has two entry points:
 The first plist implementation is a handwritten streaming lexer for XML
 property-list files such as @tt{Info.plist}. The first slice deliberately
 targets XML plists only; it does not attempt to cover binary @tt{bplist}
-files.
+files. Because this scope is XML-only, quoted attribute values are treated as
+ordinary plist attribute values, while unquoted attribute values are treated as
+malformed input.
 
 @defproc[(make-plist-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]

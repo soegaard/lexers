@@ -166,6 +166,10 @@
     "<?xml version=\"1.0\"?>\r\n<plist version=\"1.0\"><dict><key>A</key><integer>1</integer></dict></plist>\r\n")
   (define crlf-derived
     (plist-string->derived-tokens crlf-source))
+  (define malformed-attribute-source
+    "<plist version=1.0></plist>")
+  (define malformed-attribute-derived
+    (plist-string->derived-tokens malformed-attribute-source))
   (define first-streaming-token
     (first-token-before-rest? make-plist-derived-lexer
                               "<?xml version=\"1.0\"?>\n"
@@ -186,6 +190,11 @@
     (findf (lambda (token)
              (plist-derived-token-has-tag? token 'plist-processing-instruction))
            sample-derived))
+  (define malformed-attribute-token
+    (findf (lambda (token)
+             (and (plist-derived-token-has-tag? token 'plist-attribute-value)
+                  (plist-derived-token-has-tag? token 'malformed-token)))
+           malformed-attribute-derived))
 
   (check-equal? (take (map lexer-token-name sample-tokens) 4)
                 '(keyword whitespace keyword whitespace))
@@ -199,6 +208,9 @@
                 "CFBundleName")
   (check-equal? (plist-derived-token-text string-token)
                 "Lexers")
+  (check-not-false malformed-attribute-token)
+  (check-equal? (plist-derived-token-text malformed-attribute-token)
+                "1.0")
   (check-true (contiguous-derived-stream? sample-derived))
   (check-equal? (apply string-append (map plist-derived-token-text sample-derived))
                 sample-source)

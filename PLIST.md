@@ -12,9 +12,12 @@ The current lexer covers:
 - plist doctypes
 - comments
 - element names and delimiters
-- attribute names and values
+- attribute names and quoted attribute values
 - plist value text for `key`, `string`, `data`, `date`, `integer`, and `real`
 - CRLF-preserving source fidelity
 
 The lexer is streaming and designed to work well for preview-oriented tools
 such as `peek`, while still exposing richer plist-specific derived tags.
+
+Because this lexer deliberately targets XML plists, unquoted attribute values
+are treated as malformed input instead of ordinary attribute-value tokens.
