@@ -9,7 +9,9 @@ The library currently provides public lexer modules for:
 - `lexers/cpp`
 - `lexers/csv`
 - `lexers/html`
+- `lexers/go`
 - `lexers/haskell`
+- `lexers/java`
 - `lexers/json`
 - `lexers/javascript`
 - `lexers/makefile`

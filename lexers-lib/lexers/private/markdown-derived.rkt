@@ -38,9 +38,11 @@
          "../c.rkt"
          "../cpp.rkt"
          "../css.rkt"
+         "../go.rkt"
          "../haskell.rkt"
          "../html.rkt"
          "../javascript.rkt"
+         "../java.rkt"
          "../json.rkt"
          "../makefile.rkt"
          "../latex.rkt"
@@ -145,8 +147,10 @@
           (member 'shell-word tags)
           (member 'csv-field tags)
           (member 'c-identifier tags)
+          (member 'go-identifier tags)
           (member 'haskell-variable-identifier tags)
           (member 'haskell-constructor-identifier tags)
+          (member 'java-identifier tags)
           (member 'rust-identifier tags)
           (member 'rust-raw-identifier tags)
           (member 'rust-lifetime tags)
@@ -198,9 +202,18 @@
           (member 'c-string-literal tags)
           (member 'c-char-literal tags)
           (member 'c-numeric-literal tags)
+          (member 'go-string-literal tags)
+          (member 'go-raw-string-literal tags)
+          (member 'go-rune-literal tags)
+          (member 'go-numeric-literal tags)
+          (member 'go-imaginary-literal tags)
           (member 'haskell-string-literal tags)
           (member 'haskell-char-literal tags)
           (member 'haskell-numeric-literal tags)
+          (member 'java-string-literal tags)
+          (member 'java-text-block tags)
+          (member 'java-char-literal tags)
+          (member 'java-numeric-literal tags)
           (member 'rust-string-literal tags)
           (member 'rust-raw-string-literal tags)
           (member 'rust-char-literal tags)
@@ -225,7 +238,9 @@
     [(or (member 'wat-form tags)
           (member 'wat-type tags)
           (member 'wat-instruction tags)
+          (member 'go-keyword tags)
           (member 'haskell-keyword tags)
+          (member 'java-keyword tags)
           (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
@@ -236,7 +251,9 @@
       '(keyword)]
     [(or (member 'delimiter tags)
           (member 'c-delimiter tags)
+          (member 'go-delimiter tags)
           (member 'pascal-delimiter tags)
+          (member 'java-delimiter tags)
           (member 'rust-delimiter tags)
           (member 'csv-separator tags)
           (member 'csv-row-separator tags)
@@ -261,8 +278,10 @@
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
      '(delimiter)]
      [(or (member 'c-operator tags)
+          (member 'go-operator tags)
           (member 'haskell-variable-operator tags)
           (member 'haskell-constructor-operator tags)
+          (member 'java-operator tags)
           (member 'pascal-operator tags)
           (member 'rust-punctuation tags)
           (member 'swift-operator tags))
@@ -316,9 +335,11 @@
     [(member primary '("cpp" "c++" "cc" "cxx" "hpp" "hh" "hxx")) 'cpp]
     [(member primary '("csv"))           'csv]
     [(member primary '("css"))           'css]
+    [(member primary '("go" "golang"))   'go]
     [(member primary '("haskell" "hs" "lhs")) 'haskell]
     [(member primary '("html"))          'html]
     [(member primary '("javascript" "js")) 'javascript]
+    [(member primary '("java"))          'java]
     [(member primary '("json"))          'json]
     [(member primary '("make" "makefile" "mk")) 'makefile]
     [(member primary '("pascal" "pas" "delphi" "objectpascal")) 'pascal]
@@ -399,6 +420,15 @@
                           css-derived-token-end
                           css-derived-token-tags
                           '(embedded-css markdown-code-block))]
+    [(go)
+     (wrap-derived-tokens (go-string->derived-tokens body)
+                          body-start
+                          starts
+                          go-derived-token-text
+                          go-derived-token-start
+                          go-derived-token-end
+                          go-derived-token-tags
+                          '(embedded-go markdown-code-block))]
     [(haskell)
      (wrap-derived-tokens (haskell-string->derived-tokens body)
                           body-start
@@ -408,6 +438,15 @@
                           haskell-derived-token-end
                           haskell-derived-token-tags
                           '(embedded-haskell markdown-code-block))]
+    [(java)
+     (wrap-derived-tokens (java-string->derived-tokens body)
+                          body-start
+                          starts
+                          java-derived-token-text
+                          java-derived-token-start
+                          java-derived-token-end
+                          java-derived-token-tags
+                          '(embedded-java markdown-code-block))]
     [(html)
      (wrap-derived-tokens (html-string->derived-tokens body)
                           body-start

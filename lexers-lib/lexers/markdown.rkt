@@ -302,8 +302,12 @@
     (markdown-string->derived-tokens "```objc\n@interface Foo : NSObject\n@end\n```\n"))
   (define fenced-csv-derived-tokens
     (markdown-string->derived-tokens "```csv\nname,age\nAda,37\n```\n"))
+  (define fenced-go-derived-tokens
+    (markdown-string->derived-tokens "```go\npackage main\nfunc main() {}\n```\n"))
   (define fenced-haskell-derived-tokens
     (markdown-string->derived-tokens "```haskell\nmodule Main where\nmain = putStrLn \"hi\"\n```\n"))
+  (define fenced-java-derived-tokens
+    (markdown-string->derived-tokens "```java\nclass Example {\n    String s = \"hi\";\n}\n```\n"))
   (define fenced-python-derived-tokens
     (markdown-string->derived-tokens "```python\ndef answer(x):\n    return x\n```\n"))
   (define fenced-rust-derived-tokens
@@ -364,6 +368,18 @@
                   (markdown-derived-token-has-tag? token 'csv-field)
                   (string=? (markdown-derived-token-text token) "name")))
            fenced-csv-derived-tokens))
+  (define derived-go-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-go)
+                  (markdown-derived-token-has-tag? token 'go-keyword)
+                  (string=? (markdown-derived-token-text token) "package")))
+           fenced-go-derived-tokens))
+  (define derived-java-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-java)
+                  (markdown-derived-token-has-tag? token 'java-keyword)
+                  (string=? (markdown-derived-token-text token) "class")))
+           fenced-java-derived-tokens))
   (define derived-haskell-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-haskell)
@@ -564,6 +580,8 @@
   (check-not-false derived-plist-token)
   (check-not-false derived-objc-token)
   (check-not-false derived-csv-token)
+  (check-not-false derived-go-token)
+  (check-not-false derived-java-token)
   (check-not-false derived-haskell-token)
   (check-not-false derived-python-token)
   (check-not-false derived-rust-token)

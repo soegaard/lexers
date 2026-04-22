@@ -11,8 +11,10 @@
                      lexers/cpp
                      lexers/csv
                      lexers/css
+                     lexers/go
                      lexers/haskell
                      lexers/html
+                     lexers/java
                      lexers/json
                      lexers/latex
                      lexers/makefile
@@ -64,6 +66,22 @@
                          parser-tools/lex
                          lexers/token
                          lexers/csv))
+     the-eval))
+
+@(define go-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/go))
+     the-eval))
+
+@(define java-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/java))
      the-eval))
 
 @(define javascript-eval
@@ -247,8 +265,10 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/cpp]}
  @item{@racketmodname[lexers/csv]}
  @item{@racketmodname[lexers/css]}
+ @item{@racketmodname[lexers/go]}
  @item{@racketmodname[lexers/haskell]}
  @item{@racketmodname[lexers/html]}
+ @item{@racketmodname[lexers/java]}
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/latex]}
  @item{@racketmodname[lexers/makefile]}
@@ -1696,7 +1716,9 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-css]}
  @item{@racket['embedded-cpp]}
  @item{@racket['embedded-csv]}
+ @item{@racket['embedded-go]}
  @item{@racket['embedded-haskell]}
+ @item{@racket['embedded-java]}
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
  @item{@racket['embedded-makefile]}
@@ -1719,7 +1741,9 @@ The current Markdown scaffold may attach tags such as:
 Delegated raw HTML and recognized fenced-code languages keep their reusable
 derived tags and gain Markdown embedding markers such as
 @racket['embedded-html], @racket['embedded-cpp], @racket['embedded-csv],
+@racket['embedded-go],
 @racket['embedded-haskell],
+@racket['embedded-java],
 @racket['embedded-javascript], @racket['embedded-json],
 @racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
 @racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
@@ -1739,6 +1763,232 @@ derived tags and gain Markdown embedding markers such as
 
 @defthing[markdown-profiles immutable-hash?]{
 The profile defaults used by the Markdown lexer.}
+
+@section{Go}
+
+@defmodule[lexers/go]
+
+The projected Go API has two entry points:
+
+@itemlist[
+ @item{@racket[make-go-lexer] for streaming tokenization from an input port.}
+ @item{@racket[go-string->tokens] for eager tokenization of an entire string.}]
+
+The first Go implementation is a handwritten streaming lexer grounded in the
+official Go lexical specification. It covers whitespace, line and general
+comments, identifiers, keywords, string and rune literals, numeric and
+imaginary literals, operators, and delimiters.
+
+@defproc[(make-go-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                        [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                        [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Go lexer.
+
+Projected Go categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval go-eval
+(define lexer
+  (make-go-lexer #:profile 'coloring))
+(define in
+  (open-input-string "package main\nfunc main() {}\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(go-string->tokens [source string?]
+                            [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                            [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Go tokens.}
+
+The derived Go API provides reusable language-specific structure:
+
+@defproc[(make-go-derived-lexer)
+         (input-port? . -> . (or/c go-derived-token? 'eof))]{
+Constructs a streaming Go lexer that returns derived Go tokens.}
+
+@defproc[(go-string->derived-tokens [source string?])
+         (listof go-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Go tokens.}
+
+@defproc[(go-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Go tokens.}
+
+@defproc[(go-derived-token-tags [token go-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(go-derived-token-has-tag? [token go-derived-token?]
+                                    [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(go-derived-token-text [token go-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(go-derived-token-start [token go-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(go-derived-token-end [token go-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Go-specific derived tags include:
+
+@itemlist[
+ @item{@racket['go-comment]}
+ @item{@racket['go-line-comment]}
+ @item{@racket['go-general-comment]}
+ @item{@racket['go-whitespace]}
+ @item{@racket['go-keyword]}
+ @item{@racket['go-identifier]}
+ @item{@racket['go-string-literal]}
+ @item{@racket['go-raw-string-literal]}
+ @item{@racket['go-rune-literal]}
+ @item{@racket['go-numeric-literal]}
+ @item{@racket['go-imaginary-literal]}
+ @item{@racket['go-operator]}
+ @item{@racket['go-delimiter]}
+ @item{@racket['malformed-token]}]
+
+Malformed Go input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{go} and @tt{golang} delegate to
+@racketmodname[lexers/go]. Wrapped delegated Markdown tokens preserve
+Go-derived tags and gain @racket['embedded-go].}
+
+@defthing[go-profiles immutable-hash?]{
+The profile defaults used by the Go lexer.}
+
+@section{Java}
+
+@defmodule[lexers/java]
+
+The projected Java API has two entry points:
+
+@itemlist[
+ @item{@racket[make-java-lexer] for streaming tokenization from an input port.}
+ @item{@racket[java-string->tokens] for eager tokenization of an entire string.}]
+
+The first Java implementation is a handwritten streaming lexer grounded in the
+Java lexical grammar. It covers whitespace, line and block comments,
+identifiers, keywords, string literals, text blocks, char literals, numeric
+literals, operators, and delimiters.
+
+@defproc[(make-java-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Java lexer.
+
+Projected Java categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval java-eval
+(define lexer
+  (make-java-lexer #:profile 'coloring))
+(define in
+  (open-input-string "class Example {\n    String s = \"hi\";\n}\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(java-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Java tokens.}
+
+The derived Java API provides reusable language-specific structure:
+
+@defproc[(make-java-derived-lexer)
+         (input-port? . -> . (or/c java-derived-token? 'eof))]{
+Constructs a streaming Java lexer that returns derived Java tokens.}
+
+@defproc[(java-string->derived-tokens [source string?])
+         (listof java-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Java tokens.}
+
+@defproc[(java-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Java tokens.}
+
+@defproc[(java-derived-token-tags [token java-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(java-derived-token-has-tag? [token java-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(java-derived-token-text [token java-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(java-derived-token-start [token java-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(java-derived-token-end [token java-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Java-specific derived tags include:
+
+@itemlist[
+ @item{@racket['java-comment]}
+ @item{@racket['java-line-comment]}
+ @item{@racket['java-block-comment]}
+ @item{@racket['java-doc-comment]}
+ @item{@racket['java-whitespace]}
+ @item{@racket['java-keyword]}
+ @item{@racket['java-identifier]}
+ @item{@racket['java-annotation-marker]}
+ @item{@racket['java-annotation-name]}
+ @item{@racket['java-string-literal]}
+ @item{@racket['java-text-block]}
+ @item{@racket['java-char-literal]}
+ @item{@racket['java-numeric-literal]}
+ @item{@racket['java-operator]}
+ @item{@racket['java-delimiter]}
+ @item{@racket['malformed-token]}]
+
+Malformed Java input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{java} delegate to
+@racketmodname[lexers/java]. Wrapped delegated Markdown tokens preserve
+Java-derived tags and gain @racket['embedded-java].}
+
+@defthing[java-profiles immutable-hash?]{
+The profile defaults used by the Java lexer.}
 
 @section{Haskell}
 

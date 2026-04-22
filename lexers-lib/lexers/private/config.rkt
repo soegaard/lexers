@@ -20,6 +20,10 @@
 ;;   Default settings for named YAML lexer profiles.
 ;; json-profile-defaults : immutable-hash?
 ;;   Default settings for named JSON lexer profiles.
+;; java-profile-defaults : immutable-hash?
+;;   Default settings for named Java lexer profiles.
+;; go-profile-defaults : immutable-hash?
+;;   Default settings for named Go lexer profiles.
 ;; plist-profile-defaults : immutable-hash?
 ;;   Default settings for named plist lexer profiles.
 ;; haskell-profile-defaults : immutable-hash?
@@ -133,6 +137,30 @@
 ;; json-config-errors    : json-config? -> symbol?
 ;;   Extract the configured error policy.
 ;; make-json-config      : keyword-arguments -> json-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; java-config?          : any/c -> boolean?
+;;   Recognize Java lexer configuration values.
+;; java-config-profile   : java-config? -> symbol?
+;;   Extract the configured profile name.
+;; java-config-trivia    : java-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; java-config-source-positions : java-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; java-config-errors    : java-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-java-config      : keyword-arguments -> java-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+;; go-config?            : any/c -> boolean?
+;;   Recognize Go lexer configuration values.
+;; go-config-profile     : go-config? -> symbol?
+;;   Extract the configured profile name.
+;; go-config-trivia      : go-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; go-config-source-positions : go-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; go-config-errors      : go-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-go-config        : keyword-arguments -> go-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
 ;; plist-config?         : any/c -> boolean?
 ;;   Recognize plist lexer configuration values.
@@ -318,6 +346,8 @@
          tsv-profile-defaults
          yaml-profile-defaults
          json-profile-defaults
+         java-profile-defaults
+         go-profile-defaults
          plist-profile-defaults
          haskell-profile-defaults
          pascal-profile-defaults
@@ -387,6 +417,18 @@
          json-config-source-positions
          json-config-errors
          make-json-config
+         java-config?
+         java-config-profile
+         java-config-trivia
+         java-config-source-positions
+         java-config-errors
+         make-java-config
+         go-config?
+         go-config-profile
+         go-config-trivia
+         go-config-source-positions
+         go-config-errors
+         make-go-config
          plist-config?
          plist-config-profile
          plist-config-trivia
@@ -507,6 +549,12 @@
 ;; A resolved configuration for the public JSON lexer.
 (struct json-config (profile trivia source-positions errors) #:transparent)
 
+;; A resolved configuration for the public Java lexer.
+(struct java-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Go lexer.
+(struct go-config (profile trivia source-positions errors) #:transparent)
+
 ;; A resolved configuration for the public plist lexer.
 (struct plist-config (profile trivia source-positions errors) #:transparent)
 
@@ -626,6 +674,24 @@
 
 ;; Profile defaults for the JSON lexer.
 (define json-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Java lexer.
+(define java-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Go lexer.
+(define go-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -1008,6 +1074,60 @@
                resolved-trivia
                resolved-source-positions
                resolved-errors))
+
+;; make-java-config : keyword-arguments -> java-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-java-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref java-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-java-config
+                                       "unknown Java lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (java-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
+
+;; make-go-config : keyword-arguments -> go-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-go-config #:profile          [profile 'coloring]
+                        #:trivia           [trivia 'profile-default]
+                        #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref go-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-go-config
+                                       "unknown Go lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (go-config profile
+             resolved-trivia
+             resolved-source-positions
+             resolved-errors))
 
 ;; make-plist-config : keyword-arguments -> plist-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
