@@ -294,6 +294,8 @@
     (markdown-string->derived-tokens "```json\n{\"x\": 1, \"ok\": true}\n```\n"))
   (define fenced-makefile-derived-tokens
     (markdown-string->derived-tokens "```makefile\nall:\n\t$(CC) main.c\n```\n"))
+  (define fenced-mathematica-derived-tokens
+    (markdown-string->derived-tokens "```mathematica\nf[x_] := x /. y_ :> #name &\n```\n"))
   (define fenced-pascal-derived-tokens
     (markdown-string->derived-tokens "```pascal\nprogram Test;\nbegin\n  writeln('hi');\nend.\n```\n"))
   (define fenced-plist-derived-tokens
@@ -350,6 +352,12 @@
                   (markdown-derived-token-has-tag? token 'makefile-rule-target)
                   (string=? (markdown-derived-token-text token) "all")))
            fenced-makefile-derived-tokens))
+  (define derived-mathematica-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-mathematica)
+                  (markdown-derived-token-has-tag? token 'mathematica-pattern)
+                  (string=? (markdown-derived-token-text token) "_")))
+           fenced-mathematica-derived-tokens))
   (define derived-pascal-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-pascal)
@@ -576,6 +584,7 @@
   (check-not-false derived-shell-token)
   (check-not-false derived-json-token)
   (check-not-false derived-makefile-token)
+  (check-not-false derived-mathematica-token)
   (check-not-false derived-pascal-token)
   (check-not-false derived-plist-token)
   (check-not-false derived-objc-token)
@@ -677,6 +686,7 @@
           unterminated-fence-with-content-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-bash-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-json-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-mathematica-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-csv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-python-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-swift-derived-tokens))
@@ -690,6 +700,9 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-json-derived-tokens))
                 "```json\n{\"x\": 1, \"ok\": true}\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-mathematica-derived-tokens))
+                "```mathematica\nf[x_] := x /. y_ :> #name &\n```\n")
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-csv-derived-tokens))
                 "```csv\nname,age\nAda,37\n```\n")

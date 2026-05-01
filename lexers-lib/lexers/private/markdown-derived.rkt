@@ -45,6 +45,7 @@
          "../java.rkt"
          "../json.rkt"
          "../makefile.rkt"
+         "../mathematica.rkt"
          "../latex.rkt"
          "../pascal.rkt"
          "../plist.rkt"
@@ -151,6 +152,8 @@
           (member 'haskell-variable-identifier tags)
           (member 'haskell-constructor-identifier tags)
           (member 'java-identifier tags)
+          (member 'mathematica-symbol tags)
+          (member 'mathematica-long-name tags)
           (member 'rust-identifier tags)
           (member 'rust-raw-identifier tags)
           (member 'rust-lifetime tags)
@@ -214,6 +217,8 @@
           (member 'java-text-block tags)
           (member 'java-char-literal tags)
           (member 'java-numeric-literal tags)
+          (member 'mathematica-string-literal tags)
+          (member 'mathematica-number tags)
           (member 'rust-string-literal tags)
           (member 'rust-raw-string-literal tags)
           (member 'rust-char-literal tags)
@@ -244,6 +249,7 @@
           (member 'latex-command tags)
           (member 'c-keyword tags)
           (member 'c-preprocessor-directive tags)
+          (member 'mathematica-long-name tags)
           (member 'pascal-keyword tags)
           (member 'rust-keyword tags)
           (member 'shell-keyword tags)
@@ -254,6 +260,10 @@
           (member 'go-delimiter tags)
           (member 'pascal-delimiter tags)
           (member 'java-delimiter tags)
+          (member 'mathematica-delimiter tags)
+          (member 'mathematica-group-delimiter tags)
+          (member 'mathematica-part-delimiter tags)
+          (member 'mathematica-association-delimiter tags)
           (member 'rust-delimiter tags)
           (member 'csv-separator tags)
           (member 'csv-row-separator tags)
@@ -282,6 +292,9 @@
           (member 'haskell-variable-operator tags)
           (member 'haskell-constructor-operator tags)
           (member 'java-operator tags)
+          (member 'mathematica-operator tags)
+          (member 'mathematica-pattern tags)
+          (member 'mathematica-slot tags)
           (member 'pascal-operator tags)
           (member 'rust-punctuation tags)
           (member 'swift-operator tags))
@@ -342,6 +355,7 @@
     [(member primary '("java"))          'java]
     [(member primary '("json"))          'json]
     [(member primary '("make" "makefile" "mk")) 'makefile]
+    [(member primary '("mathematica" "wolfram" "wolfram-language" "wl")) 'mathematica]
     [(member primary '("pascal" "pas" "delphi" "objectpascal")) 'pascal]
     [(member primary '("plist"))         'plist]
     [(member primary '("objc" "objective-c" "objectivec" "obj-c")) 'objc]
@@ -474,6 +488,15 @@
                           makefile-derived-token-end
                           makefile-derived-token-tags
                           '(embedded-makefile markdown-code-block))]
+    [(mathematica)
+     (wrap-derived-tokens (mathematica-string->derived-tokens body)
+                          body-start
+                          starts
+                          mathematica-derived-token-text
+                          mathematica-derived-token-start
+                          mathematica-derived-token-end
+                          mathematica-derived-token-tags
+                          '(embedded-mathematica markdown-code-block))]
     [(pascal)
      (wrap-derived-tokens (pascal-string->derived-tokens body)
                           body-start

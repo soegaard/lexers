@@ -359,6 +359,7 @@
          rhombus-profile-defaults
          wat-profile-defaults
          shell-profile-defaults
+         mathematica-profile-defaults
          racket-profile-defaults
          markdown-profile-defaults
          scribble-profile-defaults
@@ -496,6 +497,12 @@
          shell-config-shell
          shell-config-errors
          make-shell-config
+         mathematica-config?
+         mathematica-config-profile
+         mathematica-config-trivia
+         mathematica-config-source-positions
+         mathematica-config-errors
+         make-mathematica-config
          racket-config?
          racket-config-profile
          racket-config-trivia
@@ -587,6 +594,9 @@
 
 ;; A resolved configuration for the public shell lexer.
 (struct shell-config (profile trivia source-positions shell errors) #:transparent)
+
+;; A resolved configuration for the public Mathematica lexer.
+(struct mathematica-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Racket lexer.
 (struct racket-config (profile trivia source-positions errors) #:transparent)
@@ -791,6 +801,15 @@
 
 ;; Profile defaults for the shell lexer.
 (define shell-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Mathematica lexer.
+(define mathematica-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -1439,6 +1458,33 @@
                 resolved-source-positions
                 resolved-shell
                 resolved-errors))
+
+;; make-mathematica-config : keyword-arguments -> mathematica-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-mathematica-config #:profile          [profile 'coloring]
+                                 #:trivia           [trivia 'profile-default]
+                                 #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref mathematica-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-mathematica-config
+                                       "unknown Mathematica lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (mathematica-config profile
+                      resolved-trivia
+                      resolved-source-positions
+                      resolved-errors))
 
 ;; make-racket-config : keyword-arguments -> racket-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

@@ -18,6 +18,7 @@
                      lexers/json
                      lexers/latex
                      lexers/makefile
+                     lexers/mathematica
                      lexers/markdown
                      lexers/objc
                      lexers/pascal
@@ -130,6 +131,14 @@
                          parser-tools/lex
                          lexers/token
                          lexers/makefile))
+     the-eval))
+
+@(define mathematica-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/mathematica))
      the-eval))
 
 @(define latex-eval
@@ -272,6 +281,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/latex]}
  @item{@racketmodname[lexers/makefile]}
+ @item{@racketmodname[lexers/mathematica]}
  @item{@racketmodname[lexers/javascript]}
  @item{@racketmodname[lexers/markdown]}
  @item{@racketmodname[lexers/objc]}
@@ -1402,6 +1412,148 @@ Markdown fenced code blocks labeled @tt{make}, @tt{makefile}, or @tt{mk}
 delegate to @racketmodname[lexers/makefile]. Wrapped delegated Markdown tokens
 preserve Makefile-derived tags and gain @racket['embedded-makefile].}
 
+@section{Mathematica}
+
+@defmodule[lexers/mathematica]
+
+The projected Mathematica API has two entry points:
+
+@itemlist[
+ @item{@racket[make-mathematica-lexer] for streaming tokenization from an input
+       port.}
+ @item{@racket[mathematica-string->tokens] for eager tokenization of an entire
+       string.}]
+
+The first Mathematica implementation is a handwritten streaming lexer grounded
+in Wolfram's documented linear input syntax. It covers whitespace, nested
+comments, symbols and context-qualified names, strings, practical numeric
+literals, character-entry forms such as @tt{\\[Alpha]}, @tt{\\:03B1},
+@tt{\\.7A}, and @tt{\\|01F600}, group delimiters, part delimiters,
+association delimiters, pattern markers, slots, and a practical operator
+surface for rules, replacements, composition, and string patterns. For
+script-style sources, a leading @tt{#!} line is treated as comment trivia.
+
+@defproc[(make-mathematica-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                 [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                 [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Mathematica lexer.
+
+Projected Mathematica categories include @racket['comment],
+@racket['whitespace], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval mathematica-eval
+(define lexer
+  (make-mathematica-lexer #:profile 'coloring))
+(define in
+  (open-input-string "f[x_] := x /. y_ :> #name &\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(mathematica-string->tokens [source string?]
+                                     [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                     [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                     [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Mathematica
+tokens.}
+
+The derived Mathematica API provides reusable language-specific structure:
+
+@defproc[(make-mathematica-derived-lexer)
+         (input-port? . -> . (or/c mathematica-derived-token? 'eof))]{
+Constructs a streaming Mathematica lexer that returns derived Mathematica
+tokens.}
+
+@defproc[(mathematica-string->derived-tokens [source string?])
+         (listof mathematica-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived Mathematica
+tokens.}
+
+@defproc[(mathematica-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Mathematica tokens.}
+
+@defproc[(mathematica-derived-token-tags [token mathematica-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(mathematica-derived-token-has-tag? [token mathematica-derived-token?]
+                                             [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(mathematica-derived-token-text [token mathematica-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(mathematica-derived-token-start [token mathematica-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(mathematica-derived-token-end [token mathematica-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+The first reusable Mathematica-specific derived tags include:
+
+@itemlist[
+ @item{@racket['mathematica-comment]}
+ @item{@racket['mathematica-whitespace]}
+ @item{@racket['mathematica-symbol]}
+ @item{@racket['mathematica-context]}
+ @item{@racket['mathematica-package-form]}
+ @item{@racket['mathematica-scoping-form]}
+ @item{@racket['mathematica-definition-form]}
+ @item{@racket['mathematica-string-literal]}
+ @item{@racket['mathematica-number]}
+ @item{@racket['mathematica-integer-number]}
+ @item{@racket['mathematica-real-number]}
+ @item{@racket['mathematica-base-number]}
+ @item{@racket['mathematica-precision-number]}
+ @item{@racket['mathematica-exponent-number]}
+ @item{@racket['mathematica-long-name]}
+ @item{@racket['mathematica-named-character]}
+ @item{@racket['mathematica-character-escape]}
+ @item{@racket['mathematica-hex-escape]}
+ @item{@racket['mathematica-operator]}
+ @item{@racket['mathematica-pattern]}
+ @item{@racket['mathematica-slot]}
+ @item{@racket['mathematica-assignment-operator]}
+ @item{@racket['mathematica-rewrite-operator]}
+ @item{@racket['mathematica-pattern-condition-operator]}
+ @item{@racket['mathematica-composition-operator]}
+ @item{@racket['mathematica-string-pattern-operator]}
+ @item{@racket['mathematica-function-arrow-operator]}
+ @item{@racket['mathematica-delimiter]}
+ @item{@racket['mathematica-group-delimiter]}
+ @item{@racket['mathematica-part-delimiter]}
+ @item{@racket['mathematica-association-delimiter]}
+ @item{@racket['mathematica-shebang-comment]}
+ @item{@racket['mathematica-error]}
+ @item{@racket['malformed-token]}]
+
+Malformed Mathematica input is handled using the shared profile rules:
+
+@itemlist[
+ @item{In the @racket['coloring] profile, malformed input projects as
+       @racket['unknown].}
+ @item{In the @racket['compiler] profile, malformed input raises a read
+       exception.}]
+
+Markdown fenced code blocks labeled @tt{mathematica}, @tt{wolfram},
+@tt{wolfram-language}, or @tt{wl} delegate to
+@racketmodname[lexers/mathematica]. Wrapped delegated Markdown tokens preserve
+Mathematica-derived tags and gain @racket['embedded-mathematica].}
+
+@defthing[mathematica-profiles immutable-hash?]{
+The profile defaults used by the Mathematica lexer.}
+
 @section{Plist}
 
 @defmodule[lexers/plist]
@@ -1648,9 +1800,10 @@ The projected Markdown API has two entry points:
 
 The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
-and known fenced-code languages to the existing C, C++, CSV, HTML, CSS,
-JavaScript, JSON, Makefile, Objective-C, plist, Python, Racket, Scribble, shell,
-Swift, TSV, WAT, and YAML lexers.
+and known fenced-code languages to the existing C, C++, CSV, HTML, CSS, Go,
+Haskell, Java, JavaScript, JSON, Makefile, Mathematica, Objective-C, Pascal,
+plist, Python, Racket, Rust, Scribble, shell, Swift, TeX, TSV, WAT, and YAML
+lexers.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -1815,6 +1968,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-javascript]}
  @item{@racket['embedded-json]}
  @item{@racket['embedded-makefile]}
+ @item{@racket['embedded-mathematica]}
  @item{@racket['embedded-latex]}
  @item{@racket['embedded-objc]}
  @item{@racket['embedded-pascal]}
@@ -1838,7 +1992,8 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-haskell],
 @racket['embedded-java],
 @racket['embedded-javascript], @racket['embedded-json],
-@racket['embedded-latex], @racket['embedded-makefile], @racket['embedded-objc],
+@racket['embedded-latex], @racket['embedded-makefile],
+@racket['embedded-mathematica], @racket['embedded-objc],
 @racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
 @racket['embedded-racket], @racket['embedded-rust], @racket['embedded-shell],
 @racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
