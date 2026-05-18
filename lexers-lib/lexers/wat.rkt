@@ -198,6 +198,14 @@
                         #:source-positions #t))
   (define fidelity-derived-tokens
     (wat-string->derived-tokens fidelity-source))
+  (define crlf-source
+    ";; line comment\r\n(module\r\n  (func $x (result i32)\r\n    i32.const 42))\r\n")
+  (define crlf-projected-tokens
+    (wat-string->tokens crlf-source
+                        #:profile 'coloring
+                        #:source-positions #f))
+  (define crlf-derived-tokens
+    (wat-string->derived-tokens crlf-source))
   (define incremental-source
     (string-append "(module"
                    (make-string 20000 #\space)
@@ -309,6 +317,13 @@
                 fidelity-source)
   (check-equal? (apply string-append (map wat-derived-token-text fidelity-derived-tokens))
                 fidelity-source)
+  (check-equal? (apply string-append
+                       (for/list ([token (in-list crlf-projected-tokens)]
+                                  #:unless (lexer-token-eof? token))
+                         (lexer-token-value token)))
+                crlf-source)
+  (check-equal? (apply string-append (map wat-derived-token-text crlf-derived-tokens))
+                crlf-source)
   (check-true (contiguous-derived-stream? fidelity-derived-tokens))
   (check-equal? (wat-derived-token-text incremental-derived-first)
                 "(")

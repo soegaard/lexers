@@ -170,6 +170,14 @@
                          #:source-positions #f))
   (define external-script-derived-tokens
     (html-string->derived-tokens external-script-source))
+  (define crlf-source
+    "<!doctype html>\r\n<main id=\"app\">Hi &amp; bye</main>\r\n")
+  (define crlf-tokens
+    (html-string->tokens crlf-source
+                         #:profile 'coloring
+                         #:source-positions #f))
+  (define crlf-derived-tokens
+    (html-string->derived-tokens crlf-source))
   (define empty-script-followed-source
     "<script></script><div>ok</div>")
   (define empty-script-followed-tokens
@@ -285,6 +293,12 @@
   (check-equal? (apply string-append
                        (map html-derived-token-text external-script-derived-tokens))
                 external-script-source)
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value crlf-tokens) 1))
+                crlf-source)
+  (check-equal? (apply string-append
+                       (map html-derived-token-text crlf-derived-tokens))
+                crlf-source)
   (check-equal? (apply string-append
                        (drop-right (map stream-token-value empty-script-followed-tokens) 1))
                 empty-script-followed-source)

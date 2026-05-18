@@ -63,6 +63,8 @@ Coding guidelines for Racket code in `lexers`:
 28. Corpus checker scripts in `tools/` must skip cleanly when their local
     `/tmp` corpus directory is unavailable, so package-server tests do not
     fail when the corpus is absent.
+29. When newline handling is relevant for a public lexer, add an explicit CRLF
+    round-trip regression to the public lexer module.
 28. For languages with an official lexical-analysis reference, treat that
     lexical specification as the primary lexer source. Use parser grammars and
     implementation files as secondary context.

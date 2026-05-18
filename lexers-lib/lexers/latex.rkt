@@ -152,6 +152,14 @@
            sample-derived))
   (define line-break-derived
     (latex-string->derived-tokens "A\\\\\nB\n"))
+  (define crlf-source
+    "\\section{Hi}\r\n\\begin{itemize}\r\n\\item One\r\n\\end{itemize}\r\n")
+  (define crlf-derived
+    (latex-string->derived-tokens crlf-source))
+  (define crlf-tokens
+    (latex-string->tokens crlf-source
+                          #:profile 'coloring
+                          #:source-positions #f))
   (define line-break-token
     (findf (lambda (token)
              (latex-derived-token-has-tag? token 'latex-line-break-command))
@@ -172,5 +180,10 @@
                 "\\\\")
   (check-equal? (take (map lexer-token-name sample-tokens) 4)
                 '(keyword delimiter literal delimiter))
+  (check-equal? (apply string-append
+                       (drop-right (map lexer-token-value crlf-tokens) 1))
+                crlf-source)
+  (check-equal? (apply string-append (map latex-derived-token-text crlf-derived))
+                crlf-source)
   (check-equal? (apply string-append (map latex-derived-token-text sample-derived))
                 sample-source))

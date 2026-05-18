@@ -293,6 +293,14 @@
     (css-string->tokens "u+" #:profile 'compiler #:source-positions #f))
   (define raw-tokens
     (css-string->raw-tokens "@media color 12px"))
+  (define crlf-source
+    "/* c */\r\n.hero {\r\n  color: #fff;\r\n}\r\n")
+  (define crlf-tokens
+    (css-string->tokens crlf-source
+                        #:profile 'coloring
+                        #:source-positions #f))
+  (define crlf-derived
+    (css-string->derived-tokens crlf-source))
   (define derived-lexer
     (make-css-derived-lexer))
   (define derived-tokens
@@ -417,6 +425,11 @@
   (check-not-false
    (member 'color-literal
            (css-derived-token-tags derived-color-token)))
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value crlf-tokens) 1))
+                crlf-source)
+  (check-equal? (apply string-append (map css-derived-token-text crlf-derived))
+                crlf-source)
   (check-equal? (css-derived-token-text derived-color-token)
                 "#fff")
   (check-equal? (position-offset (css-derived-token-start derived-color-token))

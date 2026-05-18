@@ -188,6 +188,14 @@
     "#!/usr/bin/env wolframscript\nBeginPackage[\"Demo`\"]\n")
   (define shebang-derived
     (mathematica-string->derived-tokens shebang-source))
+  (define crlf-source
+    "BeginPackage[\"Demo`\"]\r\nassoc = <|\"a\" -> 1|>;\r\n\\[Alpha]\r\n")
+  (define crlf-derived
+    (mathematica-string->derived-tokens crlf-source))
+  (define crlf-tokens
+    (mathematica-string->tokens crlf-source
+                                #:profile 'coloring
+                                #:source-positions #f))
   (define first-streaming-token
     (first-token-before-rest? make-mathematica-derived-lexer
                               "BeginPackage["
@@ -323,6 +331,11 @@
                 sample-source)
   (check-equal? (apply string-append (map mathematica-derived-token-text shebang-derived))
                 shebang-source)
+  (check-equal? (apply string-append
+                       (drop-right (map lexer-token-value crlf-tokens) 1))
+                crlf-source)
+  (check-equal? (apply string-append (map mathematica-derived-token-text crlf-derived))
+                crlf-source)
   (check-equal? (apply string-append (map mathematica-derived-token-text escape-derived))
                 escape-source)
   (check-not-false (mathematica-derived-token-has-tag? (car malformed-comment-derived)

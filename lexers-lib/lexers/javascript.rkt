@@ -181,6 +181,14 @@
      #:profile 'compiler
      #:source-positions #f
      #:jsx? #t))
+  (define crlf-source
+    "// c\r\nconst x = 1;\r\nconst y = `ok`;\r\n")
+  (define crlf-tokens
+    (javascript-string->tokens crlf-source
+                               #:profile 'coloring
+                               #:source-positions #f))
+  (define crlf-derived-tokens
+    (javascript-string->derived-tokens crlf-source))
   (define derived-lexer
     (make-javascript-derived-lexer))
   (define derived-tokens
@@ -307,6 +315,12 @@
   (check-equal? (stream-token-value (cadr template-tokens)) "a ")
   (check-equal? (map stream-token-value (take numeric-forms-tokens 6))
                 '("0xFF" "0b1010" "0o77" "1_000" "1.2e3" "123n"))
+  (check-equal? (apply string-append
+                       (drop-right (map stream-token-value crlf-tokens) 1))
+                crlf-source)
+  (check-equal? (apply string-append
+                       (map javascript-derived-token-text crlf-derived-tokens))
+                crlf-source)
   (check-equal? (map stream-token-name jsx-tokens)
                 '(keyword identifier operator delimiter identifier identifier
                   operator literal delimiter literal delimiter identifier
