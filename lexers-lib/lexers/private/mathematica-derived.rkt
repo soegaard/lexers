@@ -484,8 +484,8 @@
        [else
         (when (and (char? (peek-next in))
                    (char=? (peek-next in) #\.)
-                   (char? (peek-next in 1))
-                   (decimal-digit? (peek-next in 1)))
+                   (not (and (char? (peek-next in 1))
+                             (char=? (peek-next in 1) #\.))))
           (write-one! in out)
           (read-digit-sequence! in out decimal-digit?))
         (read-number-precision! in out)
