@@ -40,6 +40,8 @@
 ;;   Default settings for named Swift lexer profiles.
 ;; python-profile-defaults : immutable-hash?
 ;;   Default settings for named Python lexer profiles.
+;; ruby-profile-defaults : immutable-hash?
+;;   Default settings for named Ruby lexer profiles.
 ;; rhombus-profile-defaults : immutable-hash?
 ;;   Default settings for named Rhombus lexer profiles.
 ;; wat-profile-defaults : immutable-hash?
@@ -248,6 +250,18 @@
 ;;   Extract the configured error policy.
 ;; make-python-config    : keyword-arguments -> python-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; ruby-config?        : any/c -> boolean?
+;;   Recognize Ruby lexer configuration values.
+;; ruby-config-profile : ruby-config? -> symbol?
+;;   Extract the configured profile name.
+;; ruby-config-trivia  : ruby-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; ruby-config-source-positions : ruby-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; ruby-config-errors  : ruby-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-ruby-config    : keyword-arguments -> ruby-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 ;; rhombus-config?       : any/c -> boolean?
 ;;   Recognize Rhombus lexer configuration values.
 ;; rhombus-config-profile : rhombus-config? -> symbol?
@@ -356,6 +370,7 @@
          rust-profile-defaults
          swift-profile-defaults
          python-profile-defaults
+         ruby-profile-defaults
          rhombus-profile-defaults
          wat-profile-defaults
          shell-profile-defaults
@@ -478,6 +493,12 @@
          python-config-source-positions
          python-config-errors
          make-python-config
+         ruby-config?
+         ruby-config-profile
+         ruby-config-trivia
+         ruby-config-source-positions
+         ruby-config-errors
+         make-ruby-config
          rhombus-config?
          rhombus-config-profile
          rhombus-config-trivia
@@ -585,6 +606,9 @@
 
 ;; A resolved configuration for the public Python lexer.
 (struct python-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Ruby lexer.
+(struct ruby-config (profile trivia source-positions errors) #:transparent)
 
 ;; A resolved configuration for the public Rhombus lexer.
 (struct rhombus-config (profile trivia source-positions errors) #:transparent)
@@ -774,6 +798,15 @@
 
 ;; Profile defaults for the Python lexer.
 (define python-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Ruby lexer.
+(define ruby-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -1363,6 +1396,33 @@
                  resolved-trivia
                  resolved-source-positions
                  resolved-errors))
+
+;; make-ruby-config : keyword-arguments -> ruby-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-ruby-config #:profile          [profile 'coloring]
+                          #:trivia           [trivia 'profile-default]
+                          #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref ruby-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-ruby-config
+                                       "unknown Ruby lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (ruby-config profile
+               resolved-trivia
+               resolved-source-positions
+               resolved-errors))
 
 ;; make-rhombus-config : keyword-arguments -> rhombus-config?
 ;;   Resolve profile defaults and explicit overrides into one config.

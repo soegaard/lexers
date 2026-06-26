@@ -24,6 +24,7 @@
                      lexers/pascal
                      lexers/plist
                      lexers/python
+                     lexers/ruby
                      lexers/racket
                      lexers/rhombus
                      lexers/rust
@@ -189,6 +190,14 @@
                          lexers/python))
      the-eval))
 
+@(define ruby-eval
+   (let ([the-eval (make-base-eval)])
+     (the-eval '(require racket/base
+                         parser-tools/lex
+                         lexers/token
+                         lexers/ruby))
+     the-eval))
+
 @(define racket-eval
    (let ([the-eval (make-base-eval)])
      (the-eval '(require racket/base
@@ -288,6 +297,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/pascal]}
  @item{@racketmodname[lexers/plist]}
  @item{@racketmodname[lexers/python]}
+ @item{@racketmodname[lexers/ruby]}
  @item{@racketmodname[lexers/racket]}
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/rust]}
@@ -2734,6 +2744,163 @@ Malformed Python input is handled using the shared profile rules:
 Markdown fenced code blocks labeled @tt{python} and @tt{py} delegate to
 @racketmodname[lexers/python]. Wrapped delegated Markdown tokens preserve
 Python-derived tags and gain @racket['embedded-python].}
+
+@section{Ruby}
+
+@defmodule[lexers/ruby]
+
+The projected Ruby API has two entry points:
+
+@itemlist[
+ @item{@racket[make-ruby-lexer] for streaming tokenization from an input port.}
+ @item{@racket[ruby-string->tokens] for eager tokenization of an entire string.}]
+
+The Ruby implementation uses @racketmodname[parser-tools/lex] for the
+token-dispatch layer and covers comments, whitespace, identifiers,
+keywords, constants, instance/class/global variables, decimal numbers, quoted
+strings, symbol literals, regexp literals, percent literals, command literals,
+heredoc literals, operators, and delimiters.
+
+@defproc[(make-ruby-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Ruby lexer.}
+
+@defproc[(ruby-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes an entire Ruby source string using the projected token API.}
+
+@subsection{Ruby Returned Tokens}
+
+Common projected Ruby categories include:
+
+@itemlist[
+ @item{@racket['whitespace]}
+ @item{@racket['comment]}
+ @item{@racket['keyword]}
+ @item{@racket['identifier]}
+ @item{@racket['literal]}
+ @item{@racket['operator]}
+ @item{@racket['delimiter]}
+ @item{@racket['unknown]}
+ @item{@racket['eof]}]
+
+For Ruby:
+
+@itemlist[
+ @item{reserved words project as @racket['keyword]}
+ @item{ordinary identifiers, constants, and variable forms project as
+       @racket['identifier]}
+ @item{numbers, character literals, strings, symbol literals, regexp literals,
+       percent literals, command literals, and heredoc literals project as
+       @racket['literal]}
+ @item{punctuation and symbolic operators project as @racket['operator] or
+       @racket['delimiter]}
+ @item{recoverable malformed input projects as @racket['unknown] in
+       @racket['coloring] mode and raises in @racket['compiler] mode}]
+
+@examples[#:eval ruby-eval
+(define lexer
+  (make-ruby-lexer #:profile 'coloring))
+(define in
+  (open-input-string "class Demo\n  puts :hello\nend\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(make-ruby-derived-lexer)
+         (input-port? . -> . (or/c ruby-derived-token? 'eof))]{
+Constructs a streaming Ruby lexer that returns derived Ruby token values.}
+
+@defproc[(ruby-string->derived-tokens [source string?])
+         (listof ruby-derived-token?)]{
+Tokenizes an entire Ruby source string into derived Ruby token values.}
+
+@defproc[(ruby-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived Ruby token values.}
+
+@defproc[(ruby-derived-token-tags [token ruby-derived-token?])
+         (listof symbol?)]{
+Returns the Ruby-specific classification tags attached to a derived token.}
+
+@defproc[(ruby-derived-token-has-tag? [token ruby-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether a derived Ruby token carries a given classification tag.}
+
+@defproc[(ruby-derived-token-text [token ruby-derived-token?])
+         string?]{
+Returns the exact source text corresponding to a derived Ruby token.}
+
+@defproc[(ruby-derived-token-start [token ruby-derived-token?])
+         position?]{
+Returns the starting source position for a derived Ruby token.}
+
+@defproc[(ruby-derived-token-end [token ruby-derived-token?])
+         position?]{
+Returns the ending source position for a derived Ruby token.}
+
+Ruby-specific derived tags include:
+
+@itemlist[
+ @item{@racket['ruby-comment]}
+ @item{@racket['ruby-shebang-comment]}
+ @item{@racket['ruby-whitespace]}
+ @item{@racket['ruby-newline]}
+ @item{@racket['ruby-keyword]}
+ @item{@racket['ruby-identifier]}
+ @item{@racket['ruby-constant]}
+ @item{@racket['ruby-instance-variable]}
+ @item{@racket['ruby-class-variable]}
+ @item{@racket['ruby-global-variable]}
+ @item{@racket['ruby-string-literal]}
+ @item{@racket['ruby-symbol-literal]}
+ @item{@racket['ruby-character-literal]}
+ @item{@racket['ruby-number-literal]}
+ @item{@racket['ruby-regexp-literal]}
+ @item{@racket['ruby-command-literal]}
+ @item{@racket['ruby-percent-literal]}
+ @item{@racket['ruby-word-list-literal]}
+ @item{@racket['ruby-symbol-list-literal]}
+ @item{@racket['ruby-method-name]}
+ @item{@racket['ruby-operator-method-name]}
+ @item{@racket['ruby-method-reference]}
+ @item{@racket['ruby-method-symbol-literal]}
+ @item{@racket['ruby-interpolated-literal]}
+ @item{@racket['ruby-interpolation]}
+ @item{@racket['ruby-keyword-argument-label]}
+ @item{@racket['ruby-heredoc-introducer]}
+ @item{@racket['ruby-heredoc-body]}
+ @item{@racket['ruby-plain-heredoc]}
+ @item{@racket['ruby-indented-heredoc]}
+ @item{@racket['ruby-squiggly-heredoc]}
+ @item{@racket['ruby-command-heredoc]}
+ @item{@racket['ruby-interpolating-heredoc]}
+ @item{@racket['ruby-noninterpolating-heredoc]}
+ @item{@racket['ruby-operator]}
+ @item{@racket['ruby-delimiter]}
+ @item{@racket['ruby-line-continuation]}
+ @item{@racket['ruby-error]}
+ @item{@racket['malformed-token]}]
+
+Interpolated Ruby literals continue to carry their enclosing literal tags, and
+their embedded interpolation slices are emitted as separate derived tokens tagged
+with @racket['ruby-interpolation]. Bare hash-style keyword argument labels such
+as @tt{timeout:} add @racket['ruby-keyword-argument-label] to the identifier
+token. Heredoc introducers and bodies also carry reusable flavor tags that
+distinguish plain, indented, squiggly, command, interpolating, and
+non-interpolating forms.
+
+@defthing[ruby-profiles immutable-hash?]{
+The profile defaults used by the Ruby lexer.}
 
 @section{Shell}
 
