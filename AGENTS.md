@@ -53,6 +53,9 @@ Coding guidelines for Racket code in `lexers`:
     `procedure?`.
 24. In documentation, prefer precise types over broad placeholders such as
     `any/c`.
+25. In user-facing documentation, avoid internal staging language such as
+    "first implementation", "current slice", or similar project-internal
+    phrasing.
 25. In hot paths, prefer shared non-allocating substring comparison helpers
     over patterns such as `(string=? (substring ...) ...)`.
 26. When optional language integrations depend on packages or Racket versions
@@ -65,6 +68,8 @@ Coding guidelines for Racket code in `lexers`:
     fail when the corpus is absent.
 29. When newline handling is relevant for a public lexer, add an explicit CRLF
     round-trip regression to the public lexer module.
+30. When multiple languages need local corpus builders, prefer a shared helper
+    in `tools/private/` over duplicating one-off builder logic in each script.
 28. For languages with an official lexical-analysis reference, treat that
     lexical specification as the primary lexer source. Use parser grammars and
     implementation files as secondary context.
