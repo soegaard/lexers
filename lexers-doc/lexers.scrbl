@@ -1,6 +1,7 @@
 #lang scribble/manual
 
-@(require scribble/example
+@(require racket/promise
+          scribble/example
           (for-label racket/base
                      racket/contract/base
                      parser-tools/lex
@@ -38,229 +39,44 @@
                      lexers/wat
                      lexers/yaml))
 
-@(define c-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/c))
-     the-eval))
+@(define-syntax-rule (define-delayed-eval name module-path)
+   (define name
+     (delay
+       (let ([the-eval (make-base-eval)])
+         (the-eval '(require racket/base
+                             parser-tools/lex
+                             lexers/token
+                             module-path))
+         the-eval))))
 
-@(define cpp-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/cpp))
-     the-eval))
-
-@(define css-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/css))
-     the-eval))
-
-@(define csv-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/csv))
-     the-eval))
-
-@(define go-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/go))
-     the-eval))
-
-@(define java-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/java))
-     the-eval))
-
-@(define javascript-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/javascript))
-     the-eval))
-
-@(define html-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/html))
-     the-eval))
-
-@(define haskell-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/haskell))
-     the-eval))
-
-@(define markdown-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/markdown))
-     the-eval))
-
-@(define json-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/json))
-     the-eval))
-
-@(define makefile-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/makefile))
-     the-eval))
-
-@(define mathematica-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/mathematica))
-     the-eval))
-
-@(define latex-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/latex))
-     the-eval))
-
-@(define plist-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/plist))
-     the-eval))
-
-@(define objc-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/objc))
-     the-eval))
-
-@(define pascal-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/pascal))
-     the-eval))
-
-@(define yaml-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/yaml))
-     the-eval))
-
-@(define python-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/python))
-     the-eval))
-
-@(define ruby-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/ruby))
-     the-eval))
-
-@(define racket-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/racket))
-     the-eval))
-
-@(define rust-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/rust))
-     the-eval))
-
-@(define shell-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/shell))
-     the-eval))
-
-@(define swift-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/swift))
-     the-eval))
-
-@(define tex-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/tex))
-     the-eval))
-
-@(define tsv-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/tsv))
-     the-eval))
-
-@(define wat-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/wat))
-     the-eval))
-
-@(define scribble-eval
-   (let ([the-eval (make-base-eval)])
-     (the-eval '(require racket/base
-                         parser-tools/lex
-                         lexers/token
-                         lexers/scribble))
-     the-eval))
+@(define-delayed-eval c-eval            lexers/c)
+@(define-delayed-eval cpp-eval          lexers/cpp)
+@(define-delayed-eval css-eval          lexers/css)
+@(define-delayed-eval csv-eval          lexers/csv)
+@(define-delayed-eval go-eval           lexers/go)
+@(define-delayed-eval java-eval         lexers/java)
+@(define-delayed-eval javascript-eval   lexers/javascript)
+@(define-delayed-eval html-eval         lexers/html)
+@(define-delayed-eval haskell-eval      lexers/haskell)
+@(define-delayed-eval markdown-eval     lexers/markdown)
+@(define-delayed-eval json-eval         lexers/json)
+@(define-delayed-eval makefile-eval     lexers/makefile)
+@(define-delayed-eval mathematica-eval  lexers/mathematica)
+@(define-delayed-eval latex-eval        lexers/latex)
+@(define-delayed-eval plist-eval        lexers/plist)
+@(define-delayed-eval objc-eval         lexers/objc)
+@(define-delayed-eval pascal-eval       lexers/pascal)
+@(define-delayed-eval yaml-eval         lexers/yaml)
+@(define-delayed-eval python-eval       lexers/python)
+@(define-delayed-eval ruby-eval         lexers/ruby)
+@(define-delayed-eval racket-eval       lexers/racket)
+@(define-delayed-eval rust-eval         lexers/rust)
+@(define-delayed-eval shell-eval        lexers/shell)
+@(define-delayed-eval swift-eval        lexers/swift)
+@(define-delayed-eval tex-eval          lexers/tex)
+@(define-delayed-eval tsv-eval          lexers/tsv)
+@(define-delayed-eval wat-eval          lexers/wat)
+@(define-delayed-eval scribble-eval     lexers/scribble)
 
 @title{Lexers}
 @author[(author+email "Jens Axel Søgaard" "jensaxel@soegaard.net")]
@@ -454,7 +270,7 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
-@examples[#:eval css-eval
+@examples[#:eval (force css-eval)
 (define lexer
   (make-css-lexer #:profile 'coloring))
 (define in
@@ -525,7 +341,7 @@ original source text of the emitted token. In particular:
  @item{For @racket['unknown] in tolerant mode, the value is the malformed input
        text that could not be accepted.}]
 
-@examples[#:eval css-eval
+@examples[#:eval (force css-eval)
 (define inspect-lexer
   (make-css-lexer #:profile 'coloring))
 (define inspect-in
@@ -552,7 +368,7 @@ This layer stays close to CSS Syntax Level 3 token categories and is intended
 for parser consumers that need stable raw token kinds instead of the broader
 projected categories.
 
-@examples[#:eval css-eval
+@examples[#:eval (force css-eval)
 (define raw-lexer
   (make-css-raw-lexer))
 (define raw-in
@@ -607,7 +423,7 @@ The intended use is the same as for @racket[make-css-lexer]: create the lexer
 once, then call it repeatedly on the same port until it returns
 @racket['eof].
 
-@examples[#:eval css-eval
+@examples[#:eval (force css-eval)
 (define derived-lexer
   (make-css-derived-lexer))
 (define derived-in
@@ -686,7 +502,7 @@ The current CSS scaffold may attach tags such as:
  @item{@racket['length-dimension]}
  @item{@racket['malformed-token]}]
 
-@examples[#:eval css-eval
+@examples[#:eval (force css-eval)
 (define derived-tokens
   (css-string->derived-tokens ".foo { color: red; background: rgb(1 2 3); }"))
 (map (lambda (token)
@@ -734,7 +550,7 @@ When @racket[#:source-positions] is true, each result is a
 @racket[position-token?]. When it is false, the result is either a bare symbol
 or a @racket[token?] directly.
 
-@examples[#:eval html-eval
+@examples[#:eval (force html-eval)
 (define lexer
   (make-html-lexer #:profile 'coloring))
 (define in
@@ -781,7 +597,7 @@ For the current HTML scaffold:
  @item{comments project as @racket['comment]}
  @item{doctype/declaration markup projects as @racket['keyword]}]
 
-@examples[#:eval html-eval
+@examples[#:eval (force html-eval)
 (define inspect-lexer
   (make-html-lexer #:profile 'coloring))
 (define inspect-in
@@ -852,7 +668,7 @@ Delegated CSS and JavaScript body tokens keep their reusable semantic tags and
 gain an additional language marker such as @racket['embedded-css] or
 @racket['embedded-javascript].
 
-@examples[#:eval html-eval
+@examples[#:eval (force html-eval)
 (define derived-tokens
   (html-string->derived-tokens
    "<!doctype html><section id=main class=\"card\">Hi &amp; bye<style>.hero { color: #c33; }</style><script>const root = document.querySelector(\"#app\");</script></section>"))
@@ -904,7 +720,7 @@ Keywords and preprocessor directive names project as @racket['keyword].
 Header names such as @tt{<stdio.h>} and @tt{"local.h"} project as
 @racket['literal].
 
-@examples[#:eval c-eval
+@examples[#:eval (force c-eval)
 (define lexer
   (make-c-lexer #:profile 'coloring))
 (define in
@@ -1016,7 +832,7 @@ Projected C++ categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].
 
-@examples[#:eval cpp-eval
+@examples[#:eval (force cpp-eval)
 (define lexer
   (make-cpp-lexer #:profile 'coloring))
 (define in
@@ -1135,7 +951,7 @@ Projected CSV categories include @racket['literal], @racket['delimiter], and
 Field contents project as @racket['literal]. Field separators and row
 separators project as @racket['delimiter].
 
-@examples[#:eval csv-eval
+@examples[#:eval (force csv-eval)
 (define lexer
   (make-csv-lexer #:profile 'coloring))
 (define in
@@ -1246,7 +1062,7 @@ Object keys project as @racket['identifier], while numbers, ordinary strings,
 and the JSON keywords @tt{true}, @tt{false}, and @tt{null} project as
 @racket['literal].
 
-@examples[#:eval json-eval
+@examples[#:eval (force json-eval)
 (define lexer
   (make-json-lexer #:profile 'coloring))
 (define in
@@ -1453,7 +1269,7 @@ Projected Mathematica categories include @racket['comment],
 @racket['whitespace], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].}
 
-@examples[#:eval mathematica-eval
+@examples[#:eval (force mathematica-eval)
 (define lexer
   (make-mathematica-lexer #:profile 'coloring))
 (define in
@@ -1697,7 +1513,7 @@ quoted scalars project as @racket['literal]. Structural markers such as
 @tt{:}, @tt{-}, @tt{[}, @tt{]}, @tt{@(litchar "{")}, @tt{@(litchar "}")}, and document
 markers project as @racket['delimiter].
 
-@examples[#:eval yaml-eval
+@examples[#:eval (force yaml-eval)
 (define lexer
   (make-yaml-lexer #:profile 'coloring))
 (define in
@@ -1832,7 +1648,7 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
-@examples[#:eval markdown-eval
+@examples[#:eval (force markdown-eval)
 (define lexer
   (make-markdown-lexer #:profile 'coloring))
 (define in
@@ -1887,7 +1703,7 @@ fenced-code info string as an explicit whitespace token before the code body.
 Incomplete fenced-code blocks are tokenized best-effort instead of raising an
 internal error.
 
-@examples[#:eval markdown-eval
+@examples[#:eval (force markdown-eval)
 (define inspect-lexer
   (make-markdown-lexer #:profile 'coloring))
 (define inspect-in
@@ -2009,7 +1825,7 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
 @racket['embedded-wat], or @racket['embedded-yaml].
 
-@examples[#:eval markdown-eval
+@examples[#:eval (force markdown-eval)
 (define derived-tokens
   (markdown-string->derived-tokens
    "# Title\n\n- [x] done\n\n```js\nconst x = 1;\n```\n\nText <span class=\"x\">hi</span>\n"))
@@ -2050,7 +1866,7 @@ Projected Go categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].}
 
-@examples[#:eval go-eval
+@examples[#:eval (force go-eval)
 (define lexer
   (make-go-lexer #:profile 'coloring))
 (define in
@@ -2168,7 +1984,7 @@ Projected Java categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].}
 
-@examples[#:eval java-eval
+@examples[#:eval (force java-eval)
 (define lexer
   (make-java-lexer #:profile 'coloring))
 (define in
@@ -2293,7 +2109,7 @@ Projected Haskell categories include @racket['comment],
 @racket['literal], @racket['operator], @racket['delimiter], and
 @racket['unknown].}
 
-@examples[#:eval haskell-eval
+@examples[#:eval (force haskell-eval)
 (define lexer
   (make-haskell-lexer #:profile 'coloring))
 (define in
@@ -2409,7 +2225,7 @@ Projected Objective-C categories include @racket['comment],
 @racket['literal], @racket['operator], @racket['delimiter], and
 @racket['unknown].
 
-@examples[#:eval objc-eval
+@examples[#:eval (force objc-eval)
 (define lexer
   (make-objc-lexer #:profile 'coloring))
 (define in
@@ -2533,7 +2349,7 @@ Projected Pascal categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].}
 
-@examples[#:eval pascal-eval
+@examples[#:eval (force pascal-eval)
 (define lexer
   (make-pascal-lexer #:profile 'coloring))
 (define in
@@ -2651,7 +2467,7 @@ Projected Python categories include @racket['comment], @racket['whitespace],
 Soft keywords currently project as @racket['keyword], while the derived layer
 keeps the more specific @racket['python-soft-keyword] tag.
 
-@examples[#:eval python-eval
+@examples[#:eval (force python-eval)
 (define lexer
   (make-python-lexer #:profile 'coloring))
 (define in
@@ -2803,7 +2619,7 @@ For Ruby:
  @item{recoverable malformed input projects as @racket['unknown] in
        @racket['coloring] mode and raises in @racket['compiler] mode}]
 
-@examples[#:eval ruby-eval
+@examples[#:eval (force ruby-eval)
 (define lexer
   (make-ruby-lexer #:profile 'coloring))
 (define in
@@ -2965,7 +2781,7 @@ For the current shell scaffold:
 Projected and derived shell token text preserve the exact consumed source
 slice, including comments, whitespace, and CRLF line endings.
 
-@examples[#:eval shell-eval
+@examples[#:eval (force shell-eval)
 (define lexer
   (make-shell-lexer #:profile 'coloring #:shell 'bash))
 (define in
@@ -3044,7 +2860,7 @@ Markdown fenced code blocks delegate to @racketmodname[lexers/shell] for
 @tt{ps1} info strings. Delegated Markdown tokens keep the shell tags and gain
 @racket['embedded-shell].
 
-@examples[#:eval shell-eval
+@examples[#:eval (force shell-eval)
 (define derived-tokens
   (shell-string->derived-tokens "printf \"%s\\n\" $(pwd)\n# done\n"))
 (map (lambda (token)
@@ -3082,7 +2898,7 @@ Projected Rust categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].}
 
-@examples[#:eval rust-eval
+@examples[#:eval (force rust-eval)
 (define lexer
   (make-rust-lexer #:profile 'coloring))
 (define in
@@ -3202,7 +3018,7 @@ Projected Swift categories include @racket['comment], @racket['whitespace],
 @racket['keyword], @racket['identifier], @racket['literal],
 @racket['operator], @racket['delimiter], and @racket['unknown].
 
-@examples[#:eval swift-eval
+@examples[#:eval (force swift-eval)
 (define lexer
   (make-swift-lexer #:profile 'coloring))
 (define in
@@ -3321,7 +3137,7 @@ Projected TeX categories include @racket['comment], @racket['whitespace],
 @racket['identifier], @racket['literal], @racket['delimiter], and
 @racket['unknown].
 
-@examples[#:eval tex-eval
+@examples[#:eval (force tex-eval)
 (define lexer
   (make-tex-lexer #:profile 'coloring))
 (define in
@@ -3527,7 +3343,7 @@ Projected TSV categories include @racket['literal], @racket['delimiter], and
 Field contents project as @racket['literal]. Field separators and row
 separators project as @racket['delimiter].
 
-@examples[#:eval tsv-eval
+@examples[#:eval (force tsv-eval)
 (define lexer
   (make-tsv-lexer #:profile 'coloring))
 (define in
@@ -3643,7 +3459,7 @@ same port until it returns an end-of-file token.
 The streaming port readers emit tokens incrementally. They do not buffer the
 entire remaining input before producing the first token.
 
-@examples[#:eval wat-eval
+@examples[#:eval (force wat-eval)
 (define lexer
   (make-wat-lexer #:profile 'coloring))
 (define in
@@ -3694,7 +3510,7 @@ For the current WAT scaffold:
 Projected and derived token text preserve the exact source slice, including
 whitespace and comments.
 
-@examples[#:eval wat-eval
+@examples[#:eval (force wat-eval)
 (define inspect-lexer
   (make-wat-lexer #:profile 'coloring))
 (define inspect-in
@@ -3759,7 +3575,7 @@ The current WAT scaffold may attach tags such as:
  @item{@racket['whitespace]}
  @item{@racket['malformed-token]}]
 
-@examples[#:eval wat-eval
+@examples[#:eval (force wat-eval)
 (define derived-tokens
   (wat-string->derived-tokens
    "(module (func $answer (result i32) i32.const 42))"))
@@ -3808,7 +3624,7 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
-@examples[#:eval racket-eval
+@examples[#:eval (force racket-eval)
 (define lexer
   (make-racket-lexer #:profile 'coloring))
 (define in
@@ -3857,7 +3673,7 @@ For the current adapter:
 Projected and derived Racket token text preserve the exact consumed source
 slice, including multi-semicolon comment headers such as @tt{;;;}.
 
-@examples[#:eval racket-eval
+@examples[#:eval (force racket-eval)
 (define inspect-lexer
   (make-racket-lexer #:profile 'coloring))
 (define inspect-in
@@ -3946,7 +3762,7 @@ guarantees about expanded meaning. In particular, a token whose text is
 a program where @racket[define] has been rebound, because the lexer does not
 perform expansion or binding resolution.
 
-@examples[#:eval racket-eval
+@examples[#:eval (force racket-eval)
 (define derived-tokens
   (racket-string->derived-tokens "#;(+ 1 2) #:x \"hi\""))
 (map (lambda (token)
@@ -4137,7 +3953,7 @@ or a @racket[token?] directly.
 The intended use is to create the lexer once, then call it repeatedly on the
 same port until it returns an end-of-file token.
 
-@examples[#:eval scribble-eval
+@examples[#:eval (force scribble-eval)
 (define lexer
   (make-scribble-lexer #:profile 'coloring))
 (define in
@@ -4186,7 +4002,7 @@ For source fidelity, the Scribble adapter preserves the exact source slice for
 projected and derived token text, including whitespace spans that contain one
 or more newlines.
 
-@examples[#:eval scribble-eval
+@examples[#:eval (force scribble-eval)
 (define inspect-lexer
   (make-scribble-lexer #:profile 'coloring))
 (define inspect-in
@@ -4262,7 +4078,7 @@ being used as a command name after @racket["@"]. It does not mean the lexer has
 inferred higher-level document semantics for commands such as
 @racket[title] or @racket[itemlist].
 
-@examples[#:eval scribble-eval
+@examples[#:eval (force scribble-eval)
 (define derived-tokens
   (scribble-string->derived-tokens
    "@title{Hi}\n@racket[(define x 1)]"))
@@ -4317,7 +4133,7 @@ The current JavaScript slice includes broader modern numeric literals, such as
 hexadecimal, binary, and octal prefixed integers, decimal exponents, numeric
 separators, and integer @tt{BigInt} suffixes.
 
-@examples[#:eval javascript-eval
+@examples[#:eval (force javascript-eval)
 (define lexer
   (make-javascript-lexer #:profile 'coloring))
 (define in
@@ -4390,7 +4206,7 @@ original source text of the emitted token. In particular:
  @item{For @racket['unknown] in tolerant mode, the value is the malformed input
        text that could not be accepted.}]
 
-@examples[#:eval javascript-eval
+@examples[#:eval (force javascript-eval)
 (define inspect-lexer
   (make-javascript-lexer #:profile 'coloring))
 (define inspect-in
@@ -4418,7 +4234,7 @@ The intended use is the same as for @racket[make-javascript-lexer]: create the
 lexer once, then call it repeatedly on the same port until it returns
 @racket['eof].
 
-@examples[#:eval javascript-eval
+@examples[#:eval (force javascript-eval)
 (define derived-lexer
   (make-javascript-derived-lexer))
 (define derived-in
@@ -4505,7 +4321,7 @@ The current JavaScript scaffold may attach tags such as:
  @item{@racket['comment]}
  @item{@racket['malformed-token]}]
 
-@examples[#:eval javascript-eval
+@examples[#:eval (force javascript-eval)
 (define derived-tokens
   (javascript-string->derived-tokens
    "class Box { static create() { return this.value; } #secret = 1; }\nfunction wrap(name) { return name; }\nconst item = obj.run();\nconst data = { answer: 42 };\nconst greeting = `a ${name} b`;\nreturn /ab+c/i;"))
@@ -4529,7 +4345,7 @@ The current JavaScript scaffold may attach tags such as:
      derived-tokens)
 ]}
 
-@examples[#:eval javascript-eval
+@examples[#:eval (force javascript-eval)
 (define jsx-derived-tokens
   (javascript-string->derived-tokens
    "const el = <Button kind=\"primary\">Hello {name}</Button>;\nconst frag = <>ok</>;"
