@@ -30,6 +30,7 @@
                      lexers/rhombus
                      lexers/rust
                      lexers/shell
+                     lexers/sql
                      lexers/scribble
                      lexers/swift
                      lexers/tex
@@ -72,6 +73,7 @@
 @(define-delayed-eval racket-eval       lexers/racket)
 @(define-delayed-eval rust-eval         lexers/rust)
 @(define-delayed-eval shell-eval        lexers/shell)
+@(define-delayed-eval sql-eval          lexers/sql)
 @(define-delayed-eval swift-eval        lexers/swift)
 @(define-delayed-eval tex-eval          lexers/tex)
 @(define-delayed-eval tsv-eval          lexers/tsv)
@@ -118,6 +120,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/rust]}
  @item{@racketmodname[lexers/shell]}
+ @item{@racketmodname[lexers/sql]}
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/swift]}
  @item{@racketmodname[lexers/tex]}
@@ -218,7 +221,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
 @racket[make-cpp-lexer], @racket[cpp-string->tokens],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
-@racket[scribble-string->tokens], @racket[make-swift-lexer],
+@racket[scribble-string->tokens], @racket[make-sql-lexer],
+@racket[sql-string->tokens], @racket[make-swift-lexer],
 @racket[swift-string->tokens], @racket[make-wat-lexer], and
 @racket[wat-string->tokens]:
 
@@ -230,6 +234,113 @@ For the keyword arguments accepted by @racket[make-css-lexer],
        source-position setting from the selected profile”.}
  @item{An explicit @racket[#:trivia] or @racket[#:source-positions] value
        overrides the selected profile default.}]
+
+The SQL module also accepts a @racket[#:dialect] argument. The supported
+dialect names are @racket['generic], @racket['sqlite], @racket['postgres],
+and @racket['mysql].
+
+@section{SQL}
+
+@defmodule[lexers/sql]
+
+The projected SQL API has two entry points:
+
+@itemlist[
+ @item{@racket[make-sql-lexer] for streaming tokenization from an input port.}
+ @item{@racket[sql-string->tokens] for eager tokenization of an entire string.}]
+
+The SQL lexer is a handwritten streaming lexer aimed at syntax-highlighting and
+other reusable token consumers. It covers shared SQL structure plus
+dialect-sensitive handling for SQLite, PostgreSQL, and MySQL, including
+whitespace, line and block comments, unquoted and quoted identifiers, common
+keywords, string literals, numeric literals, parameters, operators, and
+delimiters. PostgreSQL dollar-quoted strings, SQLite bracket identifiers, and
+MySQL hash comments and character-set introducers are also recognized.
+
+@defproc[(make-sql-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                         [#:dialect dialect (or/c 'generic 'sqlite 'postgres 'mysql) 'generic])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming SQL lexer.
+
+Projected SQL categories include @racket['comment], @racket['whitespace],
+@racket['keyword], @racket['identifier], @racket['literal],
+@racket['operator], @racket['delimiter], and @racket['unknown].}
+
+@examples[#:eval (force sql-eval)
+(define lexer
+  (make-sql-lexer #:dialect 'postgres
+                  #:profile 'coloring))
+(define in
+  (open-input-string "SELECT $1, $$hello$$ FROM logs;\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))
+]}
+
+@defproc[(sql-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                             [#:dialect dialect (or/c 'generic 'sqlite 'postgres 'mysql) 'generic])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected SQL tokens.}
+
+The derived SQL API provides reusable language-specific structure:
+
+@defproc[(make-sql-derived-lexer [#:dialect dialect (or/c 'generic 'sqlite 'postgres 'mysql) 'generic])
+         (input-port? . -> . (or/c sql-derived-token? 'eof))]{
+Constructs a streaming SQL lexer that returns derived SQL tokens.}
+
+@defproc[(sql-string->derived-tokens [source string?]
+                                     [#:dialect dialect (or/c 'generic 'sqlite 'postgres 'mysql) 'generic])
+         (listof sql-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns derived SQL tokens.}
+
+@defproc[(sql-derived-token? [v any/c])
+         boolean?]{
+Recognizes derived SQL tokens.}
+
+@defproc[(sql-derived-token-tags [token sql-derived-token?])
+         (listof symbol?)]{
+Returns the derived-token tags for @racket[token].}
+
+@defproc[(sql-derived-token-has-tag? [token sql-derived-token?]
+                                     [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(sql-derived-token-text [token sql-derived-token?])
+         string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(sql-derived-token-start [token sql-derived-token?])
+         position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(sql-derived-token-end [token sql-derived-token?])
+         position?]{
+Returns the ending source position of @racket[token].}
+
+Useful derived SQL tags include:
+
+@itemlist[
+ @item{@racket['sql-comment]}
+ @item{@racket['sql-line-comment]}
+ @item{@racket['sql-block-comment]}
+ @item{@racket['sql-whitespace]}
+ @item{@racket['sql-keyword]}
+ @item{@racket['sql-identifier]}
+ @item{@racket['sql-quoted-identifier]}
+ @item{@racket['sql-string-literal]}
+ @item{@racket['sql-dollar-string]}
+ @item{@racket['sql-numeric-literal]}
+ @item{@racket['sql-parameter]}
+ @item{@racket['sql-operator]}
+ @item{@racket['sql-delimiter]}]
 
 @section{CSS}
 

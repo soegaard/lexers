@@ -9,8 +9,11 @@
 
 ;; build-corpus : keyword-arguments -> void?
 ;;   Build one local corpus from the configured roots and predicates.
+;; build-bucketed-corpus : keyword-arguments -> void?
+;;   Build one local corpus root with multiple named sub-corpora.
 
-(provide build-corpus)
+(provide build-corpus
+         build-bucketed-corpus)
 
 (require racket/file
          racket/format
@@ -112,8 +115,108 @@
                      summary-path
                      source-roots
                      all-files
-                     unique-files)
+        unique-files)
      (printf "Built ~a corpus in ~a\n" name corpus-root)
      (printf "Source files: ~a\n" (length all-files))
      (printf "Unique files: ~a\n" (length unique-files))
+     (printf "Wrote build summary to ~a\n" summary-path)]))
+
+;; -----------------------------------------------------------------------------
+;; Bucketed corpus support
+
+;; bucket-name : list? -> string?
+;;   Extract the display name for one bucket configuration.
+(define (bucket-name bucket)
+  (list-ref bucket 0))
+
+;; bucket-source-roots : list? -> (listof path-string?)
+;;   Extract the source roots for one bucket configuration.
+(define (bucket-source-roots bucket)
+  (list-ref bucket 1))
+
+;; bucket-include-path? : list? -> (path? -> boolean?)
+;;   Extract the inclusion predicate for one bucket configuration.
+(define (bucket-include-path? bucket)
+  (list-ref bucket 2))
+
+;; build-bucket! : path-string? list? -> list?
+;;   Build one named bucket and report its source and unique files.
+(define (build-bucket! corpus-root bucket)
+  (define name
+    (bucket-name bucket))
+  (define source-roots
+    (bucket-source-roots bucket))
+  (define include-path?
+    (bucket-include-path? bucket))
+  (define all-files
+    (collect-source-files source-roots include-path?))
+  (define unique-files
+    (reverse (unique-source-files all-files)))
+  (write-corpus! (build-path corpus-root name)
+                 unique-files)
+  (list name source-roots all-files unique-files))
+
+;; write-bucketed-summary! : path-string? path-string? (listof list?) -> void?
+;;   Write a build summary for a bucketed corpus.
+(define (write-bucketed-summary! corpus-root summary-path bucket-results)
+  (call-with-output-file summary-path
+    (lambda (out)
+      (fprintf out "corpus-root: ~a\n" corpus-root)
+      (fprintf out "buckets: ~a\n\n" (length bucket-results))
+      (for ([result (in-list bucket-results)])
+        (define name
+          (list-ref result 0))
+        (define source-roots
+          (list-ref result 1))
+        (define all-files
+          (list-ref result 2))
+        (define unique-files
+          (list-ref result 3))
+        (fprintf out "[~a]\n" name)
+        (fprintf out "source-roots:\n")
+        (for ([root (in-list (available-source-roots source-roots))])
+          (fprintf out "  ~a\n" root))
+        (fprintf out "source-files: ~a\n" (length all-files))
+        (fprintf out "unique-files: ~a\n" (length unique-files))
+        (for ([p (in-list unique-files)])
+          (fprintf out "  ~a\n" p))
+        (newline out)))
+    #:exists 'truncate/replace))
+
+;; build-bucketed-corpus : keyword-arguments -> void?
+;;   Build one local corpus root with multiple named sub-corpora.
+(define (build-bucketed-corpus #:name         name
+                               #:corpus-root  corpus-root
+                               #:summary-path summary-path
+                               #:buckets      buckets)
+  (define available-buckets
+    (filter (lambda (bucket)
+              (not (empty? (available-source-roots (bucket-source-roots bucket)))))
+            buckets))
+  (cond
+    [(empty? available-buckets)
+     (printf "No configured ~a source roots are available.\n" name)
+     (exit 0)]
+    [else
+     (when (directory-exists? corpus-root)
+       (delete-directory/files corpus-root))
+     (make-directory* corpus-root)
+     (define bucket-results
+       (for/list ([bucket (in-list available-buckets)])
+         (build-bucket! corpus-root bucket)))
+     (write-bucketed-summary! corpus-root
+                             summary-path
+                             bucket-results)
+     (printf "Built ~a corpus in ~a\n" name corpus-root)
+     (for ([result (in-list bucket-results)])
+       (define name
+         (list-ref result 0))
+       (define all-files
+         (list-ref result 2))
+       (define unique-files
+         (list-ref result 3))
+       (printf "  ~a: source-files=~a unique-files=~a\n"
+               name
+               (length all-files)
+               (length unique-files)))
      (printf "Wrote build summary to ~a\n" summary-path)]))

@@ -56,6 +56,8 @@
 ;;   Default settings for named Scribble lexer profiles.
 ;; javascript-profile-defaults : immutable-hash?
 ;;   Default settings for named JavaScript lexer profiles.
+;; sql-profile-defaults : immutable-hash?
+;;   Default settings for named SQL lexer profiles.
 ;; css-config?           : any/c -> boolean?
 ;;   Recognize CSS lexer configuration values.
 ;; css-config-profile    : css-config? -> symbol?
@@ -350,6 +352,20 @@
 ;;   Extract the configured error policy.
 ;; make-javascript-config : keyword-arguments -> javascript-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
+;; sql-config?            : any/c -> boolean?
+;;   Recognize SQL lexer configuration values.
+;; sql-config-profile     : sql-config? -> symbol?
+;;   Extract the configured profile name.
+;; sql-config-trivia      : sql-config? -> symbol?
+;;   Extract the configured trivia policy.
+;; sql-config-source-positions : sql-config? -> boolean?
+;;   Extract the configured source-position setting.
+;; sql-config-dialect     : sql-config? -> symbol?
+;;   Extract the configured SQL dialect.
+;; sql-config-errors      : sql-config? -> symbol?
+;;   Extract the configured error policy.
+;; make-sql-config        : keyword-arguments -> sql-config?
+;;   Resolve profile defaults and explicit overrides into one config.
 
 (provide css-profile-defaults
          html-profile-defaults
@@ -379,6 +395,7 @@
          markdown-profile-defaults
          scribble-profile-defaults
          javascript-profile-defaults
+         sql-profile-defaults
          css-config?
          css-config-profile
          css-config-trivia
@@ -548,7 +565,14 @@
          javascript-config-source-positions
          javascript-config-jsx?
          javascript-config-errors
-         make-javascript-config)
+         make-javascript-config
+         sql-config?
+         sql-config-profile
+         sql-config-trivia
+         sql-config-source-positions
+         sql-config-dialect
+         sql-config-errors
+         make-sql-config)
 
 ;; A resolved configuration for the public CSS lexer.
 (struct css-config (profile trivia source-positions errors) #:transparent)
@@ -633,6 +657,9 @@
 
 ;; A resolved configuration for the public JavaScript lexer.
 (struct javascript-config (profile trivia source-positions jsx? errors) #:transparent)
+
+;; A resolved configuration for the public SQL lexer.
+(struct sql-config (profile trivia source-positions dialect errors) #:transparent)
 
 ;; Profile defaults for the CSS lexer.
 (define css-profile-defaults
@@ -879,6 +906,15 @@
 
 ;; Profile defaults for the JavaScript lexer.
 (define javascript-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the SQL lexer.
+(define sql-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -1651,3 +1687,32 @@
                      resolved-source-positions
                      jsx?
                      resolved-errors))
+
+;; make-sql-config : keyword-arguments -> sql-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-sql-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default]
+                         #:dialect          [dialect 'generic])
+  (define defaults
+    (hash-ref sql-profile-defaults
+              profile
+              (lambda ()
+                (raise-arguments-error 'make-sql-config
+                                       "unknown SQL lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (define resolved-errors
+    (hash-ref defaults 'errors))
+  (sql-config profile
+              resolved-trivia
+              resolved-source-positions
+              dialect
+              resolved-errors))
