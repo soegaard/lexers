@@ -60,6 +60,8 @@
 ;;   Default settings for named SQL lexer profiles.
 ;; toml-profile-defaults : immutable-hash?
 ;;   Default settings for named TOML lexer profiles.
+;; lua-profile-defaults : immutable-hash?
+;;   Default settings for named Lua lexer profiles.
 ;; css-config?           : any/c -> boolean?
 ;;   Recognize CSS lexer configuration values.
 ;; css-config-profile    : css-config? -> symbol?
@@ -399,6 +401,7 @@
          javascript-profile-defaults
          sql-profile-defaults
          toml-profile-defaults
+         lua-profile-defaults
          css-config?
          css-config-profile
          css-config-trivia
@@ -581,7 +584,13 @@
          toml-config-trivia
          toml-config-source-positions
          toml-config-errors
-         make-toml-config)
+         make-toml-config
+         lua-config?
+         lua-config-profile
+         lua-config-trivia
+         lua-config-source-positions
+         lua-config-errors
+         make-lua-config)
 
 ;; A resolved configuration for the public CSS lexer.
 (struct css-config (profile trivia source-positions errors) #:transparent)
@@ -672,6 +681,9 @@
 
 ;; A resolved configuration for the public TOML lexer.
 (struct toml-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Lua lexer.
+(struct lua-config (profile trivia source-positions errors) #:transparent)
 
 ;; Profile defaults for the CSS lexer.
 (define css-profile-defaults
@@ -936,6 +948,15 @@
 
 ;; Profile defaults for the TOML lexer.
 (define toml-profile-defaults
+  (hash 'coloring (hash 'trivia           'keep
+                        'source-positions #t
+                        'errors           'emit-unknown)
+        'compiler (hash 'trivia           'skip
+                        'source-positions #t
+                        'errors           'raise)))
+
+;; Profile defaults for the Lua lexer.
+(define lua-profile-defaults
   (hash 'coloring (hash 'trivia           'keep
                         'source-positions #t
                         'errors           'emit-unknown)
@@ -1762,3 +1783,25 @@
                resolved-trivia
                resolved-source-positions
                (hash-ref defaults 'errors)))
+
+;; make-lua-config : keyword-arguments -> lua-config?
+;;   Resolve profile defaults and explicit overrides into one config.
+(define (make-lua-config #:profile          [profile 'coloring]
+                         #:trivia           [trivia 'profile-default]
+                         #:source-positions [source-positions 'profile-default])
+  (define defaults
+    (hash-ref lua-profile-defaults profile
+              (lambda ()
+                (raise-arguments-error 'make-lua-config
+                                       "unknown Lua lexer profile"
+                                       "profile" profile))))
+  (define resolved-trivia
+    (case trivia
+      [(profile-default) (hash-ref defaults 'trivia)]
+      [else              trivia]))
+  (define resolved-source-positions
+    (case source-positions
+      [(profile-default) (hash-ref defaults 'source-positions)]
+      [else              source-positions]))
+  (lua-config profile resolved-trivia resolved-source-positions
+              (hash-ref defaults 'errors)))

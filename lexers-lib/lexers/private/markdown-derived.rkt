@@ -47,6 +47,7 @@
          "../makefile.rkt"
          "../mathematica.rkt"
          "../latex.rkt"
+         "../lua.rkt"
          "../pascal.rkt"
          "../plist.rkt"
          "../objc.rkt"
@@ -153,6 +154,7 @@
           (member 'haskell-variable-identifier tags)
           (member 'haskell-constructor-identifier tags)
           (member 'java-identifier tags)
+          (member 'lua-identifier tags)
           (member 'mathematica-symbol tags)
           (member 'mathematica-long-name tags)
           (member 'rust-identifier tags)
@@ -219,6 +221,9 @@
           (member 'java-text-block tags)
           (member 'java-char-literal tags)
           (member 'java-numeric-literal tags)
+          (member 'lua-string-literal tags)
+          (member 'lua-long-string tags)
+          (member 'lua-number tags)
           (member 'mathematica-string-literal tags)
           (member 'mathematica-number tags)
           (member 'rust-string-literal tags)
@@ -266,6 +271,7 @@
           (member 'go-delimiter tags)
           (member 'pascal-delimiter tags)
           (member 'java-delimiter tags)
+          (member 'lua-delimiter tags)
           (member 'mathematica-delimiter tags)
           (member 'mathematica-group-delimiter tags)
           (member 'mathematica-part-delimiter tags)
@@ -301,6 +307,7 @@
           (member 'haskell-variable-operator tags)
           (member 'haskell-constructor-operator tags)
           (member 'java-operator tags)
+          (member 'lua-operator tags)
           (member 'mathematica-operator tags)
           (member 'mathematica-pattern tags)
           (member 'mathematica-slot tags)
@@ -364,6 +371,7 @@
     [(member primary '("javascript" "js")) 'javascript]
     [(member primary '("java"))          'java]
     [(member primary '("json"))          'json]
+    [(member primary '("lua"))           'lua]
     [(member primary '("make" "makefile" "mk")) 'makefile]
     [(member primary '("mathematica" "wolfram" "wolfram-language" "wl")) 'mathematica]
     [(member primary '("pascal" "pas" "delphi" "objectpascal")) 'pascal]
@@ -562,6 +570,12 @@
                           yaml-derived-token-end
                           yaml-derived-token-tags
                           '(embedded-yaml markdown-code-block))]
+    [(lua)
+     (wrap-derived-tokens (lua-string->derived-tokens body)
+                          body-start starts
+                          lua-derived-token-text lua-derived-token-start lua-derived-token-end
+                          lua-derived-token-tags
+                          '(embedded-lua markdown-code-block))]
     [(toml)
      (wrap-derived-tokens (toml-string->derived-tokens body)
                           body-start

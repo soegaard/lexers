@@ -18,6 +18,7 @@
                      lexers/java
                      lexers/json
                      lexers/latex
+                     lexers/lua
                      lexers/makefile
                      lexers/mathematica
                      lexers/markdown
@@ -65,6 +66,7 @@
 @(define-delayed-eval makefile-eval     lexers/makefile)
 @(define-delayed-eval mathematica-eval  lexers/mathematica)
 @(define-delayed-eval latex-eval        lexers/latex)
+@(define-delayed-eval lua-eval          lexers/lua)
 @(define-delayed-eval plist-eval        lexers/plist)
 @(define-delayed-eval objc-eval         lexers/objc)
 @(define-delayed-eval pascal-eval       lexers/pascal)
@@ -109,6 +111,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/java]}
  @item{@racketmodname[lexers/json]}
  @item{@racketmodname[lexers/latex]}
+ @item{@racketmodname[lexers/lua]}
  @item{@racketmodname[lexers/makefile]}
  @item{@racketmodname[lexers/mathematica]}
  @item{@racketmodname[lexers/javascript]}
@@ -1725,6 +1728,55 @@ YAML-derived tags and gain @racket['embedded-yaml].}
 
 @defthing[yaml-profiles immutable-hash?]{
 The profile defaults used by the YAML lexer.}
+
+@section{Lua}
+
+@defmodule[lexers/lua]
+
+The Lua lexer follows the Lua 5.4 lexical conventions. It recognizes reserved
+words, identifiers, decimal and hexadecimal numerals, quoted strings,
+long-bracket strings, short and long comments, operators, and delimiters.
+Long brackets preserve their equals-sign level, such as @tt{[=[...]=]}.
+
+@defproc[(make-lua-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming Lua lexer. Projected categories include
+@racket['comment], @racket['whitespace], @racket['keyword],
+@racket['identifier], @racket['literal], @racket['operator],
+@racket['delimiter], and @racket['unknown].}
+
+@defproc[(lua-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Lua tokens.}
+
+@defproc[(make-lua-derived-lexer) (input-port? . -> . (or/c lua-derived-token? 'eof))]{
+Constructs a streaming lexer that returns Lua-derived tokens.}
+
+@defproc[(lua-string->derived-tokens [source string?]) (listof lua-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns Lua-derived tokens.}
+
+@defproc[(lua-derived-token? [v any/c]) boolean?]{Recognizes Lua-derived tokens.}
+@defproc[(lua-derived-token-tags [token lua-derived-token?]) (listof symbol?)]{Returns token tags.}
+@defproc[(lua-derived-token-has-tag? [token lua-derived-token?] [tag symbol?]) boolean?]{Determines whether @racket[token] carries @racket[tag].}
+@defproc[(lua-derived-token-text [token lua-derived-token?]) string?]{Returns exact token source text.}
+@defproc[(lua-derived-token-start [token lua-derived-token?]) position?]{Returns the token start position.}
+@defproc[(lua-derived-token-end [token lua-derived-token?]) position?]{Returns the token end position.}
+
+Lua-derived tags include @racket['lua-comment], @racket['lua-line-comment],
+@racket['lua-long-comment], @racket['lua-whitespace], @racket['lua-keyword],
+@racket['lua-constant], @racket['lua-identifier], @racket['lua-string-literal],
+@racket['lua-long-string], @racket['lua-number], @racket['lua-operator],
+@racket['lua-delimiter], @racket['lua-error], and @racket['malformed-token].
+
+Markdown fenced code blocks labeled @tt{lua} delegate to @racketmodname[lexers/lua]
+and gain @racket['embedded-lua].
+
+@defthing[lua-profiles immutable-hash?]{The profile defaults used by the Lua lexer.}
 
 @section{TOML}
 
