@@ -320,6 +320,8 @@
     (markdown-string->derived-tokens "```tex\n\\textbf{Hi} $x$\n```\n"))
   (define fenced-latex-derived-tokens
     (markdown-string->derived-tokens "```latex\n\\section{Hi}\n\\begin{itemize}\n\\item One\n\\end{itemize}\n```\n"))
+  (define fenced-toml-derived-tokens
+    (markdown-string->derived-tokens "```toml\n[package]\nname = \"lexers\"\n```\n"))
   (define fenced-tsv-derived-tokens
     (markdown-string->derived-tokens "```tsv\nname\tage\nAda\t37\n```\n"))
   (define fenced-yaml-derived-tokens
@@ -418,6 +420,12 @@
                   (markdown-derived-token-has-tag? token 'tex-control-word)
                   (string=? (markdown-derived-token-text token) "\\textbf")))
            fenced-tex-derived-tokens))
+  (define derived-toml-token
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-toml)
+                  (markdown-derived-token-has-tag? token 'toml-key)
+                  (string=? (markdown-derived-token-text token) "name")))
+           fenced-toml-derived-tokens))
   (define derived-latex-token
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'embedded-latex)
@@ -596,6 +604,7 @@
   (check-not-false derived-rust-token)
   (check-not-false derived-swift-token)
   (check-not-false derived-tex-token)
+  (check-not-false derived-toml-token)
   (check-not-false derived-latex-token)
   (check-not-false derived-tsv-token)
   (check-not-false derived-yaml-token)
@@ -690,6 +699,7 @@
   (check-true (contiguous-derived-stream? fenced-csv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-python-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-swift-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-toml-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-tsv-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-yaml-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-c-derived-tokens))
@@ -712,6 +722,9 @@
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-swift-derived-tokens))
                 "```swift\nimport UIKit\nlet value = 42\n```\n")
+  (check-equal? (apply string-append
+                       (map markdown-derived-token-text fenced-toml-derived-tokens))
+                "```toml\n[package]\nname = \"lexers\"\n```\n")
   (check-equal? (apply string-append
                        (map markdown-derived-token-text fenced-tsv-derived-tokens))
                 "```tsv\nname\tage\nAda\t37\n```\n")

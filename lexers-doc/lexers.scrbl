@@ -34,6 +34,7 @@
                      lexers/scribble
                      lexers/swift
                      lexers/tex
+                     lexers/toml
                      lexers/token
                      lexers/tsv
                      lexers/javascript
@@ -76,6 +77,7 @@
 @(define-delayed-eval sql-eval          lexers/sql)
 @(define-delayed-eval swift-eval        lexers/swift)
 @(define-delayed-eval tex-eval          lexers/tex)
+@(define-delayed-eval toml-eval         lexers/toml)
 @(define-delayed-eval tsv-eval          lexers/tsv)
 @(define-delayed-eval wat-eval          lexers/wat)
 @(define-delayed-eval scribble-eval     lexers/scribble)
@@ -124,6 +126,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/scribble]}
  @item{@racketmodname[lexers/swift]}
  @item{@racketmodname[lexers/tex]}
+ @item{@racketmodname[lexers/toml]}
  @item{@racketmodname[lexers/tsv]}
  @item{@racketmodname[lexers/wat]}
  @item{@racketmodname[lexers/yaml]}]
@@ -1723,6 +1726,98 @@ YAML-derived tags and gain @racket['embedded-yaml].}
 @defthing[yaml-profiles immutable-hash?]{
 The profile defaults used by the YAML lexer.}
 
+@section{TOML}
+
+@defmodule[lexers/toml]
+
+The TOML lexer is a handwritten streaming lexer grounded in the TOML 1.0
+lexical rules. It recognizes comments, bare and quoted keys, dotted keys,
+table and array-table headers, basic and literal strings (including their
+multiline forms), booleans, integer and floating-point forms, date/time forms,
+arrays, inline tables, and structural punctuation. It preserves source text and
+positions but does not validate document-level constraints such as duplicate
+keys or table redefinition.
+
+@defproc[(make-toml-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming TOML lexer.
+
+Projected TOML categories include @racket['comment], @racket['whitespace],
+@racket['identifier], @racket['literal], @racket['operator],
+@racket['delimiter], and @racket['unknown]. The key/value separator
+@tt{=} projects as @racket['operator]; dots, brackets, braces, and commas
+project as @racket['delimiter].}
+
+@examples[#:eval (force toml-eval)
+(define lexer
+  (make-toml-lexer #:profile 'coloring))
+(define in
+  (open-input-string "[package]\nname = \"lexers\"\n"))
+(port-count-lines! in)
+(list (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in))
+      (lexer-token-name (lexer in)))]
+
+@defproc[(toml-string->tokens [source string?]
+                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected TOML tokens.}
+
+@defproc[(make-toml-derived-lexer)
+         (input-port? . -> . (or/c toml-derived-token? 'eof))]{
+Constructs a streaming lexer that returns TOML-derived tokens.}
+
+@defproc[(toml-string->derived-tokens [source string?])
+         (listof toml-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns TOML-derived tokens.}
+
+@defproc[(toml-derived-token? [v any/c]) boolean?]{
+Recognizes TOML-derived tokens.}
+
+@defproc[(toml-derived-token-tags [token toml-derived-token?])
+         (listof symbol?)]{
+Returns the tags for @racket[token].}
+
+@defproc[(toml-derived-token-has-tag? [token toml-derived-token?]
+                                      [tag symbol?])
+         boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(toml-derived-token-text [token toml-derived-token?]) string?]{
+Returns the exact source text covered by @racket[token].}
+
+@defproc[(toml-derived-token-start [token toml-derived-token?]) position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(toml-derived-token-end [token toml-derived-token?]) position?]{
+Returns the ending source position of @racket[token].}
+
+TOML-derived tags include @racket['toml-comment], @racket['toml-whitespace],
+@racket['toml-key], @racket['toml-table-key], @racket['toml-string],
+@racket['toml-multiline-string], @racket['toml-boolean],
+@racket['toml-number], @racket['toml-date-time],
+@racket['toml-key-value-separator], @racket['toml-dot],
+@racket['toml-comma], @racket['toml-structural-delimiter],
+@racket['toml-table-delimiter], @racket['toml-array-table-delimiter],
+@racket['toml-bare-value], @racket['toml-error], and
+@racket['malformed-token].
+
+In the @racket['coloring] profile, malformed input projects as
+@racket['unknown]. In the @racket['compiler] profile, it raises a read
+exception.
+
+Markdown fenced code blocks labeled @tt{toml} delegate to
+@racketmodname[lexers/toml]. Wrapped delegated Markdown tokens preserve
+TOML-derived tags and gain @racket['embedded-toml].
+
+@defthing[toml-profiles immutable-hash?]{
+The profile defaults used by the TOML lexer.}
+
 @section{Markdown}
 
 @defmodule[lexers/markdown]
@@ -1917,6 +2012,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-scribble]}
  @item{@racket['embedded-swift]}
  @item{@racket['embedded-tex]}
+ @item{@racket['embedded-toml]}
  @item{@racket['embedded-tsv]}
  @item{@racket['embedded-wat]}
  @item{@racket['embedded-yaml]}
@@ -1933,7 +2029,7 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-mathematica], @racket['embedded-objc],
 @racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
 @racket['embedded-racket], @racket['embedded-rust], @racket['embedded-shell],
-@racket['embedded-swift], @racket['embedded-tex], @racket['embedded-tsv],
+@racket['embedded-swift], @racket['embedded-tex], @racket['embedded-toml], @racket['embedded-tsv],
 @racket['embedded-wat], or @racket['embedded-yaml].
 
 @examples[#:eval (force markdown-eval)

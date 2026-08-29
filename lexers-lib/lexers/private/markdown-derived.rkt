@@ -57,6 +57,7 @@
          "../scribble.rkt"
          "../swift.rkt"
          "../tex.rkt"
+         "../toml.rkt"
          "../tsv.rkt"
          "../wat.rkt"
          "../yaml.rkt"
@@ -160,6 +161,7 @@
           (member 'tex-control-word tags)
           (member 'tex-control-symbol tags)
           (member 'swift-identifier tags)
+          (member 'toml-key tags)
           (member 'tsv-field tags)
           (member 'yaml-anchor tags)
           (member 'yaml-alias tags)
@@ -229,6 +231,10 @@
           (member 'tex-text tags)
           (member 'swift-string-literal tags)
           (member 'swift-numeric-literal tags)
+          (member 'toml-string tags)
+          (member 'toml-boolean tags)
+          (member 'toml-number tags)
+          (member 'toml-date-time tags)
           (member 'tsv-field tags)
           (member 'c-header-name tags)
           (member 'yaml-plain-scalar tags)
@@ -283,6 +289,9 @@
           (member 'tex-group-delimiter tags)
           (member 'tex-optional-delimiter tags)
           (member 'tex-special-character tags)
+          (member 'toml-structural-delimiter tags)
+          (member 'toml-dot tags)
+          (member 'toml-comma tags)
           (member 'tsv-separator tags)
           (member 'tsv-row-separator tags)
           (regexp-match? #px"^[()\\[\\]{}<>;,:.]$" text))
@@ -297,7 +306,8 @@
           (member 'mathematica-slot tags)
           (member 'pascal-operator tags)
           (member 'rust-punctuation tags)
-          (member 'swift-operator tags))
+          (member 'swift-operator tags)
+          (member 'toml-key-value-separator tags))
       '(operator)]
      [(regexp-match? #px"^[=+\\-*/!&|%^~]+$" text)
       '(operator)]
@@ -364,6 +374,7 @@
     [(member primary '("swift"))         'swift]
     [(member primary '("tex"))           'tex]
     [(member primary '("latex"))         'latex]
+    [(member primary '("toml"))          'toml]
     [(member primary '("tsv"))           'tsv]
     [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
@@ -551,6 +562,15 @@
                           yaml-derived-token-end
                           yaml-derived-token-tags
                           '(embedded-yaml markdown-code-block))]
+    [(toml)
+     (wrap-derived-tokens (toml-string->derived-tokens body)
+                          body-start
+                          starts
+                          toml-derived-token-text
+                          toml-derived-token-start
+                          toml-derived-token-end
+                          toml-derived-token-tags
+                          '(embedded-toml markdown-code-block))]
     [(javascript)
      (wrap-derived-tokens (javascript-string->derived-tokens body #:jsx? #f)
                           body-start
