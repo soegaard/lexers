@@ -28,6 +28,7 @@
                      lexers/python
                      lexers/ruby
                      lexers/racket
+                     lexers/scheme
                      lexers/rhombus
                      lexers/rust
                      lexers/shell
@@ -74,6 +75,7 @@
 @(define-delayed-eval python-eval       lexers/python)
 @(define-delayed-eval ruby-eval         lexers/ruby)
 @(define-delayed-eval racket-eval       lexers/racket)
+@(define-delayed-eval scheme-eval       lexers/scheme)
 @(define-delayed-eval rust-eval         lexers/rust)
 @(define-delayed-eval shell-eval        lexers/shell)
 @(define-delayed-eval sql-eval          lexers/sql)
@@ -122,6 +124,7 @@ The public language modules currently available are:
  @item{@racketmodname[lexers/python]}
  @item{@racketmodname[lexers/ruby]}
  @item{@racketmodname[lexers/racket]}
+ @item{@racketmodname[lexers/scheme]}
  @item{@racketmodname[lexers/rhombus]}
  @item{@racketmodname[lexers/rust]}
  @item{@racketmodname[lexers/shell]}
@@ -223,7 +226,8 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[markdown-string->tokens], @racket[make-objc-lexer],
 @racket[objc-string->tokens], @racket[make-python-lexer],
 @racket[python-string->tokens], @racket[make-racket-lexer],
-@racket[racket-string->tokens], @racket[make-rhombus-lexer],
+@racket[racket-string->tokens], @racket[make-scheme-lexer],
+@racket[scheme-string->tokens], @racket[make-rhombus-lexer],
 @racket[rhombus-string->tokens], @racket[make-shell-lexer],
 @racket[make-cpp-lexer], @racket[cpp-string->tokens],
 @racket[shell-string->tokens], @racket[make-scribble-lexer],
@@ -346,7 +350,76 @@ Useful derived SQL tags include:
  @item{@racket['sql-numeric-literal]}
  @item{@racket['sql-parameter]}
  @item{@racket['sql-operator]}
- @item{@racket['sql-delimiter]}]
+@item{@racket['sql-delimiter]}]
+
+@section{Scheme}
+
+@defmodule[lexers/scheme]
+
+The Scheme lexer has projected and derived APIs for source in the R5RS, R6RS,
+and R7RS reports and for Chez Scheme, Guile, CHICKEN, and Gambit. It is a
+streaming source lexer for syntax highlighting and other token consumers, not
+a full Scheme datum reader.
+
+It recognizes whitespace, line comments, nested block comments, datum
+comments, reader directives, identifiers, prefix and implementation keyword
+forms, exact and inexact number candidates, booleans, strings, character
+literals, escaped identifiers, abbreviations, vectors, bytevectors, and datum
+delimiters. Derived tokens retain reader-specific roles such as
+@racket['scheme-prefix-keyword], @racket['scheme-suffix-keyword],
+@racket['scheme-reader-abbreviation], and @racket['scheme-bytevector-open].
+
+@defproc[(make-scheme-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                            [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                            [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                            [#:dialect dialect (or/c 'r5rs 'r6rs 'r7rs 'chez 'guile 'chicken 'gambit) 'r5rs])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming projected Scheme lexer. Projected categories are
+@racket['comment], @racket['whitespace], @racket['keyword],
+@racket['identifier], @racket['literal], @racket['delimiter], and
+@racket['unknown].}
+
+@defproc[(scheme-string->tokens [source string?]
+                                [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                                [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                                [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                                [#:dialect dialect (or/c 'r5rs 'r6rs 'r7rs 'chez 'guile 'chicken 'gambit) 'r5rs])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes all of @racket[source] eagerly and returns projected Scheme tokens.}
+
+@defproc[(make-scheme-derived-lexer [#:dialect dialect (or/c 'r5rs 'r6rs 'r7rs 'chez 'guile 'chicken 'gambit) 'r5rs])
+         (input-port? . -> . (or/c scheme-derived-token? 'eof))]{
+Constructs a streaming lexer that returns Scheme-specific derived tokens.}
+
+@defproc[(scheme-string->derived-tokens [source string?]
+                                        [#:dialect dialect (or/c 'r5rs 'r6rs 'r7rs 'chez 'guile 'chicken 'gambit) 'r5rs])
+         (listof scheme-derived-token?)]{
+Tokenizes all of @racket[source] eagerly and returns Scheme derived tokens.}
+
+@defproc[(scheme-derived-token? [v any/c]) boolean?]{
+Recognizes a Scheme derived token.}
+
+@defproc[(scheme-derived-token-tags [token scheme-derived-token?]) (listof symbol?)]{
+Returns the reusable syntax-role tags for @racket[token].}
+
+@defproc[(scheme-derived-token-has-tag? [token scheme-derived-token?] [tag symbol?]) boolean?]{
+Determines whether @racket[token] carries @racket[tag].}
+
+@defproc[(scheme-derived-token-text [token scheme-derived-token?]) string?]{
+Returns the exact source slice covered by @racket[token].}
+
+@defproc[(scheme-derived-token-start [token scheme-derived-token?]) position?]{
+Returns the starting source position of @racket[token].}
+
+@defproc[(scheme-derived-token-end [token scheme-derived-token?]) position?]{
+Returns the ending source position of @racket[token].}
+
+@examples[#:eval (force scheme-eval)
+(map scheme-derived-token-tags
+     (scheme-string->derived-tokens
+      "(display #:name #\\space)"
+      #:dialect 'guile))
+]
 
 @section{CSS}
 
@@ -1886,8 +1959,12 @@ The first Markdown implementation is a handwritten, parser-lite,
 GitHub-flavored Markdown lexer. It is line-oriented and can delegate raw HTML
 and known fenced-code languages to the existing C, C++, CSV, HTML, CSS, Go,
 Haskell, Java, JavaScript, JSON, Makefile, Mathematica, Objective-C, Pascal,
-plist, Python, Racket, Rust, Scribble, shell, Swift, TeX, TSV, WAT, and YAML
+plist, Python, Racket, Scheme, Rust, Scribble, shell, Swift, TeX, TSV, WAT, and YAML
 lexers.
+
+Fenced code blocks labeled @tt{scheme}, @tt{scm}, @tt{ss}, @tt{r5rs},
+@tt{r6rs}, @tt{r7rs}, @tt{chez}, @tt{guile}, @tt{chicken}, or @tt{gambit}
+delegate to the matching Scheme lexer dialect.
 
 @defproc[(make-markdown-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                               [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
@@ -2059,6 +2136,7 @@ The current Markdown scaffold may attach tags such as:
  @item{@racket['embedded-plist]}
  @item{@racket['embedded-python]}
  @item{@racket['embedded-racket]}
+ @item{@racket['embedded-scheme]}
  @item{@racket['embedded-rust]}
  @item{@racket['embedded-shell]}
  @item{@racket['embedded-scribble]}
@@ -2081,6 +2159,7 @@ derived tags and gain Markdown embedding markers such as
 @racket['embedded-mathematica], @racket['embedded-objc],
 @racket['embedded-pascal], @racket['embedded-plist], @racket['embedded-python],
 @racket['embedded-racket], @racket['embedded-rust], @racket['embedded-shell],
+@racket['embedded-scheme],
 @racket['embedded-swift], @racket['embedded-tex], @racket['embedded-toml], @racket['embedded-tsv],
 @racket['embedded-wat], or @racket['embedded-yaml].
 

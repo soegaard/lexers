@@ -62,6 +62,8 @@
 ;;   Default settings for named TOML lexer profiles.
 ;; lua-profile-defaults : immutable-hash?
 ;;   Default settings for named Lua lexer profiles.
+;; scheme-profile-defaults : immutable-hash?
+;;   Default settings for named Scheme lexer profiles.
 ;; css-config?           : any/c -> boolean?
 ;;   Recognize CSS lexer configuration values.
 ;; css-config-profile    : css-config? -> symbol?
@@ -402,6 +404,7 @@
          sql-profile-defaults
          toml-profile-defaults
          lua-profile-defaults
+         scheme-profile-defaults
          css-config?
          css-config-profile
          css-config-trivia
@@ -590,7 +593,14 @@
          lua-config-trivia
          lua-config-source-positions
          lua-config-errors
-         make-lua-config)
+         make-lua-config
+         scheme-config?
+         scheme-config-profile
+         scheme-config-trivia
+         scheme-config-source-positions
+         scheme-config-dialect
+         scheme-config-errors
+         make-scheme-config)
 
 ;; A resolved configuration for the public CSS lexer.
 (struct css-config (profile trivia source-positions errors) #:transparent)
@@ -684,6 +694,9 @@
 
 ;; A resolved configuration for the public Lua lexer.
 (struct lua-config (profile trivia source-positions errors) #:transparent)
+
+;; A resolved configuration for the public Scheme lexer.
+(struct scheme-config (profile trivia source-positions dialect errors) #:transparent)
 
 ;; Profile defaults for the CSS lexer.
 (define css-profile-defaults
@@ -963,6 +976,11 @@
         'compiler (hash 'trivia           'skip
                         'source-positions #t
                         'errors           'raise)))
+
+;; Profile defaults for the Scheme lexer.
+(define scheme-profile-defaults
+  (hash 'coloring (hash 'trivia 'keep 'source-positions #t 'errors 'emit-unknown)
+        'compiler (hash 'trivia 'skip 'source-positions #t 'errors 'raise)))
 
 ;; make-css-config : keyword-arguments -> css-config?
 ;;   Resolve profile defaults and explicit overrides into one config.
@@ -1805,3 +1823,18 @@
       [else              source-positions]))
   (lua-config profile resolved-trivia resolved-source-positions
               (hash-ref defaults 'errors)))
+
+;; make-scheme-config : keyword-arguments -> scheme-config?
+;;   Resolve Scheme profile defaults and validate the selected dialect.
+(define (make-scheme-config #:profile [profile 'coloring]
+                            #:trivia [trivia 'profile-default]
+                            #:source-positions [source-positions 'profile-default]
+                            #:dialect [dialect 'r5rs])
+  (unless (member dialect '(r5rs r6rs r7rs chez guile chicken gambit))
+    (raise-arguments-error 'make-scheme-config "unknown Scheme dialect" "dialect" dialect))
+  (define defaults (hash-ref scheme-profile-defaults profile
+                             (lambda () (raise-arguments-error 'make-scheme-config "unknown Scheme lexer profile" "profile" profile))))
+  (define resolved-trivia (if (eq? trivia 'profile-default) (hash-ref defaults 'trivia) trivia))
+  (define resolved-positions (if (eq? source-positions 'profile-default)
+                                 (hash-ref defaults 'source-positions) source-positions))
+  (scheme-config profile resolved-trivia resolved-positions dialect (hash-ref defaults 'errors)))

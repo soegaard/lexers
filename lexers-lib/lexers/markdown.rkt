@@ -458,6 +458,8 @@
            fenced-cpp-derived-tokens))
   (define fenced-racket-derived-tokens
     (markdown-string->derived-tokens "```racket\n(+ 1 2)\n```\n"))
+  (define fenced-guile-derived-tokens
+    (markdown-string->derived-tokens "```guile\n(display #:name)\n```\n"))
   (define fenced-webracket-derived-tokens
     (markdown-string->derived-tokens "```webracket.rkt\n(test)\n```\n"))
   (define lone-fence-derived-tokens
@@ -498,6 +500,12 @@
              (and (markdown-derived-token-has-tag? token 'whitespace)
                   (string=? (markdown-derived-token-text token) "\n")))
            fenced-racket-derived-tokens))
+  (define fenced-guile-keyword
+    (findf (lambda (token)
+             (and (markdown-derived-token-has-tag? token 'embedded-scheme)
+                  (markdown-derived-token-has-tag? token 'scheme-prefix-keyword)
+                  (string=? (markdown-derived-token-text token) "#:name")))
+           fenced-guile-derived-tokens))
   (define fenced-webracket-newline
     (findf (lambda (token)
              (and (markdown-derived-token-has-tag? token 'whitespace)
@@ -613,6 +621,7 @@
   (check-not-false derived-hard-break)
   (check-not-false fenced-bash-newline)
   (check-not-false fenced-racket-newline)
+  (check-not-false fenced-guile-keyword)
   (check-not-false fenced-webracket-newline)
   (check-not-false hard-break-token)
   (check-not-false hard-break-text-token)
@@ -704,6 +713,7 @@
   (check-true (contiguous-derived-stream? fenced-yaml-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-c-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-racket-derived-tokens))
+  (check-true (contiguous-derived-stream? fenced-guile-derived-tokens))
   (check-true (contiguous-derived-stream? fenced-webracket-derived-tokens))
   (check-true (contiguous-derived-stream? hard-break-derived-tokens))
   (check-true (contiguous-derived-stream? prose-exclamation-derived-tokens))

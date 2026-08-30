@@ -53,6 +53,7 @@
          "../objc.rkt"
          "../python.rkt"
          "../racket.rkt"
+         "../scheme.rkt"
          "../rust.rkt"
          "../shell.rkt"
          "../scribble.rkt"
@@ -145,6 +146,8 @@
           (member 'racket-symbol tags)
           (member 'racket-no-color tags)
           (member 'racket-other tags)
+          (member 'scheme-identifier tags)
+          (member 'scheme-escaped-identifier tags)
           (member 'scribble-symbol tags)
           (member 'scribble-command tags)
           (member 'shell-word tags)
@@ -197,6 +200,10 @@
           (member 'racket-string tags)
           (member 'racket-constant tags)
           (member 'racket-hash-colon-keyword tags)
+          (member 'scheme-string tags)
+          (member 'scheme-character tags)
+          (member 'scheme-number tags)
+          (member 'scheme-boolean tags)
           (member 'scribble-text tags)
           (member 'scribble-string tags)
           (member 'scribble-constant tags)
@@ -286,6 +293,11 @@
           (member 'yaml-sequence-indicator tags)
           (member 'yaml-block-scalar-header tags)
           (member 'racket-parenthesis tags)
+          (member 'scheme-delimiter tags)
+          (member 'scheme-vector-open tags)
+          (member 'scheme-bytevector-open tags)
+          (member 'scheme-abbreviation tags)
+          (member 'scheme-reader-abbreviation tags)
           (member 'scribble-parenthesis tags)
           (member 'scribble-command-char tags)
           (member 'scribble-body-delimiter tags)
@@ -387,6 +399,14 @@
     [(member primary '("yaml" "yml"))    'yaml]
     [(member primary '("jsx"))           'jsx]
     [(member primary '("racket" "rkt"))  'racket]
+    [(member primary '("scheme" "scm" "ss")) 'scheme-r5rs]
+    [(member primary '("r5rs"))            'scheme-r5rs]
+    [(member primary '("r6rs"))            'scheme-r6rs]
+    [(member primary '("r7rs"))            'scheme-r7rs]
+    [(member primary '("chez" "chezscheme")) 'scheme-chez]
+    [(member primary '("guile"))           'scheme-guile]
+    [(member primary '("chicken"))         'scheme-chicken]
+    [(member primary '("gambit"))          'scheme-gambit]
     [(member primary '("bash" "sh" "shell")) 'bash]
     [(member primary '("zsh"))           'zsh]
     [(member primary '("powershell" "pwsh" "ps1")) 'powershell]
@@ -612,6 +632,24 @@
                           racket-derived-token-end
                           racket-derived-token-tags
                           '(embedded-racket markdown-code-block))]
+    [(scheme-r5rs scheme-r6rs scheme-r7rs scheme-chez scheme-guile scheme-chicken scheme-gambit)
+     (define dialect
+       (case lang
+         [(scheme-r5rs) 'r5rs]
+         [(scheme-r6rs) 'r6rs]
+         [(scheme-r7rs) 'r7rs]
+         [(scheme-chez) 'chez]
+         [(scheme-guile) 'guile]
+         [(scheme-chicken) 'chicken]
+         [(scheme-gambit) 'gambit]))
+     (wrap-derived-tokens (scheme-string->derived-tokens body #:dialect dialect)
+                          body-start
+                          starts
+                          scheme-derived-token-text
+                          scheme-derived-token-start
+                          scheme-derived-token-end
+                          scheme-derived-token-tags
+                          '(embedded-scheme markdown-code-block))]
     [(bash)
      (wrap-derived-tokens (shell-string->derived-tokens body #:shell 'bash)
                           body-start
