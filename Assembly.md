@@ -4,11 +4,12 @@ The reusable assembly lexer owns assembly lexical decisions. Terminal preview,
 file-type detection, and other consumers must use this implementation rather
 than introducing their own assembler tokenizers.
 
-## Implemented foundation
+## Implemented lexer foundation (M0–M6)
 
-`lexers/asm` currently provides an intentionally conservative generic profile.
-It preserves source bytes and distinguishes only syntax that does not require a
-dialect claim:
+`lexers/asm` provides an intentionally conservative generic profile and
+explicit, source-preserving profile selection for the M4–M6 dialects. The
+generic profile distinguishes only syntax that does not require a dialect
+claim:
 
 - whitespace;
 - symbol fragments;
@@ -20,6 +21,29 @@ quoted strings, a CPU, an assembler implementation, or an output format.
 Unknown source remains source; it is not an error merely because a specific
 assembler has not been selected.
 
+Explicit selections currently provide these profile-owned lexical decisions:
+
+- `ca65`: directives, CPU-related declarations, cheap-local and anonymous
+  labels, macros, numeric literals, and the supported `.feature c_comments`
+  change;
+- `acme`: bang directives, zones, macro calls, literals, and semicolon
+  comments;
+- `native-motorola`, `asmone`, and `devpac`: a conservative m68k baseline for
+  mnemonic suffixes, registers, directives, labels, and semicolon comments;
+- `kick`: C-style comments, script braces, directives, and semicolon statement
+  separators rather than semicolon comments;
+- `64tass`: source directives, namespace and encoding declarations, macro
+  boundaries, literals, and semicolon comments;
+- `gas`, which requires `m68k`, `x86`, `arm`, or `aarch64` explicitly: target
+  comment rules, directives, macros, registers, numeric local references, and
+  documented syntax or instruction-mode changes; and
+- `nasm`: preprocessor and macro directives, macro parameters and local names,
+  `BITS` modes, directives, registers, and data forms.
+
+The deliberately small instruction and directive tables classify documented
+lexical structures; they do not attempt complete assembler emulation or infer a
+tool identity from shared source.
+
 The derived-token API owns immutable raw byte fragments. Their zero-based,
 half-open byte spans partition the input exactly, including byte-order marks,
 CRLF, invalid encoded bytes, and missing final newlines. Decoded text and
@@ -29,33 +53,30 @@ the original bytes unchanged.
 
 The first byte source supports UTF-8 and BOM-selected UTF-16LE/UTF-16BE. It
 decodes incrementally and retains only bounded decoder lookahead. The lexer
-emits fragments no larger than one decoded scalar value, so an arbitrary source
-token or line is never buffered as a whole.
+emits fragments no larger than the configured cap, so an arbitrary source token
+or line is never buffered as a whole. Consecutive fragments of a capped logical
+word share a continuation identifier.
 
 ## Profiles and selection
 
-The profile registry records three distinct states:
+The profile registry records implemented names (`generic`, `ca65`, `acme`,
+`native-motorola`, `asmone`, `devpac`, `kick`, `64tass`, `gas`, and `nasm`) and
+unknown names separately. No selection is silently mapped to generic syntax.
 
-- `generic` is implemented;
-- known future profiles, such as `ca65`, `acme`, `gas`, and `nasm`, are
-  recognized but unavailable; and
-- unlisted names are unknown.
+`gas` has no default architecture. Both the lexer and `lexers/asm/detect`
+reject a GNU selection without an explicit supported target. The detection API
+exposes bounded, versioned selection records, but automatic dialect detection
+remains disabled until calibration gates can be met.
 
-An unavailable profile is reported as unavailable instead of being silently
-mapped to generic syntax. `lexers/asm/detect` exposes versioned, bounded
-selection records. Automatic dialect detection is intentionally disabled until
-individual profiles have specification-backed rules and calibration tests.
+## Follow-on work
 
-## Follow-on profiles
+M7 is calibrated automatic selection, enabled one profile at a time only after
+audited real-source samples and detection counterexamples are available. M8 is
+additional dialects and representation adapters. Existing profiles must grow
+from their published lexical references and fixture evidence; CPU names and
+directive tables alone do not define a source language.
 
-Profiles must be implemented one at a time from their language specifications.
-Each profile owns its comment, string, label, macro, preprocessing, case, and
-state-change rules. CPU names and directive tables alone do not define a source
-language. A profile may report ambiguity or unsupported features; it must not
-invent certainty from a compatible subset of source.
-
-Before adding a profile, add its focused RackUnit coverage for raw-byte
-round-tripping, malformed recovery, chunk boundaries, restart state, and its
-specific lexical constructs. Add a corpus checker only once reviewed local
-source is available; it must skip cleanly when the optional corpus directory is
-absent.
+The M4–M6 checks cover profile-specific structures, raw-byte reconstruction,
+malformed recovery, bounded fragments, and GNU target selection. A corpus
+checker will be added once reviewed local source is admitted; it must skip
+cleanly when the optional corpus directory is absent.

@@ -4,14 +4,14 @@
 ;;; Assembly Lexer
 ;;;
 
-;; Byte-preserving, streaming entry points for the conservative generic
-;; assembly-source lexer.  Dialect-specific lexical rules intentionally live
-;; in later profiles rather than being guessed from common punctuation.
+;; Byte-preserving, streaming entry points for generic and explicit assembly
+;; profiles.  Each profile keeps its own comment, directive, label, and macro
+;; rules instead of applying one punctuation grammar to every assembler.
 
 ;; make-asm-lexer                  : keyword-arguments -> (input-port? -> token-like?)
-;;   Construct a projected lexer for generic assembly source on a binary port.
+;;   Construct a projected lexer for one explicit assembly profile on a binary port.
 ;; make-asm-derived-lexer          : keyword-arguments -> (input-port? -> (or/c asm-derived-token? 'eof))
-;;   Construct a byte-preserving derived lexer for generic assembly source.
+;;   Construct a byte-preserving derived lexer for one explicit assembly profile.
 ;; asm-derived-token?              : any/c -> boolean?
 ;;   Recognize a derived assembly token.
 ;; asm-derived-token-category      : asm-derived-token? -> symbol?
@@ -47,7 +47,7 @@
 ;; asm-string->derived-tokens      : string? keyword-arguments -> (listof asm-derived-token?)
 ;;   Tokenize UTF-8 string input through the byte-preserving derived API.
 ;; asm-profiles                    : immutable-hash?
-;;   Describe implemented and recognized-but-unavailable assembly profiles.
+;;   Describe implemented assembly profiles and their required selections.
 ;; asm-profile?                    : any/c -> boolean?
 ;;   Recognize an assembly profile registry entry.
 ;; asm-effective-state?            : any/c -> boolean?
@@ -83,20 +83,22 @@
          racket/list
          "private/parser-tools-compat.rkt"
          "private/source.rkt"
+         "private/asm/profiles.rkt"
+         "private/asm/scanner.rkt"
          "token.rkt")
 
 ;; A profile record separates implementation status from dialect identity.
 (struct asm-profile (name status architecture dialect description) #:transparent)
 
-;; The lexical context recorded for each generic token.  Future dialects can
-;; extend this value without conflating syntax with renderer color policy.
+;; The lexical context effective for one token. Detailed roles are carried by
+;; derived-token tags rather than renderer-specific styling fields.
 (struct asm-effective-state (dialect encoding line-start?) #:transparent)
 
 ;; A bounded recoverable issue associated with a source fragment.
 (struct asm-diagnostic (code severity message byte-span) #:transparent)
 
-;; A lossless generic token.  `continuation-id` is #f while every fragment is
-;; independently bounded; future profiles may use it for larger logical forms.
+;; A lossless, bounded source fragment. Continuation identifiers connect the
+;; pieces of one source word when the configured byte cap splits it.
 (struct asm-derived-token (category text tags start end byte-span raw-bytes
                                    continuation-id effective-state diagnostics)
   #:transparent)
@@ -116,9 +118,8 @@
 (define asm-byte-span-end
   source-span-end)
 
-;; The assembly-profile registry.  Only generic is a selectable lexer today;
-;; the remaining entries retain useful identities without pretending to parse
-;; an unavailable dialect as a neighbouring grammar.
+;; The assembly-profile registry.  Each entry has its own lexical rules; a
+;; profile is never silently replaced by a nearby assembly language.
 (define asm-profiles
   (hasheq 'generic
           (asm-profile 'generic
@@ -128,46 +129,58 @@
                        "Conservative source-preserving assembly syntax.")
           'ca65
           (asm-profile 'ca65
-                       'recognized-only
+                       'implemented
                        'mos-6502
                        'ca65
-                       "ca65 requires a dialect-specific lexer profile.")
+                       "ca65 6502-family source syntax.")
           'acme
           (asm-profile 'acme
-                       'recognized-only
+                       'implemented
                        'mos-6502
                        'acme
-                       "ACME requires a dialect-specific lexer profile.")
+                       "ACME 6502-family source syntax.")
           'native-motorola
           (asm-profile 'native-motorola
-                       'recognized-only
+                       'implemented
                        'm68k
                        'native-motorola
-                       "Native Motorola syntax requires a lexer profile.")
+                       "Conservative native Motorola 68000-family syntax.")
+          'asmone
+          (asm-profile 'asmone
+                       'implemented
+                       'm68k
+                       'asmone
+                       "Asm-One-compatible Motorola syntax defaults.")
+          'devpac
+          (asm-profile 'devpac
+                       'implemented
+                       'm68k
+                       'devpac
+                       "Devpac-compatible Motorola syntax defaults.")
           'kick
           (asm-profile 'kick
-                       'recognized-only
+                       'implemented
                        'mos-6502
                        'kick
-                       "Kick Assembler requires a lexer profile.")
-          '64tass
-          (asm-profile '64tass
-                       'recognized-only
+                       "Kick Assembler source and script syntax.")
+          '|64tass|
+          (asm-profile '|64tass|
+                       'implemented
                        'mos-6502
-                       '64tass
-                       "64tass requires a lexer profile.")
+                       '|64tass|
+                       "64tass source syntax.")
           'gas
           (asm-profile 'gas
-                       'recognized-only
+                       'implemented
                        #f
                        'gas
-                       "GNU assembler requires a target-specific lexer profile.")
+                       "GNU assembler syntax; a target architecture is required.")
           'nasm
           (asm-profile 'nasm
-                       'recognized-only
+                       'implemented
                        'x86
                        'nasm
-                       "NASM requires a dialect-specific lexer profile.")))
+                       "NASM-compatible source and preprocessor syntax.")))
 
 ;; Default settings for the ordinary consumer profiles.
 (define asm-lexer-profile-defaults
@@ -179,7 +192,7 @@
                             'errors 'raise)))
 
 ;; The resolved settings for one projected assembly reader.
-(struct asm-config (profile trivia source-positions errors dialect encoding fragment-cap)
+(struct asm-config (profile trivia source-positions errors dialect architecture encoding fragment-cap)
   #:transparent)
 
 ;; implemented-dialect? : symbol? -> boolean?
@@ -207,6 +220,38 @@
                             "unknown assembly dialect"
                             "dialect" dialect)]))
 
+;; validate-architecture : symbol? (or/c symbol? #f) symbol? -> (or/c symbol? #f)
+;;   Require target selection when a dialect has target-dependent lexical rules.
+(define (validate-architecture dialect architecture who)
+  (define required
+    (asm-profile-architectures dialect))
+  (cond
+    [(null? required)
+     (define profile
+       (hash-ref asm-profiles dialect))
+     (cond
+       [(and architecture
+             (not (eq? architecture (asm-profile-architecture profile))))
+        (raise-arguments-error who
+                               "the selected dialect does not support that architecture"
+                               "dialect" dialect
+                               "architecture" architecture)]
+       [else
+        (asm-profile-architecture profile)])]
+    [(not architecture)
+     (raise-arguments-error who
+                            "the selected dialect requires an explicit architecture"
+                            "dialect" dialect
+                            "supported architectures" required)]
+    [(member architecture required)
+     architecture]
+    [else
+     (raise-arguments-error who
+                            "the selected dialect does not support that architecture"
+                            "dialect" dialect
+                            "architecture" architecture
+                            "supported architectures" required)]))
+
 ;; validate-fragment-cap : exact-positive-integer? -> exact-positive-integer?
 ;;   Require a cap that can hold the largest supported decoded scalar value.
 (define (validate-fragment-cap fragment-cap who)
@@ -230,6 +275,7 @@
                          #:trivia           [trivia 'profile-default]
                          #:source-positions [source-positions 'profile-default]
                          #:dialect          [dialect 'generic]
+                         #:architecture     [architecture #f]
                          #:encoding         [encoding 'auto]
                          #:fragment-cap     [fragment-cap 16384])
   (unless (hash-has-key? asm-lexer-profile-defaults profile)
@@ -258,11 +304,14 @@
        (raise-argument-error 'make-asm-lexer
                              "(or/c 'profile-default boolean?)"
                              source-positions)]))
+  (define resolved-dialect
+    (validate-dialect dialect 'make-asm-lexer))
   (asm-config profile
               resolved-trivia
               resolved-positions
               (hash-ref defaults 'errors)
-              (validate-dialect dialect 'make-asm-lexer)
+              resolved-dialect
+              (validate-architecture resolved-dialect architecture 'make-asm-lexer)
               (validate-asm-encoding encoding 'make-asm-lexer)
               (validate-fragment-cap fragment-cap 'make-asm-lexer)))
 
@@ -276,94 +325,26 @@
                            "(or/c 'auto 'utf-8 'utf-16le 'utf-16be)"
                            encoding)]))
 
-;; symbol-character? : char? -> boolean?
-;;   Recognize a conservative one-character assembly symbol fragment.
-(define (symbol-character? ch)
-  (or (char-alphabetic? ch)
-      (char-numeric? ch)
-      (memv ch '(#\_ #\. #\$ #\@ #\?))))
-
-;; delimiter-character? : char? -> boolean?
-;;   Recognize punctuation that is structurally delimited across common syntaxes.
-(define (delimiter-character? ch)
-  (memv ch '(#\: #\, #\( #\) #\[ #\] #\{ #\} #\" #\')))
-
-;; operator-character? : char? -> boolean?
-;;   Recognize punctuation without assuming that it starts a dialect comment.
-(define (operator-character? ch)
-  (memv ch '(#\+ #\- #\* #\/ #\% #\= #\< #\> #\& #\| #\^ #\~
-             #\! #\; #\# #\\)))
-
-;; classify-unit : source-unit? -> (values symbol? (listof symbol?))
-;;   Project one decoded scalar conservatively without claiming a dialect.
-(define (classify-unit unit)
-  (define text
-    (source-unit-text unit))
-  (define ch
-    (string-ref text 0))
-  (cond
-    [(source-unit-bom? unit)
-     (values 'unknown '(asm-byte-order-mark))]
-    [(source-unit-malformed? unit)
-     (values 'unknown '(asm-invalid-encoding malformed-token))]
-    [(char-whitespace? ch)
-     (values 'whitespace '(whitespace))]
-    [(symbol-character? ch)
-     (values 'identifier '(identifier asm-symbol))]
-    [(delimiter-character? ch)
-     (values 'delimiter '(delimiter asm-punctuation))]
-    [(operator-character? ch)
-     (values 'operator '(operator asm-operator))]
-    [else
-     (values 'unknown '(asm-unclassified))]))
-
-;; make-unit-diagnostic : source-unit? -> (listof asm-diagnostic?)
-;;   Attach a recoverable decoding diagnostic only where source bytes require it.
-(define (make-unit-diagnostic unit)
-  (cond
-    [(source-unit-malformed? unit)
-     (list (asm-diagnostic 'invalid-encoding
-                           'warning
-                           "The source bytes do not form a valid encoded character."
-                           (source-unit-byte-span unit)))]
-    [else
-     '()]))
-
 ;; make-asm-derived-lexer : keyword-arguments -> (input-port? -> (or/c asm-derived-token? 'eof))
-;;   Construct a streaming, byte-preserving reader for conservative assembly.
+;;   Construct a streaming, byte-preserving reader for one explicit profile.
 (define (make-asm-derived-lexer #:dialect      [dialect 'generic]
+                                #:architecture [architecture #f]
                                 #:encoding     [encoding 'auto]
                                 #:fragment-cap [fragment-cap 16384])
   (define resolved-dialect
     (validate-dialect dialect 'make-asm-derived-lexer))
+  (define resolved-architecture
+    (validate-architecture resolved-dialect architecture 'make-asm-derived-lexer))
   (define resolved-encoding
     (validate-asm-encoding encoding 'make-asm-derived-lexer))
-  (validate-fragment-cap fragment-cap 'make-asm-derived-lexer)
-  (define reader
-    (make-source-reader #:encoding resolved-encoding))
-  (lambda (in)
-    (define unit
-      (source-read-unit! reader in))
-    (cond
-      [(eof-object? unit)
-       'eof]
-      [else
-       (define-values (category tags)
-         (classify-unit unit))
-       (define effective-state
-         (asm-effective-state resolved-dialect
-                              (source-unit-encoding unit)
-                              (zero? (position-col (source-unit-start unit)))))
-       (asm-derived-token category
-                          (source-unit-text unit)
-                          tags
-                          (source-unit-start unit)
-                          (source-unit-end unit)
-                          (source-unit-byte-span unit)
-                          (source-unit-raw-bytes unit)
-                          #f
-                          effective-state
-                          (make-unit-diagnostic unit))])))
+  (make-profiled-asm-derived-lexer
+   #:dialect      resolved-dialect
+   #:architecture resolved-architecture
+   #:encoding     resolved-encoding
+   #:fragment-cap (validate-fragment-cap fragment-cap 'make-asm-derived-lexer)
+   #:make-derived-token asm-derived-token
+   #:make-effective-state asm-effective-state
+   #:make-diagnostic asm-diagnostic))
 
 ;; project-derived-token : (or/c asm-derived-token? 'eof) asm-config? -> (or/c token-like? #f)
 ;;   Convert one derived token into the parser-tools-compatible public stream.
@@ -394,6 +375,7 @@
                         #:trivia           [trivia 'profile-default]
                         #:source-positions [source-positions 'profile-default]
                         #:dialect          [dialect 'generic]
+                        #:architecture     [architecture #f]
                         #:encoding         [encoding 'auto]
                         #:fragment-cap     [fragment-cap 16384])
   (define config
@@ -401,10 +383,12 @@
                      #:trivia           trivia
                      #:source-positions source-positions
                      #:dialect          dialect
+                     #:architecture     architecture
                      #:encoding         encoding
                      #:fragment-cap     fragment-cap))
   (define next-derived-token
     (make-asm-derived-lexer #:dialect      (asm-config-dialect config)
+                            #:architecture (asm-config-architecture config)
                             #:encoding     (asm-config-encoding config)
                             #:fragment-cap (asm-config-fragment-cap config)))
   (lambda (in)
@@ -427,6 +411,7 @@
                             #:trivia           [trivia 'profile-default]
                             #:source-positions [source-positions 'profile-default]
                             #:dialect          [dialect 'generic]
+                            #:architecture     [architecture #f]
                             #:fragment-cap     [fragment-cap 16384])
   (unless (string? source)
     (raise-argument-error 'asm-string->tokens "string?" source))
@@ -435,6 +420,7 @@
                     #:trivia           trivia
                     #:source-positions source-positions
                     #:dialect          dialect
+                    #:architecture     architecture
                     #:encoding         'utf-8
                     #:fragment-cap     fragment-cap))
   (define in
@@ -452,11 +438,13 @@
 ;;   Tokenize a Racket string with UTF-8-relative byte provenance.
 (define (asm-string->derived-tokens source
                                     #:dialect      [dialect 'generic]
+                                    #:architecture [architecture #f]
                                     #:fragment-cap [fragment-cap 16384])
   (unless (string? source)
     (raise-argument-error 'asm-string->derived-tokens "string?" source))
   (define lexer
     (make-asm-derived-lexer #:dialect      dialect
+                            #:architecture architecture
                             #:encoding     'utf-8
                             #:fragment-cap fragment-cap))
   (define in
@@ -486,9 +474,14 @@
 
   ;; collect-derived : bytes? keyword-arguments -> (listof asm-derived-token?)
   ;;   Read derived tokens from byte-authoritative input.
-  (define (collect-derived source #:encoding [encoding 'auto])
+  (define (collect-derived source
+                           #:encoding [encoding 'auto]
+                           #:dialect [dialect 'generic]
+                           #:architecture [architecture #f])
     (define lexer
-      (make-asm-derived-lexer #:encoding encoding))
+      (make-asm-derived-lexer #:dialect      dialect
+                              #:architecture architecture
+                              #:encoding     encoding))
     (define in
       (open-input-bytes source))
     (let loop ([tokens '()])
@@ -512,10 +505,92 @@
     (collect-derived #"a\303(b"))
   (define long-derived
     (asm-string->derived-tokens (make-string 20000 #\x)))
+  (define ca65-source
+    ".feature c_comments\n// retained C comment\n@loop: lda #$20 ; tail\njmp :-\n")
+  (define acme-source
+    "!cpu 6510\n!zone main\n+draw\n!byte $01 ; tail\n")
+  (define motorola-source
+    "start: move.l d0,(a0)\n        dc.b 1,2 ; tail\n")
+  (define kick-source
+    "#import \"lib.asm\"\n.if (true) { .for (i=0; i<3; i++) { !loop: lda #$00 // tail\n} }\n.endif\n")
+  (define tass-source
+    ".cpu \"6502\"\n.namespace demo\n.logical $0801\n.enc \"screen\"\n.endlogical\n.endnamespace\n")
+  (define gas-m68k-source
+    "1: move.l %d0,%a0 | tail\n1b\n")
+  (define gas-x86-source
+    ".att_syntax\nmov %rax, %rbx # AT&T tail\n.intel_syntax noprefix\n.code64\nmov rax, 1 # tail\n")
+  (define gas-arm-source
+    ".syntax unified\n.thumb\nmov r0, #1 @ tail\n")
+  (define gas-aarch64-source
+    ".text\nadrp x0, :lo12:symbol\n// tail\n")
+  (define nasm-source
+    "%macro m 1\n%%local: mov rax, %1\n%endmacro\ndb %{1}\nBITS 64\n")
+  (define ca65-derived
+    (asm-string->derived-tokens ca65-source #:dialect 'ca65))
+  (define acme-derived
+    (asm-string->derived-tokens acme-source #:dialect 'acme))
+  (define motorola-derived
+    (asm-string->derived-tokens motorola-source #:dialect 'native-motorola))
+  (define asmone-derived
+    (asm-string->derived-tokens motorola-source #:dialect 'asmone))
+  (define devpac-derived
+    (asm-string->derived-tokens motorola-source #:dialect 'devpac))
+  (define kick-derived
+    (asm-string->derived-tokens kick-source #:dialect 'kick))
+  (define tass-derived
+    (asm-string->derived-tokens tass-source #:dialect '|64tass|))
+  (define gas-m68k-derived
+    (asm-string->derived-tokens gas-m68k-source #:dialect 'gas #:architecture 'm68k))
+  (define gas-x86-derived
+    (asm-string->derived-tokens gas-x86-source #:dialect 'gas #:architecture 'x86))
+  (define gas-arm-derived
+    (asm-string->derived-tokens gas-arm-source #:dialect 'gas #:architecture 'arm))
+  (define gas-aarch64-derived
+    (asm-string->derived-tokens gas-aarch64-source #:dialect 'gas #:architecture 'aarch64))
+  (define nasm-derived
+    (asm-string->derived-tokens nasm-source #:dialect 'nasm))
+  (define profile-source-cases
+    (list (list (string->bytes/utf-8 ca65-source)        ca65-derived)
+          (list (string->bytes/utf-8 acme-source)        acme-derived)
+          (list (string->bytes/utf-8 motorola-source)    motorola-derived)
+          (list (string->bytes/utf-8 motorola-source)    asmone-derived)
+          (list (string->bytes/utf-8 motorola-source)    devpac-derived)
+          (list (string->bytes/utf-8 kick-source)        kick-derived)
+          (list (string->bytes/utf-8 tass-source)        tass-derived)
+          (list (string->bytes/utf-8 gas-m68k-source)    gas-m68k-derived)
+          (list (string->bytes/utf-8 gas-x86-source)     gas-x86-derived)
+          (list (string->bytes/utf-8 gas-arm-source)     gas-arm-derived)
+          (list (string->bytes/utf-8 gas-aarch64-source) gas-aarch64-derived)
+          (list (string->bytes/utf-8 nasm-source)        nasm-derived)))
+  (define malformed-profile-source
+    #"a\303(")
+  (define profile-malformed-cases
+    (list (collect-derived malformed-profile-source #:dialect 'ca65)
+          (collect-derived malformed-profile-source #:dialect 'acme)
+          (collect-derived malformed-profile-source #:dialect 'native-motorola)
+          (collect-derived malformed-profile-source #:dialect 'asmone)
+          (collect-derived malformed-profile-source #:dialect 'devpac)
+          (collect-derived malformed-profile-source #:dialect 'kick)
+          (collect-derived malformed-profile-source #:dialect '|64tass|)
+          (collect-derived malformed-profile-source #:dialect 'gas #:architecture 'm68k)
+          (collect-derived malformed-profile-source #:dialect 'gas #:architecture 'x86)
+          (collect-derived malformed-profile-source #:dialect 'gas #:architecture 'arm)
+          (collect-derived malformed-profile-source #:dialect 'gas #:architecture 'aarch64)
+          (collect-derived malformed-profile-source #:dialect 'nasm)))
+  ;; has-tag? : (listof asm-derived-token?) symbol? -> boolean?
+  ;;   Determine whether a profile emitted one expected semantic role.
+  (define (has-tag? tokens tag)
+    (ormap (lambda (token)
+             (asm-derived-token-has-tag? token tag))
+           tokens))
   (define semicolon-token
     (findf (lambda (token)
              (string=? (asm-derived-token-text token) ";"))
            generic-derived))
+  (define kick-semicolon-token
+    (findf (lambda (token)
+             (string=? (asm-derived-token-text token) ";"))
+           kick-derived))
   (define first-token-channel
     (make-channel))
   (define-values (pipe-in pipe-out)
@@ -549,15 +624,85 @@
   (check-equal? (apply bytes-append (map asm-derived-token-raw-bytes malformed-derived))
                 #"a\303(b")
   (check-true (for/and ([token (in-list long-derived)])
-                (<= (bytes-length (asm-derived-token-raw-bytes token)) 4)))
-  (check-equal? (length long-derived) 20000)
+                (<= (bytes-length (asm-derived-token-raw-bytes token)) 16384)))
+  (check-equal? (length long-derived) 2)
+  (check-equal? (map asm-derived-token-continuation-id long-derived)
+                '(1 1))
   (check-not-false first-pipe-token)
-  (check-equal? (asm-derived-token-text first-pipe-token) "m")
+  (check-equal? (asm-derived-token-text first-pipe-token) "mov")
   (check-exn exn:fail?
              (lambda ()
                (define lexer
                  (make-asm-lexer #:profile 'compiler))
                (lexer (open-input-bytes #"\303"))))
+  (check-not-exn
+   (lambda ()
+     (make-asm-derived-lexer #:dialect 'ca65)))
   (check-exn exn:fail?
              (lambda ()
-               (make-asm-derived-lexer #:dialect 'ca65))))
+               (make-asm-derived-lexer #:dialect 'gas)))
+  (for ([tokens (in-list (list ca65-derived
+                               acme-derived
+                               motorola-derived
+                               asmone-derived
+                               devpac-derived
+                               kick-derived
+                               tass-derived
+                               gas-m68k-derived
+                               gas-x86-derived
+                               gas-arm-derived
+                               gas-aarch64-derived
+                               nasm-derived))])
+    (check-true (contiguous-byte-stream? tokens)))
+  (for ([source+tokens (in-list profile-source-cases)])
+    (define source
+      (car source+tokens))
+    (define tokens
+      (cadr source+tokens))
+    (check-equal? (apply bytes-append (map asm-derived-token-raw-bytes tokens))
+                  source))
+  (for ([tokens (in-list profile-malformed-cases)])
+    (check-true (contiguous-byte-stream? tokens))
+    (check-equal? (apply bytes-append (map asm-derived-token-raw-bytes tokens))
+                  malformed-profile-source)
+    (check-true
+     (ormap (lambda (token)
+              (pair? (asm-derived-token-diagnostics token)))
+            tokens)))
+  (check-true (has-tag? ca65-derived 'ca65-directive))
+  (check-true (has-tag? ca65-derived 'ca65-cheap-local))
+  (check-true (has-tag? ca65-derived 'ca65-anonymous-label-reference))
+  (check-true (has-tag? ca65-derived 'asm-line-comment))
+  (check-true (has-tag? acme-derived 'acme-directive))
+  (check-true (has-tag? acme-derived 'acme-macro-call))
+  (check-true (has-tag? motorola-derived 'native-motorola-instruction))
+  (check-true (has-tag? asmone-derived 'asmone-comment))
+  (check-true (has-tag? devpac-derived 'devpac-comment))
+  (check-true (has-tag? kick-derived 'kick-directive))
+  (check-true (has-tag? kick-derived 'kick-immediate-literal))
+  (check-true (has-tag? kick-derived 'asm-statement-separator))
+  (check-true (has-tag? kick-derived 'kick-script-region))
+  (check-true (has-tag? kick-derived 'asm-conditional-region))
+  (check-not-false kick-semicolon-token)
+  (check-equal? (asm-derived-token-category kick-semicolon-token) 'delimiter)
+  (check-true (has-tag? kick-derived 'asm-line-comment))
+  (check-true (has-tag? tass-derived '|64tass-directive|))
+  (check-true (has-tag? tass-derived '|64tass-namespace-region|))
+  (check-true (has-tag? tass-derived '|64tass-emitted-encoding|))
+  (check-true (has-tag? gas-m68k-derived 'gas-register))
+  (check-true (has-tag? gas-m68k-derived 'gas-numeric-local-label))
+  (check-true (has-tag? gas-m68k-derived 'asm-line-comment))
+  (check-true (has-tag? gas-x86-derived 'gas-syntax-att))
+  (check-true (has-tag? gas-x86-derived 'gas-syntax-intel))
+  (check-true (has-tag? gas-x86-derived 'gas-mode-code64))
+  (check-true (has-tag? gas-arm-derived 'gas-syntax-unified))
+  (check-true (has-tag? gas-arm-derived 'gas-mode-thumb))
+  (check-true (has-tag? gas-aarch64-derived 'gas-register))
+  (check-true (has-tag? gas-aarch64-derived 'gas-relocation-modifier))
+  (check-true (has-tag? gas-aarch64-derived 'asm-line-comment))
+  (check-true (has-tag? nasm-derived 'nasm-macro-open))
+  (check-true (has-tag? nasm-derived 'asm-macro-body))
+  (check-true (has-tag? nasm-derived 'nasm-macro-local))
+  (check-true (has-tag? nasm-derived 'nasm-macro-parameter))
+  (check-true (has-tag? nasm-derived 'nasm-token-concatenation))
+  (check-true (has-tag? nasm-derived 'nasm-bits-mode)))

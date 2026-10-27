@@ -23,7 +23,7 @@
 ;; asm-detection?              : any/c -> boolean?
 ;;   Recognize a versioned assembly detection record.
 ;; resolve-asm-selection       : keyword-arguments -> asm-selection?
-;;   Resolve explicit generic selection without guessing a dialect.
+;;   Resolve an explicit profile and, when needed, its target architecture.
 ;; detect-asm-bytes            : bytes? keyword-arguments -> asm-detection?
 ;;   Inspect BOM evidence only; automatic dialect selection remains disabled.
 
@@ -36,10 +36,13 @@
 (require (only-in "../asm.rkt"
                   asm-diagnostic
                   asm-diagnostic-code
+                  asm-profile-architecture
                   asm-profile-status
                   asm-profiles)
          (only-in "../private/source.rkt"
-                  source-span))
+                  source-span)
+         (only-in "../private/asm/profiles.rkt"
+                  asm-profile-architectures))
 
 ;; A requested and effective profile remain separate when a profile is absent.
 (struct asm-selection (requested effective origin diagnostics) #:transparent)
@@ -57,9 +60,13 @@
 (define (profile-diagnostic code severity message)
   (asm-diagnostic code severity message #f))
 
-;; resolve-asm-selection : [#:dialect (or/c symbol? #f)] -> asm-selection?
-;;   Resolve explicit generic selection while preserving unavailable identities.
-(define (resolve-asm-selection #:dialect [dialect #f])
+;; resolve-asm-selection : keyword-arguments -> asm-selection?
+;;   Resolve an explicit profile without guessing a dialect or GNU target.
+(define (resolve-asm-selection #:dialect      [dialect #f]
+                               #:architecture [architecture #f])
+  (unless (or (not architecture)
+              (symbol? architecture))
+    (raise-argument-error 'resolve-asm-selection "(or/c symbol? #f)" architecture))
   (cond
     [(not dialect)
      (asm-selection #f
@@ -81,15 +88,43 @@
                        (list (profile-diagnostic 'unknown-profile
                                                  'error
                                                  "The requested assembly profile is unknown.")))]
-       [(eq? (asm-profile-status profile) 'implemented)
-        (asm-selection dialect dialect 'explicit '())]
-       [else
+       [(not (eq? (asm-profile-status profile) 'implemented))
         (asm-selection dialect
                        #f
                        'explicit
                        (list (profile-diagnostic 'profile-unavailable
                                                  'warning
-                                                 "The requested assembly profile is recognized but unavailable.")))] )]))
+                                                 "The requested assembly profile is recognized but unavailable.")))]
+       [(pair? (asm-profile-architectures dialect))
+        (define supported
+          (asm-profile-architectures dialect))
+        (cond
+          [(not architecture)
+           (asm-selection dialect
+                          #f
+                          'explicit
+                          (list (profile-diagnostic 'architecture-required
+                                                    'error
+                                                    "The requested assembly profile requires an explicit architecture.")))]
+          [(member architecture supported)
+           (asm-selection dialect dialect 'explicit '())]
+          [else
+           (asm-selection dialect
+                          #f
+                          'explicit
+                          (list (profile-diagnostic 'unsupported-architecture
+                                                    'error
+                                                    "The selected architecture is not supported by this assembly profile.")))])]
+       [(and architecture
+             (not (eq? architecture (asm-profile-architecture profile))))
+        (asm-selection dialect
+                       #f
+                       'explicit
+                       (list (profile-diagnostic 'unsupported-architecture
+                                                 'error
+                                                 "The selected architecture is not supported by this assembly profile.")))]
+       [(eq? (asm-profile-status profile) 'implemented)
+        (asm-selection dialect dialect 'explicit '())])]))
 
 ;; bom-evidence : bytes? -> (values symbol? (listof asm-evidence))
 ;;   Report only encoding facts whose byte-order marks are complete and exact.
@@ -125,8 +160,9 @@
 ;; detect-asm-bytes : bytes? keyword-arguments -> asm-detection?
 ;;   Report bounded representation facts without enabling dialect scoring.
 (define (detect-asm-bytes input
-                          #:dialect [dialect #f]
-                          #:limit   [limit 32768])
+                          #:dialect      [dialect #f]
+                          #:architecture [architecture #f]
+                          #:limit        [limit 32768])
   (unless (bytes? input)
     (raise-argument-error 'detect-asm-bytes "bytes?" input))
   (unless (exact-positive-integer? limit)
@@ -138,7 +174,8 @@
   (define-values (encoding encoding-evidence)
     (bom-evidence sample))
   (define selection
-    (resolve-asm-selection #:dialect dialect))
+    (resolve-asm-selection #:dialect      dialect
+                           #:architecture architecture))
   (define truncation-diagnostic
     (cond
       [(< inspected-byte-count (bytes-length input))
@@ -161,21 +198,38 @@
 
   (define generic-selection
     (resolve-asm-selection #:dialect 'generic))
-  (define unavailable-selection
+  (define ca65-selection
     (resolve-asm-selection #:dialect 'ca65))
+  (define gas-without-target-selection
+    (resolve-asm-selection #:dialect 'gas))
+  (define gas-x86-selection
+    (resolve-asm-selection #:dialect 'gas #:architecture 'x86))
+  (define gas-unsupported-target-selection
+    (resolve-asm-selection #:dialect 'gas #:architecture 'riscv))
   (define utf-16-detection
     (detect-asm-bytes #"\377\376l\0d\0a\0" #:dialect 'generic))
+  (define gas-detection
+    (detect-asm-bytes #"mov rax, 1" #:dialect 'gas #:architecture 'x86))
   (define truncated-detection
     (detect-asm-bytes #"abcdef" #:limit 3))
 
   (check-equal? (asm-selection-effective generic-selection) 'generic)
   (check-equal? (asm-selection-origin generic-selection) 'explicit)
-  (check-false (asm-selection-effective unavailable-selection))
-  (check-equal? (asm-diagnostic-code (car (asm-selection-diagnostics unavailable-selection)))
-                'profile-unavailable)
+  (check-equal? (asm-selection-effective ca65-selection) 'ca65)
+  (check-false (asm-selection-effective gas-without-target-selection))
+  (check-equal? (asm-diagnostic-code
+                 (car (asm-selection-diagnostics gas-without-target-selection)))
+                'architecture-required)
+  (check-equal? (asm-selection-effective gas-x86-selection) 'gas)
+  (check-false (asm-selection-effective gas-unsupported-target-selection))
+  (check-equal? (asm-diagnostic-code
+                 (car (asm-selection-diagnostics gas-unsupported-target-selection)))
+                'unsupported-architecture)
   (check-equal? (asm-detection-schema-version utf-16-detection) 1)
   (check-equal? (asm-detection-encoding utf-16-detection) 'utf-16le)
   (check-equal? (asm-evidence-dimension (car (asm-detection-evidence utf-16-detection)))
                 'encoding)
+  (check-equal? (asm-selection-effective (asm-detection-selection gas-detection))
+                'gas)
   (check-true (asm-detection-truncated? truncated-detection))
   (check-equal? (asm-detection-inspected-byte-count truncated-detection) 3))

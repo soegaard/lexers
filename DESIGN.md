@@ -280,6 +280,23 @@ This convenience interface should be defined as a thin wrapper over the
 port-based lexer interface, so that it shares the same lexical behavior,
 profiles, and compatibility guarantees.
 
+## Assembly Profile Design
+
+The assembly lexer follows the same derived-token and projected-token boundary,
+but dialect and target architecture are explicit lexical inputs. A generic
+profile intentionally recognizes only dialect-neutral source structure. A
+selected profile owns its comment markers, labels, directives, macros,
+registers, and bounded local state; it is never silently replaced by a nearby
+assembler grammar. GNU `as`-style lexical rules additionally require an
+explicit target architecture, because punctuation and comment conventions vary
+by target.
+
+Profiles expose reusable syntax-role tags rather than renderer classes. The
+assembly lexer preserves source decoding separately from source-language
+encoding directives, and it bounds macro, conditional, script, and namespace
+state. The full profile inventory and selection policy are in
+[Assembly.md](Assembly.md).
+
 ## Deferred Items
 
 The following items are intentionally left open for later design work:
