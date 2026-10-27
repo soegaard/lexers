@@ -250,6 +250,25 @@ The language-specific lexical knowledge should remain fixed. Profiles and
 options should control reporting and token-retention behavior, not the lexical
 definition of the language itself.
 
+## Byte-Authoritative Streams
+
+Some source formats need more provenance than a decoded Racket string retains.
+For those lexers, the derived-token layer may own immutable raw-byte fragments
+in addition to decoded text. The fragments must partition the input in order,
+including byte-order marks, original newline bytes, invalid encoded sequences,
+and a missing final newline.
+
+Byte spans use zero-based, half-open offsets. They are deliberately separate
+from parser-tools source positions, decoded character offsets, and terminal
+display columns. String convenience APIs define byte provenance relative to
+their UTF-8 encoding; a decoded string does not imply knowledge of an original
+file encoding.
+
+Byte-authoritative readers must be incremental and bounded. In particular,
+they must not collect an arbitrarily long source token or physical line only to
+return it as one item. A consumer may choose to collect a whole stream, but a
+live lexer must release consumed source storage as it progresses.
+
 For parser-facing consumers, `parser-tools` compatibility should be the default
 external token contract.
 

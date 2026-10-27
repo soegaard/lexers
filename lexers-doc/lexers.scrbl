@@ -8,6 +8,7 @@
                      syntax-color/racket-lexer
                      (only-in syntax-color/scribble-lexer
                               make-scribble-inside-lexer)
+                     lexers/asm
                      lexers/c
                      lexers/cpp
                      lexers/csv
@@ -54,6 +55,7 @@
          the-eval))))
 
 @(define-delayed-eval c-eval            lexers/c)
+@(define-delayed-eval asm-eval          lexers/asm)
 @(define-delayed-eval cpp-eval          lexers/cpp)
 @(define-delayed-eval css-eval          lexers/css)
 @(define-delayed-eval csv-eval          lexers/csv)
@@ -103,6 +105,7 @@ The public language modules currently available are:
 
 @itemlist[
  @item{@racketmodname[lexers/token]}
+ @item{@racketmodname[lexers/asm]}
  @item{@racketmodname[lexers/c]}
  @item{@racketmodname[lexers/cpp]}
  @item{@racketmodname[lexers/csv]}
@@ -224,6 +227,7 @@ For the keyword arguments accepted by @racket[make-css-lexer],
 @racket[json-string->tokens], @racket[make-javascript-lexer],
 @racket[javascript-string->tokens], @racket[make-markdown-lexer],
 @racket[markdown-string->tokens], @racket[make-objc-lexer],
+@racket[make-asm-lexer], @racket[asm-string->tokens],
 @racket[objc-string->tokens], @racket[make-python-lexer],
 @racket[python-string->tokens], @racket[make-racket-lexer],
 @racket[racket-string->tokens], @racket[make-scheme-lexer],
@@ -3764,6 +3768,166 @@ TSV-derived tags and gain @racket['embedded-tsv].}
 
 @defthing[tsv-profiles immutable-hash?]{
 The profile defaults used by the TSV lexer.}
+
+@section{Assembly}
+
+@defmodule[lexers/asm]
+
+The assembly lexer currently provides a conservative, byte-preserving generic
+profile. It recognizes whitespace, symbol fragments, structural delimiters,
+and operators without assigning an instruction set, assembler executable,
+comment convention, string convention, binary output format, or CPU. In
+particular, generic `;` and `#` tokens are operators, not comments.
+
+The projected API reads a @italic{binary} input port. This keeps byte spans and
+raw fragments authoritative. Use the string convenience procedures for Racket
+strings; their byte spans are defined relative to the string's UTF-8 encoding.
+
+@defproc[(make-asm-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                         [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                         [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                         [#:dialect dialect 'generic 'generic]
+                         [#:encoding encoding (or/c 'auto 'utf-8 'utf-16le 'utf-16be) 'auto]
+                         [#:fragment-cap fragment-cap exact-positive-integer? 16384])
+         (input-port? . -> . (or/c symbol? token? position-token?))]{
+Constructs a streaming generic assembly lexer. The dialect must currently be
+@racket['generic]; recognized future dialects are rejected instead of being
+silently mapped to a different grammar. The fragment cap must be between four
+and 16384 bytes.
+
+The reader emits a token without waiting for a line ending or collecting an
+arbitrarily long source token. UTF-8 and BOM-selected UTF-16LE/UTF-16BE are
+decoded incrementally. Invalid input projects as @racket['unknown] under the
+coloring profile and raises an exception under the compiler profile.
+
+@examples[#:eval (force asm-eval)
+(define lexer
+  (make-asm-lexer #:source-positions #f))
+(define in
+  (open-input-bytes #"entry: mov r0, #42\n"))
+(list (lexer in)
+      (lexer in)
+      (lexer in)
+      (lexer in))
+]}
+
+@defproc[(asm-string->tokens [source string?]
+                             [#:profile profile (or/c 'coloring 'compiler) 'coloring]
+                             [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
+                             [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
+                             [#:dialect dialect 'generic 'generic]
+                             [#:fragment-cap fragment-cap exact-positive-integer? 16384])
+         (listof (or/c symbol? token? position-token?))]{
+Tokenizes a Racket string through the projected API. The source is encoded as
+UTF-8 before byte spans are assigned.}
+
+@subsection{Assembly Derived Tokens}
+
+@defproc[(make-asm-derived-lexer [#:dialect dialect 'generic 'generic]
+                                 [#:encoding encoding (or/c 'auto 'utf-8 'utf-16le 'utf-16be) 'auto]
+                                 [#:fragment-cap fragment-cap exact-positive-integer? 16384])
+         (input-port? . -> . (or/c 'eof asm-derived-token?))]{
+Constructs a streaming byte-preserving assembly reader. Every returned token
+owns immutable raw bytes, and derived-token byte spans form a zero-based,
+half-open partition of the input.}
+
+@defproc[(asm-string->derived-tokens [source string?]
+                                     [#:dialect dialect 'generic 'generic]
+                                     [#:fragment-cap fragment-cap exact-positive-integer? 16384])
+         (listof asm-derived-token?)]{
+Tokenizes a Racket string into derived tokens with UTF-8-relative byte spans.}
+
+@defproc[(asm-derived-token? [v any/c]) boolean?]{
+Recognizes a token returned by the derived assembly API.}
+
+@defproc[(asm-derived-token-category [token asm-derived-token?]) symbol?]{
+Returns a common projected category such as @racket['whitespace],
+@racket['identifier], @racket['delimiter], @racket['operator], or
+@racket['unknown].}
+
+@defproc[(asm-derived-token-text [token asm-derived-token?]) string?]{
+Returns decoded text. It returns U+FFFD for malformed encoded bytes; use
+@racket[asm-derived-token-raw-bytes] for byte-exact reconstruction.}
+
+@defproc[(asm-derived-token-tags [token asm-derived-token?]) (listof symbol?)]{
+Returns syntax-role tags. Current generic tags include @racket['asm-symbol],
+@racket['asm-punctuation], @racket['asm-operator],
+@racket['asm-byte-order-mark], and @racket['asm-invalid-encoding].}
+
+@defproc[(asm-derived-token-has-tag? [token asm-derived-token?] [tag symbol?]) boolean?]{
+Determines whether a token includes @racket[tag] in its syntax-role tags.}
+
+@defproc[(asm-derived-token-start [token asm-derived-token?]) position?]{
+Returns the parser-tools-compatible starting position.}
+
+@defproc[(asm-derived-token-end [token asm-derived-token?]) position?]{
+Returns the parser-tools-compatible ending position.}
+
+@defproc[(asm-derived-token-byte-span [token asm-derived-token?]) asm-byte-span?]{
+Returns the authoritative byte span for one token.}
+
+@defproc[(asm-byte-span? [v any/c]) boolean?]{
+Recognizes an assembly byte span.}
+
+@defproc[(asm-byte-span-start [span asm-byte-span?]) exact-nonnegative-integer?]{
+Returns the inclusive, zero-based byte offset.}
+
+@defproc[(asm-byte-span-end [span asm-byte-span?]) exact-nonnegative-integer?]{
+Returns the exclusive byte offset.}
+
+@defproc[(asm-derived-token-raw-bytes [token asm-derived-token?]) bytes?]{
+Returns immutable bytes that exactly match the source fragment.}
+
+@defproc[(asm-derived-token-continuation-id [token asm-derived-token?])
+         (or/c exact-positive-integer? #f)]{
+Returns a shared fragment identity when a future profile splits one logical
+token. The generic profile emits independently bounded scalar fragments and
+currently returns @racket[#f].}
+
+@defproc[(asm-derived-token-effective-state [token asm-derived-token?]) asm-effective-state?]{
+Returns the effective lexical state, including dialect, source encoding, and
+whether the token starts a logical line.}
+
+@defproc[(asm-derived-token-diagnostics [token asm-derived-token?])
+         (listof asm-diagnostic?)]{
+Returns recoverable diagnostics attached to this source fragment. Diagnostic
+severity is independent of the projected token category.}
+
+@defproc[(asm-effective-state? [v any/c]) boolean?]{
+Recognizes an effective assembly lexical-state record. Its accessors report the
+dialect, source encoding, and logical-line-start flag.}
+
+@defproc[(asm-diagnostic? [v any/c]) boolean?]{
+Recognizes a recoverable assembly diagnostic. Its accessors report a stable
+code, severity, message, and optional byte span.}
+
+@defproc[(asm-profile? [v any/c]) boolean?]{
+Recognizes one assembly profile registry entry. Its accessors report the name,
+implementation status, architecture, dialect, and description.}
+
+@defthing[asm-profiles immutable-hash?]{
+Maps profile names to @racket[asm-profile?] records. `generic` is implemented.
+Known names such as `ca65`, `acme`, `gas`, and `nasm` are represented as
+recognized-but-unavailable profiles until their specific lexer rules ship.}
+
+@section{Assembly Detection}
+
+@defmodule[lexers/asm/detect]
+
+Selection is an inspection API, not an uncalibrated automatic detector.
+@tt{resolve-asm-selection} accepts an optional explicit dialect and records
+unknown or unavailable profiles without substituting a nearby grammar. With no
+explicit dialect, it records that automatic selection is disabled.
+
+@tt{detect-asm-bytes} accepts bytes, an optional explicit dialect, and an
+optional positive byte limit that defaults to 32768. It inspects complete
+byte-order marks only and returns a versioned result; it does not infer an
+assembly dialect from source content.
+
+The selection and detection records expose requested and effective profiles,
+decision origin, bounded evidence and diagnostics, resolved encoding, inspected
+byte count, and truncation. Evidence and diagnostics include a byte span when
+one is known.
 
 @section{WAT}
 

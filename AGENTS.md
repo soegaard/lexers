@@ -90,3 +90,70 @@ There are 3 packages:
 1. Shared notes are in DESIGN.md.
 2. Each programming language gets a separate file for design notes.
 3. The notes for CSS are in `CSS.md`.
+
+## Assembly Support
+
+These rules supplement the repository conventions when working on assembly
+source support.
+
+1. **Own the grammar in `lexers`.** The detector and renderer must share the
+   same assembly language definitions. Do not introduce a second tokenizer or
+   a local lexer workaround in `peek`.
+2. **Keep classification dimensions separate.** Represent artifact kind,
+   architecture, CPU variant/features, instruction mode, syntax, dialect,
+   implementation/version, processing layers, platform/ABI, actual binary
+   format, source output intent, and source encoding/container independently.
+   Validate combinations against a profile's capabilities.
+3. **Permit uncertainty.** Unknown, ambiguous, conflicting, conditional, and
+   unsupported results are valid. Compatible source is not proof of a
+   particular assembler executable, version, CPU variant, or output format.
+4. **Preserve authoritative bytes.** Token fragments must partition the input
+   exactly, including BOMs, whitespace, original newlines, invalid sequences,
+   and a missing final newline. Keep byte spans separate from Racket positions,
+   decoded character positions, and terminal columns.
+5. **Stream with bounded storage.** Bound the probe, token fragments, lexical
+   lookahead, conditional alternatives, nesting, caches, and diagnostics.
+   A port API that buffers an entire token or line is insufficient.
+6. **Use profile-specific lexical states.** Comments, strings, labels, macro
+   parameters, case rules, and preprocessing differ between dialects and CPU
+   targets. CPU tables alone do not define an assembler language.
+7. **Respect state changes and their context.** Apply source syntax/mode
+   changes locally. Do not execute a directive inside an unexpanded macro as
+   a file-level change. Join conditional branches conservatively.
+8. **Recover without losing source.** Unknown instructions and macros are not
+   automatically errors. Malformed input yields preserved fragments and bounded
+   diagnostics. Every non-EOF step must consume input or report a genuine
+   need for more input.
+9. **Keep presentation separate.** Escape terminal-active source controls and
+   undecodable bytes for display. Preserve original bytes through the lexer
+   and inspection interfaces. Disabling color does not disable escaping.
+10. **Honor explicit choices.** Record them as forced, not as confidence 100.
+    Reject contradictory explicit dimensions. Source disagreements produce
+    diagnostics without silently changing the forced dialect.
+11. **Treat suffixes as hints.** Preserve extension case. `.S` does not prove
+    CPP; `.inc` does not prove assembly; `.a` may be source or an archive.
+    Binary objects, listings, disk images, and tokenized source have separate
+    input paths.
+12. **Do not execute source during preview.** Do not expand macros, invoke CPP
+    or assemblers, run build scripts, load source-selected plugins, or traverse
+    arbitrary includes. Declarative configuration must be explicitly enabled.
+13. **Freeze automatic selection before ordinary output.** Later evidence may
+    produce diagnostics; it cannot recolor an emitted prefix. Genuine in-file
+    language switches remain supported.
+14. **Keep decisions inspectable.** Explanations go to stderr. Detection JSON
+    and token JSONL are explicit output modes with stable, versioned schemas.
+15. **Use realistic tests and provenance.** Keep persistent `peek` tests and
+    fixtures under `peek-lib/peek/test/`. Use RackUnit. Every assembly corpus
+    file has a hard 120-second deadline and failures identify the file/profile.
+16. **Preserve existing terminal behavior.** Default color stays enabled;
+    `--pager` continues to support `less -R`; `--list-file-types` stays the
+    canonical spelling. Any inserted visible text participates in width
+    calculations.
+17. **Document the proper boundary.** Shared preview decisions belong in
+    `DESIGN.md`; assembly decisions belong in `Assembly.md`. Public behavior
+    belongs in `peek-doc/peek.scrbl`; reusable lexer APIs also require
+    `lexers-doc` updates.
+18. **Fix causes at their owner.** If an existing external lexer/library defect
+    is discovered, first make a minimal reproduction, then ask how to proceed.
+    Missing assembly functionality is a planned dependency, not evidence of an
+    existing defect.
