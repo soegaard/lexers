@@ -503,6 +503,16 @@
     "entry: mov r0, #42 ; not a generic comment\r\n")
   (define generic-derived
     (asm-string->derived-tokens generic-source))
+  (define generic-layout-derived
+    (asm-string->derived-tokens "LAB_0120:\n  DS.B 1\n"))
+  (define generic-layout-head
+    (findf (lambda (token)
+             (string=? (asm-derived-token-text token) "DS.B"))
+           generic-layout-derived))
+  (define generic-layout-label
+    (findf (lambda (token)
+             (string=? (asm-derived-token-text token) "LAB_0120"))
+           generic-layout-derived))
   (define generic-projected
     (asm-string->tokens generic-source #:source-positions #f))
   (define utf-16-derived
@@ -627,6 +637,13 @@
   (check-not-false semicolon-token)
   (check-equal? (asm-derived-token-category semicolon-token) 'operator)
   (check-false (asm-derived-token-has-tag? semicolon-token 'comment))
+  (check-not-false generic-layout-head)
+  (check-true (asm-derived-token-has-tag? generic-layout-head
+                                           'asm-layout-statement-head))
+  (check-not-false generic-layout-label)
+  (check-false (asm-derived-token-has-tag? generic-layout-label
+                                            'asm-layout-statement-head))
+  (check-false (has-tag? generic-derived 'asm-layout-statement-head))
   (check-equal? (apply bytes-append (map asm-derived-token-raw-bytes utf-16-derived))
                 #"\377\376l\0d\0a\0:\0\r\0\n\0")
   (check-true (asm-derived-token-has-tag? (car utf-16-derived) 'asm-byte-order-mark))

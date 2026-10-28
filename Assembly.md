@@ -21,6 +21,13 @@ quoted strings, a CPU, an assembler implementation, or an output format.
 Unknown source remains source; it is not an error merely because a specific
 assembler has not been selected.
 
+For consumers that preserve conventional fixed-column source layout, an
+ordinary generic symbol beginning after leading whitespace carries the
+non-semantic `asm-layout-statement-head` tag.  It identifies the likely
+statement-head field without asserting that the word is an instruction or a
+directive.  Symbols at column one, labels, and literals do not receive this
+tag.
+
 Explicit selections currently provide these profile-owned lexical decisions:
 
 - `ca65`: directives, CPU-related declarations, cheap-local and anonymous

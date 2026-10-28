@@ -3868,8 +3868,11 @@ Returns decoded text. It returns U+FFFD for malformed encoded bytes; use
 @defproc[(asm-derived-token-tags [token asm-derived-token?]) (listof symbol?)]{
 Returns syntax-role tags. Generic tags include @racket['asm-symbol],
 @racket['asm-punctuation], @racket['asm-operator],
-@racket['asm-byte-order-mark], and @racket['asm-invalid-encoding]. Explicit
-profiles add reusable roles such as @racket['asm-directive],
+@racket['asm-layout-statement-head], @racket['asm-byte-order-mark], and
+@racket['asm-invalid-encoding]. The layout tag marks an ordinary generic symbol
+that begins after leading whitespace; it preserves the conventional statement
+column without asserting instruction or directive semantics. Explicit profiles
+add reusable roles such as @racket['asm-directive],
 @racket['asm-instruction], @racket['asm-register], @racket['asm-macro-open],
 and profile-specific state tags.}
 

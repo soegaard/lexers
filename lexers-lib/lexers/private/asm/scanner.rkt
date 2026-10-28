@@ -28,7 +28,8 @@
 ;;   Mutable state that affects how later source fragments are interpreted.
 (struct scanner-state (mode string-delimiter c-comments? syntax cpu-mode
                             macro-depth conditional-depth pending-directive
-                            line-start? word-continuation-id script-depth
+                            line-start? line-leading-whitespace?
+                            word-continuation-id script-depth
                             namespace-depth emitted-encoding?)
   #:mutable
   #:transparent)
@@ -143,6 +144,7 @@
                    0
                    #f
                    #t
+                   #f
                    #f
                    0
                    0
@@ -496,6 +498,10 @@
   ;; scan-word : input-port? source-unit? -> asm-derived-token?
   ;;   Read a bounded complete word, retaining its delimiter as scanner lookahead.
   (define (scan-word in first-unit)
+    (define layout-statement-head?
+      (and (eq? dialect 'generic)
+           (scanner-state-line-start? state)
+           (scanner-state-line-leading-whitespace? state)))
     (define first-character
       (source-unit-character first-unit))
     (define units-reversed
@@ -544,13 +550,21 @@
       (units-text units))
     (define-values (category tags)
       (word-tags text))
+    (define decorated-tags
+      (cond
+        [(and layout-statement-head?
+              (eq? category 'identifier)
+              (memq 'asm-symbol tags))
+         (append tags '(asm-layout-statement-head))]
+        [else
+         tags]))
     ;; Settings apply after the directive or setting has received its own tags.
     (cond
       [(scanner-state-pending-directive state)
        (update-pending-directive! text)]
       [else
        (update-directive-state! text)])
-    (make-token units category tags
+    (make-token units category decorated-tags
                 #:continuation-id (and (or continues? continuation-id)
                                        continuation-id)))
 
@@ -641,6 +655,7 @@
        (when (units-have-newline? (list unit))
          (set-scanner-state-mode! state 'code)
          (set-scanner-state-line-start?! state #t)
+         (set-scanner-state-line-leading-whitespace?! state #f)
          (set-scanner-state-pending-directive! state #f))
        token]
       [(eq? (scanner-state-mode state) 'block-comment)
@@ -692,6 +707,7 @@
          (set-scanner-state-mode! state 'code)
          (when newline?
            (set-scanner-state-line-start?! state #t)
+           (set-scanner-state-line-leading-whitespace?! state #f)
            (set-scanner-state-pending-directive! state #f)))
        (make-token (list unit)
                    'literal
@@ -710,9 +726,13 @@
          [(char-whitespace? ch)
           (define token
             (make-token (list unit) 'whitespace '(whitespace)))
-          (when (units-have-newline? (list unit))
-            (set-scanner-state-line-start?! state #t)
-            (set-scanner-state-pending-directive! state #f))
+          (cond
+            [(units-have-newline? (list unit))
+             (set-scanner-state-line-start?! state #t)
+             (set-scanner-state-line-leading-whitespace?! state #f)
+             (set-scanner-state-pending-directive! state #f)]
+            [(scanner-state-line-start? state)
+             (set-scanner-state-line-leading-whitespace?! state #t)])
           token]
          [(line-comment-start? ch)
           (set-scanner-state-mode! state 'line-comment)
@@ -761,12 +781,14 @@
           (define token
             (scan-word in unit))
           (set-scanner-state-line-start?! state #f)
+          (set-scanner-state-line-leading-whitespace?! state #f)
           token]
          [else
           (define token
             (delimiter-token in unit))
           (update-delimiter-state! ch)
           (set-scanner-state-line-start?! state #f)
+          (set-scanner-state-line-leading-whitespace?! state #f)
           token])]))
 
   (lambda (in)
