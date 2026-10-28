@@ -3950,11 +3950,49 @@ or unavailable requests produce diagnostics in the returned record.}
 Inspects complete byte-order marks and records the explicit selection. It does
 not infer an assembly dialect from source content.}
 
+@defproc[(probe-asm-bytes [input bytes?]
+                          [#:limit limit exact-positive-integer? 32768])
+         asm-probe?]{
+Runs every implemented non-generic profile scanner over a bounded input prefix.
+The result retains rule identifiers, feature classes, affected dimensions,
+scores, conflicts, source spans, and macro or conditional context. Scores are
+explainable heuristic values, not probabilities.
+
+The probe may report a high or probable hypothesis, but it enables automatic
+selection only for a profile with a held-out calibration record. Until that
+gate is satisfied, callers must retain a generic or explicitly selected lexer
+profile.}
+
 @defproc[(asm-selection? [v any/c]) boolean?]{
 Recognizes an explicit assembly selection record.}
 
 @defproc[(asm-detection? [v any/c]) boolean?]{
 Recognizes a bounded assembly inspection record.}
+
+@defproc[(asm-content-evidence? [v any/c]) boolean?]{
+Recognizes one profile-scanner observation in a bounded probe. Its accessors
+report a stable rule identifier, feature class, affected dimensions, heuristic
+contribution, byte span, and lexical context.}
+
+@defproc[(asm-detection-conflict? [v any/c]) boolean?]{
+Recognizes a strong rival observation that a candidate profile classified as
+comment text.}
+
+@defproc[(asm-detection-candidate? [v any/c]) boolean?]{
+Recognizes one separately scored dialect-and-architecture candidate. Its
+accessors report dialect and architecture scores independently, the tuple score,
+evidence classes, observations, and conflicts.}
+
+@defproc[(asm-auto-selection? [v any/c]) boolean?]{
+Recognizes a conservative conclusion from a bounded probe. Its band is one of
+@racket['high], @racket['probable], @racket['ambiguous], @racket['conflicting],
+or @racket['unknown]. The result retains compatible candidates and reports
+whether automatic use is calibration-qualified.}
+
+@defproc[(asm-probe? [v any/c]) boolean?]{
+Recognizes a versioned automatic-detection probe report. Its accessors report
+the selection conclusion, scored candidates, evidence, diagnostics, source
+encoding, inspected byte count, and truncation.}
 
 The selection and detection records expose requested and effective profiles,
 decision origin, bounded evidence and diagnostics, resolved encoding, inspected

@@ -297,6 +297,14 @@ encoding directives, and it bounds macro, conditional, script, and namespace
 state. The full profile inventory and selection policy are in
 [Assembly.md](Assembly.md).
 
+Automatic assembly selection is a bounded probe over those same profile
+scanners, not a separate regular-expression grammar. It records evidence rules,
+byte spans, lexical context, candidate conflicts, and separate dialect and
+architecture scores. A score is an inspectable heuristic, not a probability or
+permission to choose a lexer profile. Automatic use is enabled only after a
+profile has passed held-out calibration; otherwise the probe leaves selection
+generic or explicit.
+
 ## Deferred Items
 
 The following items are intentionally left open for later design work:

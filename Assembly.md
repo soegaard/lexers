@@ -65,15 +65,25 @@ unknown names separately. No selection is silently mapped to generic syntax.
 
 `gas` has no default architecture. Both the lexer and `lexers/asm/detect`
 reject a GNU selection without an explicit supported target. The detection API
-exposes bounded, versioned selection records, but automatic dialect detection
-remains disabled until calibration gates can be met.
+exposes bounded, versioned selection records. Its M7 probe runs the existing
+profile scanners over a fixed byte prefix, records rule-based evidence and
+comment-rule conflicts with byte spans, and scores dialect and architecture
+independently. It retains compatible alternatives and reports macro or
+conditional context rather than treating those observations as unconditional
+file-level settings.
+
+Automatic dialect selection remains disabled until a profile has a held-out
+calibration record. A high or probable probe result is an inspectable hypothesis
+only; callers must keep generic or explicit selection until that gate is met.
 
 ## Follow-on work
 
-M7 is calibrated automatic selection, enabled one profile at a time only after
-audited real-source samples and detection counterexamples are available. M8 is
-additional dialects and representation adapters. Existing profiles must grow
-from their published lexical references and fixture evidence; CPU names and
+M7 automatic enablement is calibrated one profile at a time only after audited
+real-source samples and detection counterexamples are available. The reusable
+probe and its score bands are implemented, but no profile is yet qualified for
+automatic use because no held-out corpus has been admitted in this repository.
+M8 is additional dialects and representation adapters. Existing profiles must
+grow from their published lexical references and fixture evidence; CPU names and
 directive tables alone do not define a source language.
 
 The M4–M6 checks cover profile-specific structures, raw-byte reconstruction,
