@@ -503,6 +503,20 @@
     "entry: mov r0, #42 ; not a generic comment\r\n")
   (define generic-derived
     (asm-string->derived-tokens generic-source))
+  (define generic-convention-derived
+    (asm-string->derived-tokens "; heading\n  ; punctuation\n  move D0,A7\n"))
+  (define generic-convention-semicolons
+    (filter (lambda (token)
+              (string=? (asm-derived-token-text token) ";"))
+            generic-convention-derived))
+  (define generic-data-register
+    (findf (lambda (token)
+             (string=? (asm-derived-token-text token) "D0"))
+           generic-convention-derived))
+  (define generic-address-register
+    (findf (lambda (token)
+             (string=? (asm-derived-token-text token) "A7"))
+           generic-convention-derived))
   (define generic-layout-derived
     (asm-string->derived-tokens "LAB_0120:\n  DS.B 1\n"))
   (define generic-layout-head
@@ -637,6 +651,25 @@
   (check-not-false semicolon-token)
   (check-equal? (asm-derived-token-category semicolon-token) 'operator)
   (check-false (asm-derived-token-has-tag? semicolon-token 'comment))
+  (check-equal? (length generic-convention-semicolons) 2)
+  (check-equal? (asm-derived-token-category
+                 (first generic-convention-semicolons))
+                'comment)
+  (check-true (asm-derived-token-has-tag?
+               (first generic-convention-semicolons)
+               'asm-line-comment))
+  (check-equal? (asm-derived-token-category
+                 (second generic-convention-semicolons))
+                'operator)
+  (check-false (asm-derived-token-has-tag?
+                (second generic-convention-semicolons)
+                'asm-line-comment))
+  (check-not-false generic-data-register)
+  (check-true (asm-derived-token-has-tag? generic-data-register
+                                           'asm-register))
+  (check-not-false generic-address-register)
+  (check-true (asm-derived-token-has-tag? generic-address-register
+                                           'asm-generic-m68k-register))
   (check-not-false generic-layout-head)
   (check-true (asm-derived-token-has-tag? generic-layout-head
                                            'asm-layout-statement-head))

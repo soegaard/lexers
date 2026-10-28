@@ -14,12 +14,19 @@ claim:
 - whitespace;
 - symbol fragments;
 - structural delimiters; and
-- operators, including `;` and `#`, without treating either as a comment.
+- operators, including `;` and `#`, without treating either as an inline
+  comment.
 
 The generic profile does not identify instructions, directives, comment forms,
 quoted strings, a CPU, an assembler implementation, or an output format.
 Unknown source remains source; it is not an error merely because a specific
 assembler has not been selected.
+
+Two narrow source conventions improve generic m68k-oriented previews without
+claiming a full assembler profile: a semicolon in column one starts a line
+comment, and the whole-word spellings `D0`–`D7` and `A0`–`A7` are data and
+address registers. An indented semicolon remains punctuation, as does an
+inline semicolon after source text.
 
 For consumers that preserve conventional fixed-column source layout, an
 ordinary generic symbol beginning after leading whitespace carries the

@@ -34,6 +34,15 @@
   #:mutable
   #:transparent)
 
+;; Generic-profile m68k register spellings retained as useful source conventions.
+(define generic-m68k-registers
+  '(d0 d1 d2 d3 d4 d5 d6 d7 a0 a1 a2 a3 a4 a5 a6 a7))
+
+;; generic-m68k-register? : symbol? -> boolean?
+;;   Recognize one data or address register supported by the generic profile.
+(define (generic-m68k-register? word)
+  (and (memq word generic-m68k-registers) #t))
+
 ;; base-word-character? : char? -> boolean?
 ;;   Recognize a conservative identifier/literal character shared by profiles.
 (define (base-word-character? ch)
@@ -440,6 +449,10 @@
        (values 'keyword
                (list 'keyword 'asm-register
                      (profile-tag spec "register")))]
+      [(and (eq? dialect 'generic)
+            (generic-m68k-register? word))
+       (values 'keyword
+               '(keyword asm-register asm-generic-m68k-register))]
       [(asm-word-instruction? spec text)
        (values 'keyword
                (list 'keyword 'asm-instruction
@@ -572,6 +585,10 @@
   ;;   Determine whether a character starts a profile-specific line comment.
   (define (line-comment-start? ch)
     (or (member ch (asm-dialect-spec-line-comments spec))
+        (and (eq? dialect 'generic)
+             (scanner-state-line-start? state)
+             (not (scanner-state-line-leading-whitespace? state))
+             (char=? ch #\;))
         (and (memq dialect '(native-motorola asmone devpac vasm))
              (scanner-state-line-start? state)
              (char=? ch #\*)) ))
