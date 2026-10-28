@@ -85,6 +85,23 @@
   '(bss cnop dc.b dc.l dc.w dcb.b dcb.l dcb.w ds.b ds.l ds.w end endm equ equr
         even idnt include incbin macro near obj section text xdef xref))
 
+;; The documented default directives for vasm's Mot syntax module.  Devpac
+;; compatibility is a vasm command-line mode with a deliberately smaller
+;; directive set, so it remains the separate `devpac` profile.
+(define vasm-directives
+  '(align blk.b blk.d blk.l blk.q blk.s blk.w blk.x bss bss_c bss_f cargs clrfo
+          clrso cnop code code_c code_f comm comment cseg data data_c data_f db
+          dc.b dc.d dc.l dc.p dc.q dc.s dc.w dc.x dcb.b dcb.d dcb.l dcb.q dcb.s
+          dcb.w dcb.x dl dr.b dr.l dr.w ds.b ds.d ds.l ds.q ds.s ds.w ds.x dseg
+          dw dx.b dx.d dx.l dx.q dx.s dx.w dx.x echo einline else end endm endr
+          equ even fail fequ.b fequ.d fequ.p fequ.s fequ.x idnt if if1 if2 ifb
+          ifc ifd ifeq ifge ifgt ifle iflt ifmacrod ifmacrond ifnb ifnc ifnd
+          ifne ifp1 iif incbin incdir include inline list llen macro mexit msource
+          nolist nopage nref odd offset org output page plen popsection printt
+          printv public pushsection rem rept rorg rs.b rs.d rs.l rs.q rs.s rs.w
+          rs.x rsreset rsset section set setfo setso showoffset spc text ttl
+          xdef xref))
+
 (define kick-directives
   '(|#import| |#importonce| .break .const .disk .else .endif .for .function .if .import
         .label .macro .pc .print .pseudocommand .segment .segmentdef .var
@@ -148,6 +165,9 @@
                 m68k-instructions 'm68k '())]
     [(devpac)
      (make-spec 'devpac 'm68k '(#\;) #f #f motorola-directives '(macro) '(endm)
+                m68k-instructions 'm68k '())]
+    [(vasm)
+     (make-spec 'vasm 'm68k '(#\;) #f #f vasm-directives '(macro) '(endm)
                 m68k-instructions 'm68k '())]
     [(kick)
      (make-spec 'kick 'mos-6502 '() #t #t kick-directives '(.macro) '(.endmacro)

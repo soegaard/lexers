@@ -291,6 +291,11 @@ assembler grammar. GNU `as`-style lexical rules additionally require an
 explicit target architecture, because punctuation and comment conventions vary
 by target.
 
+Profiles distinguish source dialects even when one tool offers another dialect
+as an optional compatibility mode. For example, vasm's default Mot syntax and
+its optional Devpac-compatibility mode are separate selections, so a caller's
+selected lexical contract does not depend on assembler command-line flags.
+
 Profiles expose reusable syntax-role tags rather than renderer classes. The
 assembly lexer preserves source decoding separately from source-language
 encoding directives, and it bounds macro, conditional, script, and namespace

@@ -157,6 +157,12 @@
                        'm68k
                        'devpac
                        "Devpac-compatible Motorola syntax defaults.")
+          'vasm
+          (asm-profile 'vasm
+                       'implemented
+                       'm68k
+                       'vasm
+                       "vasm Motorola-syntax m68k source.")
           'kick
           (asm-profile 'kick
                        'implemented
@@ -511,6 +517,8 @@
     "!cpu 6510\n!zone main\n+draw\n!byte $01 ; tail\n")
   (define motorola-source
     "start: move.l d0,(a0)\n        dc.b 1,2 ; tail\n")
+  (define vasm-source
+    "* heading\nsection code,code\ninclude \"hardware/custom.i\"\nrorg $600\nrsreset\nfield rs.w 1\nif 1\nendif\nmacro emit\n dc.w \\1\nendm\nstart: move.l d0,(a0) ; tail\n")
   (define kick-source
     "#import \"lib.asm\"\n.if (true) { .for (i=0; i<3; i++) { !loop: lda #$00 // tail\n} }\n.endif\n")
   (define tass-source
@@ -535,6 +543,8 @@
     (asm-string->derived-tokens motorola-source #:dialect 'asmone))
   (define devpac-derived
     (asm-string->derived-tokens motorola-source #:dialect 'devpac))
+  (define vasm-derived
+    (asm-string->derived-tokens vasm-source #:dialect 'vasm))
   (define kick-derived
     (asm-string->derived-tokens kick-source #:dialect 'kick))
   (define tass-derived
@@ -555,6 +565,7 @@
           (list (string->bytes/utf-8 motorola-source)    motorola-derived)
           (list (string->bytes/utf-8 motorola-source)    asmone-derived)
           (list (string->bytes/utf-8 motorola-source)    devpac-derived)
+          (list (string->bytes/utf-8 vasm-source)         vasm-derived)
           (list (string->bytes/utf-8 kick-source)        kick-derived)
           (list (string->bytes/utf-8 tass-source)        tass-derived)
           (list (string->bytes/utf-8 gas-m68k-source)    gas-m68k-derived)
@@ -570,6 +581,7 @@
           (collect-derived malformed-profile-source #:dialect 'native-motorola)
           (collect-derived malformed-profile-source #:dialect 'asmone)
           (collect-derived malformed-profile-source #:dialect 'devpac)
+          (collect-derived malformed-profile-source #:dialect 'vasm)
           (collect-derived malformed-profile-source #:dialect 'kick)
           (collect-derived malformed-profile-source #:dialect '|64tass|)
           (collect-derived malformed-profile-source #:dialect 'gas #:architecture 'm68k)
@@ -646,6 +658,7 @@
                                motorola-derived
                                asmone-derived
                                devpac-derived
+                               vasm-derived
                                kick-derived
                                tass-derived
                                gas-m68k-derived
@@ -678,6 +691,10 @@
   (check-true (has-tag? motorola-derived 'native-motorola-instruction))
   (check-true (has-tag? asmone-derived 'asmone-comment))
   (check-true (has-tag? devpac-derived 'devpac-comment))
+  (check-true (has-tag? vasm-derived 'vasm-directive))
+  (check-true (has-tag? vasm-derived 'vasm-instruction))
+  (check-true (has-tag? vasm-derived 'asm-conditional-directive))
+  (check-true (has-tag? vasm-derived 'asm-line-comment))
   (check-true (has-tag? kick-derived 'kick-directive))
   (check-true (has-tag? kick-derived 'kick-immediate-literal))
   (check-true (has-tag? kick-derived 'asm-statement-separator))

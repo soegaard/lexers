@@ -433,6 +433,23 @@
                                      30))]
        [else
         fallback])]
+    [(vasm)
+     (cond
+       [(and directive? (member word '(rorg rsreset rsset incdir inline einline
+                                            pushsection popsection)))
+        (list (make-content-evidence token
+                                     'vasm-mot-directive
+                                     'distinctive
+                                     '(dialect)
+                                     30))]
+       [(and directive? (member word '(cargs clrfo clrso setfo setso showoffset)))
+        (list (make-content-evidence token
+                                     'vasm-offset-directive
+                                     'distinctive
+                                     '(dialect)
+                                     30))]
+       [else
+        fallback])]
     [(gas)
      (case architecture
        [(x86)
@@ -917,6 +934,8 @@
     (resolve-asm-selection #:dialect 'generic))
   (define ca65-selection
     (resolve-asm-selection #:dialect 'ca65))
+  (define vasm-selection
+    (resolve-asm-selection #:dialect 'vasm))
   (define gas-without-target-selection
     (resolve-asm-selection #:dialect 'gas))
   (define gas-x86-selection
@@ -935,6 +954,8 @@
     (probe-asm-bytes #".intel_syntax noprefix\n.code64\nmov rax, 1\n"))
   (define shared-m68k-probe
     (probe-asm-bytes #"move.l d0,(a0)\n"))
+  (define vasm-probe
+    (probe-asm-bytes #"rorg $600\nrsreset\nstart: move.l d0,(a0)\nlea label,a1\nrts\n"))
   (define comment-and-string-probe
     (probe-asm-bytes #"; .setcpu \"6502\"\n\".setcpu \\\"6502\\\"\"\n"))
   (define macro-contained-setting-probe
@@ -963,6 +984,7 @@
   (check-equal? (asm-selection-effective generic-selection) 'generic)
   (check-equal? (asm-selection-origin generic-selection) 'explicit)
   (check-equal? (asm-selection-effective ca65-selection) 'ca65)
+  (check-equal? (asm-selection-effective vasm-selection) 'vasm)
   (check-false (asm-selection-effective gas-without-target-selection))
   (check-equal? (asm-diagnostic-code
                  (car (asm-selection-diagnostics gas-without-target-selection)))
@@ -1007,6 +1029,15 @@
   (check-equal? (asm-auto-selection-architecture
                  (asm-probe-selection shared-m68k-probe))
                 'm68k)
+  (check-equal? (asm-auto-selection-band (asm-probe-selection vasm-probe))
+                'ambiguous)
+  (check-equal? (asm-auto-selection-dialect (asm-probe-selection vasm-probe))
+                'vasm)
+  (check-equal? (asm-auto-selection-architecture (asm-probe-selection vasm-probe))
+                'm68k)
+  (check-false (asm-auto-selection-automatic-enabled?
+                (asm-probe-selection vasm-probe)))
+  (check-true (probe-has-rule? vasm-probe 'vasm-mot-directive))
   (check-equal? (asm-auto-selection-band
                  (asm-probe-selection comment-and-string-probe))
                 'unknown)

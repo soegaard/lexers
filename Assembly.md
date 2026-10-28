@@ -30,6 +30,10 @@ Explicit selections currently provide these profile-owned lexical decisions:
   comments;
 - `native-motorola`, `asmone`, and `devpac`: a conservative m68k baseline for
   mnemonic suffixes, registers, directives, labels, and semicolon comments;
+- `vasm`: vasm's default Mot syntax module for m68k, including its distinct
+  directives, conditional forms, macros, line-leading `*` comments, and
+  semicolon comments. Its optional `-devpac` compatibility mode remains the
+  separate `devpac` profile;
 - `kick`: C-style comments, script braces, directives, and semicolon statement
   separators rather than semicolon comments;
 - `64tass`: source directives, namespace and encoding declarations, macro
@@ -60,7 +64,7 @@ word share a continuation identifier.
 ## Profiles and selection
 
 The profile registry records implemented names (`generic`, `ca65`, `acme`,
-`native-motorola`, `asmone`, `devpac`, `kick`, `64tass`, `gas`, and `nasm`) and
+`native-motorola`, `asmone`, `devpac`, `vasm`, `kick`, `64tass`, `gas`, and `nasm`) and
 unknown names separately. No selection is silently mapped to generic syntax.
 
 `gas` has no default architecture. Both the lexer and `lexers/asm/detect`
@@ -82,11 +86,13 @@ M7 automatic enablement is calibrated one profile at a time only after audited
 real-source samples and detection counterexamples are available. The reusable
 probe and its score bands are implemented, but no profile is yet qualified for
 automatic use because no held-out corpus has been admitted in this repository.
-M8 is additional dialects and representation adapters. Existing profiles must
-grow from their published lexical references and fixture evidence; CPU names and
-directive tables alone do not define a source language.
+M8 is additional dialects and representation adapters. The vasm Mot profile is
+the first M8 dialect addition, based on its published syntax manual and a local
+real-source corpus. Existing profiles must grow from their published lexical
+references and fixture evidence; CPU names and directive tables alone do not
+define a source language.
 
 The M4–M6 checks cover profile-specific structures, raw-byte reconstruction,
-malformed recovery, bounded fragments, and GNU target selection. A corpus
-checker will be added once reviewed local source is admitted; it must skip
-cleanly when the optional corpus directory is absent.
+malformed recovery, bounded fragments, and GNU target selection. The assembly
+corpus checker tests admitted local source under `/tmp/asm-corpus` and skips
+cleanly when that optional directory is absent.

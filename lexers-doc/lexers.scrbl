@@ -3775,8 +3775,8 @@ The profile defaults used by the TSV lexer.}
 @defmodule[lexers/asm]
 
 The assembly lexer provides a conservative, byte-preserving generic profile and
-explicit profiles for ca65, ACME, native Motorola, Asm-One, Devpac, Kick
-Assembler, 64tass, GNU @tt{as}, and NASM. A selected profile recognizes its
+explicit profiles for ca65, ACME, native Motorola, Asm-One, Devpac, vasm Mot,
+Kick Assembler, 64tass, GNU @tt{as}, and NASM. A selected profile recognizes its
 documented lexical structures without claiming that a compatible source file
 identifies a particular assembler executable. Unknown words remain symbols,
 rather than lexer errors.
@@ -3788,6 +3788,10 @@ CPU. In particular, generic `;` and `#` tokens are operators, not comments.
 GNU @tt{as} requires an explicit target architecture: @racket['m68k],
 @racket['x86], @racket['arm], or @racket['aarch64].
 
+The @racket['vasm] profile models the default Motorola syntax module for m68k.
+vasm's optional @tt{-devpac} compatibility mode is represented separately by
+@racket['devpac], so profile selection does not assume command-line options.
+
 The projected API reads a @italic{binary} input port. This keeps byte spans and
 raw fragments authoritative. Use the string convenience procedures for Racket
 strings; their byte spans are defined relative to the string's UTF-8 encoding.
@@ -3795,7 +3799,7 @@ strings; their byte spans are defined relative to the string's UTF-8 encoding.
 @defproc[(make-asm-lexer [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                          [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
                          [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
-                         [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) 'generic]
+                         [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) 'generic]
                          [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f]
                          [#:encoding encoding (or/c 'auto 'utf-8 'utf-16le 'utf-16be) 'auto]
                          [#:fragment-cap fragment-cap exact-positive-integer? 16384])
@@ -3824,7 +3828,7 @@ coloring profile and raises an exception under the compiler profile.
                              [#:profile profile (or/c 'coloring 'compiler) 'coloring]
                              [#:trivia trivia (or/c 'profile-default 'keep 'skip) 'profile-default]
                              [#:source-positions source-positions (or/c 'profile-default boolean?) 'profile-default]
-                             [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) 'generic]
+                             [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) 'generic]
                              [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f]
                              [#:fragment-cap fragment-cap exact-positive-integer? 16384])
          (listof (or/c symbol? token? position-token?))]{
@@ -3833,7 +3837,7 @@ UTF-8 before byte spans are assigned.}
 
 @subsection{Assembly Derived Tokens}
 
-@defproc[(make-asm-derived-lexer [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) 'generic]
+@defproc[(make-asm-derived-lexer [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) 'generic]
                                  [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f]
                                  [#:encoding encoding (or/c 'auto 'utf-8 'utf-16le 'utf-16be) 'auto]
                                  [#:fragment-cap fragment-cap exact-positive-integer? 16384])
@@ -3843,7 +3847,7 @@ owns immutable raw bytes, and derived-token byte spans form a zero-based,
 half-open partition of the input.}
 
 @defproc[(asm-string->derived-tokens [source string?]
-                                     [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) 'generic]
+                                     [#:dialect dialect (or/c 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) 'generic]
                                      [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f]
                                      [#:fragment-cap fragment-cap exact-positive-integer? 16384])
          (listof asm-derived-token?)]{
@@ -3922,7 +3926,7 @@ implementation status, architecture, dialect, and description.}
 @defthing[asm-profiles immutable-hash?]{
 Maps profile names to @racket[asm-profile?] records. Implemented names are
 @racket['generic], @racket['ca65], @racket['acme],
-@racket['native-motorola], @racket['asmone], @racket['devpac],
+@racket['native-motorola], @racket['asmone], @racket['devpac], @racket['vasm],
 @racket['kick], @racket['|64tass|], @racket['gas], and @racket['nasm].
 The @racket['gas] record has no fixed architecture because callers must select
 one of its supported targets explicitly.}
@@ -3934,7 +3938,7 @@ one of its supported targets explicitly.}
 Selection is an inspection API, not an uncalibrated automatic detector.
 With no explicit dialect, it records that automatic selection is disabled.
 
-@defproc[(resolve-asm-selection [#:dialect dialect (or/c #f 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) #f]
+@defproc[(resolve-asm-selection [#:dialect dialect (or/c #f 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) #f]
                                 [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f])
          asm-selection?]{
 Records an explicit profile request without substituting a nearby grammar.
@@ -3943,7 +3947,7 @@ Records an explicit profile request without substituting a nearby grammar.
 or unavailable requests produce diagnostics in the returned record.}
 
 @defproc[(detect-asm-bytes [input bytes?]
-                            [#:dialect dialect (or/c #f 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'kick '|64tass| 'gas 'nasm) #f]
+                            [#:dialect dialect (or/c #f 'generic 'ca65 'acme 'native-motorola 'asmone 'devpac 'vasm 'kick '|64tass| 'gas 'nasm) #f]
                             [#:architecture architecture (or/c #f 'mos-6502 'm68k 'x86 'arm 'aarch64) #f]
                             [#:limit limit exact-positive-integer? 32768])
          asm-detection?]{

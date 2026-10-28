@@ -259,13 +259,18 @@
   ;; conditional-open? : symbol? -> boolean?
   ;;   Recognize a directive that introduces a conservative conditional region.
   (define (conditional-open? word)
-    (member word '(.if .ifdef .ifndef .ifblank .ifnblank !if !ifdef !ifndef
-                       %if %ifdef %ifndef)))
+    (or (member word '(.if .ifdef .ifndef .ifblank .ifnblank !if !ifdef !ifndef
+                         %if %ifdef %ifndef))
+        (and (eq? dialect 'vasm)
+             (member word '(if if1 if2 ifb ifc ifd ifeq ifge ifgt ifle iflt
+                              ifmacrod ifmacrond ifnb ifnc ifnd ifne ifp1)))))
 
   ;; conditional-close? : symbol? -> boolean?
   ;;   Recognize a directive that ends a conditional region.
   (define (conditional-close? word)
-    (member word '(.endif !endif %endif)))
+    (or (member word '(.endif !endif %endif))
+        (and (eq? dialect 'vasm)
+             (eq? word 'endif))))
 
   ;; update-directive-state! : string? -> void?
   ;;   Apply only local, lexical setting changes outside macros and conditionals.
@@ -423,7 +428,9 @@
                        (cond
                          [(or (conditional-open? word)
                               (conditional-close? word)
-                              (member word '(.else !else %else)))
+                              (member word '(.else !else %else))
+                              (and (eq? dialect 'vasm)
+                                   (eq? word 'else)))
                           '(asm-conditional-directive)]
                          [else '()])
                        (list (profile-tag spec "directive"))))]
@@ -551,7 +558,7 @@
   ;;   Determine whether a character starts a profile-specific line comment.
   (define (line-comment-start? ch)
     (or (member ch (asm-dialect-spec-line-comments spec))
-        (and (memq dialect '(native-motorola asmone devpac))
+        (and (memq dialect '(native-motorola asmone devpac vasm))
              (scanner-state-line-start? state)
              (char=? ch #\*)) ))
 
